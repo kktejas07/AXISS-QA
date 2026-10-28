@@ -1,8 +1,0 @@
-{% for item in financials %}
-    <div class="p-5 rounded-20 bg-blue border border-lineColor/70 text-center" data-sttr-card>
-        <h3 class="text-3xl md:text-4xl lg:text-[40px] font-semibold sm:tracking-[-0.2px]">{{ item.symbol }} <span class="counter" data-target="{{ item.target }}">{{ item.number }}</span>{{ item.symbol2 }}<span class="{{ item.style }}">{{ item.symbol3 }}</span></h3>
-        <h5 class="font-dmSans font-medium text-lg md:text-xl sm:tracking-[-0.2px] text-offWhite/80 mt-2">{{ item.title }}</h5>
-        <div class="my-4 sm:my-6 gradient-border max-w-[320px] mx-auto w-full h-[1px]"></div>
-        <p class="text-white/80 tracking-[0.1px]">{{ item.desc }}</p>
-    </div>
-{% endfor %}
