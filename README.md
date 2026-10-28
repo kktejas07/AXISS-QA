@@ -110,19 +110,24 @@ npm run web                 # http://localhost:8081
 
 ## Deploying on Dokploy / Dockply
 
-Two apps, one repository. Each app uses the Dockerfile in its own subdirectory.
+Two apps, one repository. Both use the Dockerfile inside their own subdirectory.
+
+> Dokploy joins **Build Path + Docker File** to locate the Dockerfile, but resolves **Docker Context Path** from the repo root. So the values below are not the same for every field.
 
 ### 1. API
 
-| Setting        | Value                                          |
-| -------------- | ---------------------------------------------- |
-| Build type     | Dockerfile                                     |
-| Base directory | `backend`                                      |
-| Dockerfile     | `Dockerfile`                                   |
-| Port           | `3000`                                         |
-| Health check   | `/api/health`                                  |
+| Setting            | Value                |
+| ------------------ | -------------------- |
+| Build Type         | Dockerfile           |
+| Build Path         | `backend`            |
+| Docker File        | `Dockerfile`         |
+| Docker Context Path| `backend`            |
+| Watch Paths        | `backend/**`         |
+| Trigger Type       | On Push              |
+| Container port     | `3000`               |
+| Health check       | `/api/health`        |
 
-Environment:
+Environment (runtime):
 
 ```env
 DATABASE_URL=postgresql://postgres:<password>@<db-service-host>:5432/<database>
@@ -134,14 +139,17 @@ The schema is created on boot, so no manual migration step is needed. To run it 
 
 ### 2. Web (coming soon page)
 
-| Setting        | Value                              |
-| -------------- | ---------------------------------- |
-| Build type     | Dockerfile                         |
-| Base directory | `frontend`                         |
-| Dockerfile     | `Dockerfile`                       |
-| Port           | `80`                               |
+| Setting            | Value                |
+| ------------------ | -------------------- |
+| Build Type         | Dockerfile           |
+| Build Path         | `frontend`           |
+| Docker File        | `Dockerfile`         |
+| Docker Context Path| `frontend`           |
+| Watch Paths        | `frontend/**`        |
+| Trigger Type       | On Push              |
+| Container port     | `80`                 |
 
-Build argument:
+**Environment tab → Build Time Arguments** (not runtime variables):
 
 ```env
 EXPO_PUBLIC_API_URL=https://<your-api-domain>
