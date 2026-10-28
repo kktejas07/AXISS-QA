@@ -1,6 +1,5 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from slugify import slugify
 from . import context_processors
 import os
 from dotenv import load_dotenv
@@ -35,6 +34,5 @@ def create_app():
     # Register the blueprint (routes)
     from .routes import main
     app.register_blueprint(main)
-    app.jinja_env.filters['slugify'] = slugify
 
     return app

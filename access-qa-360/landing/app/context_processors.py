@@ -1,6 +1,5 @@
 # app/context_processors.py
 from flask import request
-from slugify import slugify
 
 # logos data
 
