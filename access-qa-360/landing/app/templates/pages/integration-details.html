@@ -1,0 +1,120 @@
+{% extends "Base/base.html" %}
+
+{% block hero_content %}
+
+{% include 'Base/navbar.html' %}
+
+<!-- Components/Home/index/preloader.html -->
+{% include 'Components/Home/index/preloader.html' %}
+
+<div id="smooth-wrapper">
+    <div id="smooth-content">
+        <div class="header-innerHeight">
+            <div class="container">
+                <div class="border-container"></div>
+            </div>
+        </div>
+        <!-- Integration Details Area Start -->
+        <section class="section-bottom-border">
+            <div class="container">
+                <div class="border-container section-spacing-lg" data-sttr-wrapper>
+                    <div class="text-center max-w-[600px] mx-auto">
+                        <div class="flex items-center justify-center gap-0" data-sttr-card>
+                            <div class="w-21 h-21 rounded-full bg-white flex items-center justify-center">
+                                <img src="{{ url_for('static', filename='assets/img/integration/taskpilot.svg') }}" alt="TaskPilot logo">
+                            </div>
+                            <div class="-ml-5 w-21 h-21 rounded-full bg-white flex items-center justify-center shadow-[-5.25px_5.25px_5.25px_0px_rgba(0,0,0,0.35)]">
+                                <img src="{{ url_for('static', filename='assets/img/integration/riteflow-logo.svg') }}" alt="RiteFlow logo">
+                            </div>
+                        </div>
+                        <h1 class="text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] font-semibold tracking-[-0.4px] text-white mt-5" data-sttr-card>TaskPilot + Riteflow</h1>
+                        <p class="mt-5" data-sttr-card>AI-driven project manager that syncs tasks, deadlines, and team chat so RiteFlow automations can update status, assign owners, and surface next steps in real time.</p>
+                    </div>
+                    <div class="my-10 md:my-13 gradient-border w-full h-[1px] max-w-[306px] mx-auto" data-sttr-card></div>
+                    <div class="max-w-[793px] mx-auto" data-sttr-card>
+                        <article class="article-content">
+                            <h5>Seamless Productivity: TaskPilot Now Integrates with RiteFlow</h5>
+                            <p>In today's fast-moving digital landscape, tools that work together win. That's why we're thrilled to announce our latest integration — TaskPilot + RiteFlow — a powerful combination that brings intelligent automation directly into your task management system.</p>
+                            <p>Whether you're managing a solo project or leading a global team, this integration helps you save time, reduce manual effort, and keep everything flowing with AI precision.</p>
+                            <figure>
+                                <a data-fslightbox="gallery" href="{{ url_for('static', filename='assets/img/blog/blog-details.jpg') }}">
+                                    <img src="{{ url_for('static', filename='assets/img/blog/blog-details.jpg') }}" alt="Dashboard screenshot of TaskPilot integration">
+                                </a>
+                                <figcaption>Full Width Image</figcaption>
+                            </figure>
+                            <h5>Why Integrate TaskPilot with RiteFlow?</h5>
+                            <p>TaskPilot is loved for its intuitive task boards, flexible workflows, and real-time collaboration. RiteFlow, on the other hand, brings smart AI that can automate, suggest, and analyze.</p>
+                            <p>Together, they create a connected workspace where tasks get done faster, decisions get smarter, and teams stay focused on what really matters.</p>
+<pre>
+<code>
+
+const homeBtn = document.querySelector(&quot;.scroll-to-home&quot;);
+homeBtn.addEventListener(&quot;click&quot;, (e) =&gt; {
+  e.preventDefault();
+  const target = document.querySelector(&quot;#home&quot;);
+
+  if (window.ScrollSmoother) {
+    const smoother = ScrollSmoother.get();
+    smoother.scrollTo(target, true, &quot;top top&quot;);
+  } else {
+    target.scrollIntoView({ behavior: &quot;smooth&quot; });
+  }
+});
+
+</code>
+</pre>
+                            <h5>What This Integration Unlocks</h5>
+                            <p>What This Integration Unlocks</p>
+                            <h6>✅ AI-Powered Task Recommendations</h6>
+                            <p>RiteFlow analyzes your task history and project goals to suggest next steps, flag bottlenecks, and even auto-generate subtasks.</p>
+                            <h6>✅ Intelligent Summaries & Reports</h6>
+                            <p>Need to update your team or stakeholders? Automatically generate clean summaries of progress, blockers, and deadlines — ready to send or present.</p>
+                            <h6>✅ Context-Aware Suggestions</h6>
+                            <p>Get smart tips based on task descriptions, assignee history, and past outcomes. From re-prioritization to deadline adjustments, our AI adapts in real time.</p>
+                            <h6>✅ Automated Workflows</h6>
+                            <p>Set up triggers that connect your tools — like auto-assigning tasks after content approval, or creating follow-ups when deadlines shift.</p>
+                            <figure>
+                                <a data-fslightbox="gallery" href="{{ url_for('static', filename='assets/img/about/banner-thumb.jpg') }}">
+                                    <img src="{{ url_for('static', filename='assets/img/about/banner-thumb.jpg') }}" alt="AI workflow integration visual">
+                                </a>
+                                <figcaption>Full Width Image</figcaption>
+                            </figure>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Integration Details Area End -->
+
+        <!-- Releted Integration Area Start -->
+        <section class="section-bottom-border relative z-1">
+            <div class="container">
+                <div class="border-container section-spacing-lg" data-sttr-wrapper="">
+                    <!-- Section Title -->
+                    <div class="text-center mb-10 sm:mb-12 md:mb-15" data-sttr-card>
+                        <h2 class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] font-semibold -tracking-[0.4px] !leading-[1.2]">Related Integrations</h2>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+
+                        <!-- Components/All-Pages/integration/related-integrations.html -->
+                        {% include 'Components/All-Pages/integration/related-integrations.html' %}
+
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Related Integration Area End -->
+
+        <!-- Base/footer.html -->
+        {% include 'Base/footer.html' %}
+
+    </div>
+</div>
+
+<!-- Components/Home/index/scrollTop.html -->
+{% include 'Components/Home/index/scrollTop.html' %}
+
+<!-- Components/Home/index/symbol.html -->
+{% include 'Components/Home/index/symbol.html' %}
+    
+{% endblock %}

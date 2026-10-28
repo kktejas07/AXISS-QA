@@ -1,0 +1,248 @@
+{% extends "Base/base.html" %}
+
+{% block hero_content %}
+
+{% include 'Base/navbar.html' %}
+
+<!-- Components/Home/index/preloader.html -->
+{% include 'Components/Home/index/preloader.html' %}
+
+<div id="smooth-wrapper">
+    <div id="smooth-content">
+        <div class="header-innerHeight">
+            <div class="container">
+                <div class="border-container"></div>
+            </div>
+        </div>
+        <!-- Banner Area Start -->
+        <section class="section-bottom-border relative z-1 overflow-hidden" data-hero-section>
+            <img src="{{ url_for('static', filename='assets/img/home/banner-bg.webp') }}" 
+                alt="banner-circles-shape"
+                class="absolute w-full h-full top-0 left-0 z-[-1]"
+                data-bg-shape
+                data-lag="0.2"
+                data-speed="0.6"
+            >
+            <div class="container">
+                <div class="border-container pt-14 sm:pt-[72px] relative z-1">
+                    <div class="max-w-[500px] lg:max-w-[670px] mx-auto text-center">
+                        <span data-subtitle class="badge-button" >AI-Powered QE + Cyber Security Platform</span>
+                        <h1 data-title class="font-semibold !leading-[1.2] gradient-text mt-5" >One Scan. Vulnerabilities, QA Gaps & <span class="font-instrument italic font-medium">Test Cases.</span></h1>
+                        <p data-excerpt class="mt-2 sm:mt-5 text-base sm:text-lg md:text-xl font-medium tracking-[0.2px] text-offWhite/80" >Paste any URL. Get OWASP vulnerability findings, QA coverage gaps, and AI-generated test cases — manual, automated, performance, and security — all in one report.</p>
+                        <div data-button class="mt-5 sm:mt-8 lg:mt-10" >
+                            <a href="http://localhost:5173/login" class="button-secondary">Start Free</a>
+                        </div>
+                    </div>
+                    <div  data-thumbnail class="home-banner-dashboard mt-10 lg:mt-11.5 rounded-t-[20px] overflow-hidden p-1 sm:p-2.5 !pb-0 border border-tertiary/20 border-b-0 bg-linear-to-b from-tertiary/20 to-primary/20 glowing-border" >
+                        <img class="rounded-t-[20px] w-full" src="{{ url_for('static', filename='assets/img/home/banner-dashboard.png') }}" alt="dashboard">
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Banner Area End -->
+
+        <!-- Logo Slider Area Start -->
+        <section class="section-bottom-border relative z-10" data-sttr-wrapper>
+            <div class="container data-sttr-card" data-sttr-card>
+                <div class="border-container py-14 sm:py-16">
+                    <h2 class="text-xl leading-none font-normal font-dmSans text-offWhite/80 mb-8 text-center" >Trusted by engineering teams worldwide</h2>
+                    <div class="overflow-hidden relative">
+                        <div class="absolute w-[10%] h-full top-0 left-0 bg-linear-to-r from-secondary to-secondary/0 z-10">
+                        </div>
+                        <!-- Logos -->
+                        <div class="swiper logo-auto-slider">
+                            <div class="swiper-wrapper">
+
+                                <!-- Components/Home/index/logos.html -->
+                                {% include 'Components/Home/index/logos.html' %}
+
+                            </div>
+                        </div>
+                        <div class="absolute w-[10%] h-full top-0 right-0 bg-linear-to-r from-secondary/0 to-secondary z-10">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Logo Slider Area End -->
+
+        <!-- About Area Start -->
+        <section class="section-bottom-border relative z-10">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+
+                    <!-- Components/Home/index/about.html -->
+                    {% include 'Components/Home/index/about.html' %}
+
+                </div>
+            </div>
+        </section>
+        <!-- About Area End -->
+
+        <!-- Process Area Start -->
+        <section class="section-bottom-border" id="process-area" data-container="process-area">
+            <div class="container">
+                <div class="border-container section-spacing-lg sticky-cards">
+                    <div class="flex items-start justify-between gap-10 relative flex-col md:flex-row process-wrapper">
+                        <div class="max-w-[520px] md:max-w-[560px] w-full md:sticky sticky-card">
+                            <h2 data-title class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] font-semibold -tracking-[0.4px] !leading-[1.1]" >How It Works</h2>
+                            <p data-excerpt class="mt-4 md:mt-5 text-offWhite/80" >Three steps from URL to complete security + QA report. Paste a URL, let AI scan for vulnerabilities and coverage gaps, and get production-ready test cases.</p>
+                        </div>
+                        <div class="md:max-w-[560px] w-full flex flex-col gap-5" data-card>
+
+                            <!-- Components/Home/index/process.html -->
+                            {% include 'Components/Home/index/process.html' %}
+
+                        </div>
+                    </div>
+                    <section class="process-end md:h-[150px]"></section>
+                </div>
+                
+            </div>
+        </section>
+        <!-- Process Area End -->
+        
+        <!-- Use Cases Area Start -->
+        <section class="section-bottom-border">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+                    <!-- Section Title -->
+                    <div class="max-w-[450px] sm:max-w-[520px] lg:max-w-[600px] mx-auto text-center mb-10 sm:mb-12 md:mb-16 xl:mb-20" data-section-title>
+                        <span class="badge-button mb-5 " data-subtitle>Platform Modules</span>
+                        <h2 class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] !leading-[1.2] font-semibold -tracking-[0.4px] overflow-hidden" data-title>Eight Modules. One Platform.</h2>
+                        <p class="mt-4 md:mt-5 text-offWhite/80 overflow-hidden" data-excerpt>From URL scanning and OWASP vulnerability detection to AI test generation and compliance reporting — every capability in a single workflow.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" data-sttr-wrapper>
+
+                        <!-- Components/Home/index/cases.html -->
+                        {% include 'Components/Home/index/cases.html' %}
+
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Use Cases Area End -->
+
+        <!-- Workflow Area Start -->
+        <section class="section-bottom-border">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+
+                    <!-- Components/Home/index/workflow.html -->
+                    {% include 'Components/Home/index/workflow.html' %}
+
+                </div>
+            </div>
+        </section>
+        <!-- Workflow Area End -->
+
+        <!-- Testimonial Area Start -->
+        <section class="section-bottom-border">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+                    <!-- Section Title -->
+                    <div class="max-w-[450px] sm:max-w-[520px] lg:max-w-[600px] mx-auto text-center mb-10 sm:mb-12 md:mb-16 xl:mb-20" data-section-title>
+                        <span class="badge-button mb-5 " data-subtitle>Testimonials</span>
+                        <h2 class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] !leading-[1.2] font-semibold -tracking-[0.4px] overflow-hidden" data-title>Trusted by Security & QA Teams</h2>
+                        <p class="mt-4 md:mt-5 text-offWhite/80 overflow-hidden" data-excerpt>From solo developers to enterprise security teams, see how Access QA 360 replaces six tools with one unified platform.</p>
+                    </div>
+                    <div class="relative" data-lag="0.3">
+                        <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-5 overflow-hidden relative h-[500px] sm:h-[700px] testimonial-wrapper" >
+                            <div class="flex flex-col gap-5 auto-scroll-content">
+
+                                <!-- Components/Home/index/testimonial.html -->
+                                {% include 'Components/Home/index/testimonial.html' %}
+
+                            </div>
+                            <div class="hidden sm:flex flex-col gap-5 auto-scroll-content-reverse">
+
+                                <!-- Components/Home/index/testimonial2.html -->
+                                {% include 'Components/Home/index/testimonial2.html' %}
+
+                            </div>
+                            <div class="hidden md:flex flex-col gap-5 auto-scroll-content">
+
+                                <!-- Components/Home/index/testimonial3.html -->
+                                {% include 'Components/Home/index/testimonial3.html' %}
+
+                            </div>
+                        </div>
+                        <div class="testimonial-overlay h-[calc(100%+10px)] !top-[-5px] pointer-events-none"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Testimonial Area End -->
+
+        <!-- Pricing Table Area Start -->
+        <section class="section-bottom-border">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+                    <!-- Section Title -->
+                    <div class="max-w-[450px] sm:max-w-[520px] lg:max-w-[600px] mx-auto text-center mb-10 sm:mb-12 md:mb-16 xl:mb-20" data-section-title>
+                        <span class="badge-button mb-5 " data-subtitle>Pricing Plans</span>
+                        <h2 class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] !leading-[1.2] font-semibold -tracking-[0.4px] overflow-hidden" data-title>Replace Six Tools for $199/mo</h2>
+                        <p class="mt-4 md:mt-5 text-offWhite/80 overflow-hidden" data-excerpt>Teams pay $1,472/month across OWASP ZAP, Burp Suite, TestRail, Selenium IDE, and Snyk. Access QA 360 does it all — start free, go Pro at $199.</p>
+                    </div>
+                    <!-- Pricing Table -->
+                    <div class="flex flex-col items-center" data-sttr-wrapper>
+                        <div data-sttr-card>
+                            <div class="toggle-wrapper inline-flex items-center justify-center gap-4 relative" data-lag="0.05" >
+                                <div class="flex items-end sm:items-start gap-1.5 absolute left-[80%] sm:left-full bottom-full">
+                                    <!-- <svg id="myShape" width="36" height="20" viewBox="0 0 36 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M35.4425 1.05272C35.8034 1.27768 35.9136 1.7526 35.6886 2.11349C35.4636 2.47437 34.9887 2.58456 34.6278 2.3596L35.0352 1.70616L35.4425 1.05272ZM15.0222 10.8354L14.2599 10.9446L15.0222 10.8354ZM27.204 6.08888L27.7276 5.52431L27.204 6.08888ZM1.62019 18.9488C1.19753 18.9957 0.816829 18.6912 0.769865 18.2685L0.00454224 11.3809C-0.0424219 10.9582 0.262138 10.5775 0.684796 10.5306C1.10745 10.4836 1.48816 10.7882 1.53512 11.2108L2.21541 17.3331L8.33773 16.6528C8.76039 16.6059 9.14109 16.9104 9.18806 17.3331C9.23502 17.7558 8.93046 18.1365 8.5078 18.1834L1.62019 18.9488ZM35.0352 1.70616L34.6278 2.3596C34.4838 2.26984 34.062 2.11601 33.3247 1.96494C32.6225 1.82105 31.7193 1.69596 30.6886 1.61932C28.6244 1.46584 26.0968 1.51025 23.7029 1.96138C21.296 2.41497 19.1093 3.26371 17.6373 4.65131C16.206 6.00048 15.3826 7.92022 15.7844 10.7263L15.0222 10.8354L14.2599 10.9446C13.7916 7.67385 14.7628 5.24455 16.581 3.5307C18.3583 1.8553 20.8758 0.927057 23.4177 0.448022C25.9727 -0.0334738 28.6387 -0.0773411 30.8028 0.0835597C31.8862 0.164116 32.8559 0.296875 33.6339 0.456291C34.3768 0.608532 35.0426 0.80347 35.4425 1.05272L35.0352 1.70616ZM15.0222 10.8354L15.7844 10.7263C16.3581 14.7331 17.8982 16.7615 19.5609 17.6027C21.2364 18.4503 23.2624 18.2088 25.0513 17.1959C26.8414 16.1823 28.2719 14.4589 28.7417 12.5556C29.1995 10.7009 28.769 8.59057 26.6804 6.65344L27.204 6.08888L27.7276 5.52431C30.2071 7.82397 30.8352 10.5007 30.2369 12.9246C29.6506 15.3 27.9104 17.3467 25.8101 18.5359C23.7087 19.7258 21.1249 20.1198 18.8657 18.9769C16.594 17.8275 14.8749 15.2393 14.2599 10.9446L15.0222 10.8354ZM27.204 6.08888L26.6804 6.65344C24.1154 4.27451 21.4923 3.69823 18.948 4.14377C16.3543 4.59794 13.7748 6.12828 11.4057 8.10106C6.65559 12.0567 3.06834 17.4996 2.13643 18.6645L1.53516 18.1835L0.933884 17.7024C1.74223 16.692 5.51052 11.0062 10.4203 6.91765C12.8812 4.86835 15.7077 3.14775 18.6823 2.62685C21.7063 2.09732 24.8137 2.82183 27.7276 5.52431L27.204 6.08888Z" fill="#A78BFA"/>
+                                    </svg>  -->
+                                    <svg width="36" height="20" viewBox="0 0 36 20" xmlns="http://www.w3.org/2000/svg">
+                                        <defs>
+                                            <mask id="drawMask">
+                                            <rect width="36" height="20" fill="black"/>
+                                            <path id="revealStroke" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M35.4425 1.05272C35.8034 1.27768 35.9136 1.7526 35.6886 2.11349C35.4636 2.47437 34.9887 2.58456 34.6278 2.3596L35.0352 1.70616L35.4425 1.05272ZM15.0222 10.8354L14.2599 10.9446L15.0222 10.8354ZM27.204 6.08888L27.7276 5.52431L27.204 6.08888ZM1.62019 18.9488C1.19753 18.9957 0.816829 18.6912 0.769865 18.2685L0.00454224 11.3809C-0.0424219 10.9582 0.262138 10.5775 0.684796 10.5306C1.10745 10.4836 1.48816 10.7882 1.53512 11.2108L2.21541 17.3331L8.33773 16.6528C8.76039 16.6059 9.14109 16.9104 9.18806 17.3331C9.23502 17.7558 8.93046 18.1365 8.5078 18.1834L1.62019 18.9488ZM35.0352 1.70616L34.6278 2.3596C34.4838 2.26984 34.062 2.11601 33.3247 1.96494C32.6225 1.82105 31.7193 1.69596 30.6886 1.61932C28.6244 1.46584 26.0968 1.51025 23.7029 1.96138C21.296 2.41497 19.1093 3.26371 17.6373 4.65131C16.206 6.00048 15.3826 7.92022 15.7844 10.7263L15.0222 10.8354L14.2599 10.9446C13.7916 7.67385 14.7628 5.24455 16.581 3.5307C18.3583 1.8553 20.8758 0.927057 23.4177 0.448022C25.9727 -0.0334738 28.6387 -0.0773411 30.8028 0.0835597C31.8862 0.164116 32.8559 0.296875 33.6339 0.456291C34.3768 0.608532 35.0426 0.80347 35.4425 1.05272L35.0352 1.70616ZM15.0222 10.8354L15.7844 10.7263C16.3581 14.7331 17.8982 16.7615 19.5609 17.6027C21.2364 18.4503 23.2624 18.2088 25.0513 17.1959C26.8414 16.1823 28.2719 14.4589 28.7417 12.5556C29.1995 10.7009 28.769 8.59057 26.6804 6.65344L27.204 6.08888L27.7276 5.52431C30.2071 7.82397 30.8352 10.5007 30.2369 12.9246C29.6506 15.3 27.9104 17.3467 25.8101 18.5359C23.7087 19.7258 21.1249 20.1198 18.8657 18.9769C16.594 17.8275 14.8749 15.2393 14.2599 10.9446L15.0222 10.8354ZM27.204 6.08888L26.6804 6.65344C24.1154 4.27451 21.4923 3.69823 18.948 4.14377C16.3543 4.59794 13.7748 6.12828 11.4057 8.10106C6.65559 12.0567 3.06834 17.4996 2.13643 18.6645L1.53516 18.1835L0.933884 17.7024C1.74223 16.692 5.51052 11.0062 10.4203 6.91765C12.8812 4.86835 15.7077 3.14775 18.6823 2.62685C21.7063 2.09732 24.8137 2.82183 27.7276 5.52431L27.204 6.08888Z"/>
+                                            </mask>
+                                        </defs>
+
+                                        <path fill="#A78BFA" mask="url(#drawMask)" d="M35.4425 1.05272C35.8034 1.27768 35.9136 1.7526 35.6886 2.11349C35.4636 2.47437 34.9887 2.58456 34.6278 2.3596L35.0352 1.70616L35.4425 1.05272ZM15.0222 10.8354L14.2599 10.9446L15.0222 10.8354ZM27.204 6.08888L27.7276 5.52431L27.204 6.08888ZM1.62019 18.9488C1.19753 18.9957 0.816829 18.6912 0.769865 18.2685L0.00454224 11.3809C-0.0424219 10.9582 0.262138 10.5775 0.684796 10.5306C1.10745 10.4836 1.48816 10.7882 1.53512 11.2108L2.21541 17.3331L8.33773 16.6528C8.76039 16.6059 9.14109 16.9104 9.18806 17.3331C9.23502 17.7558 8.93046 18.1365 8.5078 18.1834L1.62019 18.9488ZM35.0352 1.70616L34.6278 2.3596C34.4838 2.26984 34.062 2.11601 33.3247 1.96494C32.6225 1.82105 31.7193 1.69596 30.6886 1.61932C28.6244 1.46584 26.0968 1.51025 23.7029 1.96138C21.296 2.41497 19.1093 3.26371 17.6373 4.65131C16.206 6.00048 15.3826 7.92022 15.7844 10.7263L15.0222 10.8354L14.2599 10.9446C13.7916 7.67385 14.7628 5.24455 16.581 3.5307C18.3583 1.8553 20.8758 0.927057 23.4177 0.448022C25.9727 -0.0334738 28.6387 -0.0773411 30.8028 0.0835597C31.8862 0.164116 32.8559 0.296875 33.6339 0.456291C34.3768 0.608532 35.0426 0.80347 35.4425 1.05272L35.0352 1.70616ZM15.0222 10.8354L15.7844 10.7263C16.3581 14.7331 17.8982 16.7615 19.5609 17.6027C21.2364 18.4503 23.2624 18.2088 25.0513 17.1959C26.8414 16.1823 28.2719 14.4589 28.7417 12.5556C29.1995 10.7009 28.769 8.59057 26.6804 6.65344L27.204 6.08888L27.7276 5.52431C30.2071 7.82397 30.8352 10.5007 30.2369 12.9246C29.6506 15.3 27.9104 17.3467 25.8101 18.5359C23.7087 19.7258 21.1249 20.1198 18.8657 18.9769C16.594 17.8275 14.8749 15.2393 14.2599 10.9446L15.0222 10.8354ZM27.204 6.08888L26.6804 6.65344C24.1154 4.27451 21.4923 3.69823 18.948 4.14377C16.3543 4.59794 13.7748 6.12828 11.4057 8.10106C6.65559 12.0567 3.06834 17.4996 2.13643 18.6645L1.53516 18.1835L0.933884 17.7024C1.74223 16.692 5.51052 11.0062 10.4203 6.91765C12.8812 4.86835 15.7077 3.14775 18.6823 2.62685C21.7063 2.09732 24.8137 2.82183 27.7276 5.52431L27.204 6.08888Z"/>
+                                    </svg>
+
+                                    <span class="text-tertiary text-sm font-medium sm:whitespace-nowrap">20% Saved</span>
+                                </div>
+                                <span class="monthly text-base sm:text-lg sm:-tracking-[0.2px] text-offWhite/40 duration-300">Monthly</span>
+                                <label class="pricing-switch relative inline-block w-14 h-7 rounded-2xl bg-tertiary cursor-pointer">
+                                    <input type="checkbox" id="priceToggle" class="hidden">
+                                    <span class="pricing-switch-slider absolute w-5 h-5 rounded-full bg-offWhite top-1 left-1 transition-transform duration-300"></span>
+                                </label>
+                                <span class="yearly text-base sm:text-lg sm:-tracking-[0.2px] text-offWhite/40 duration-300">Yearly</span>
+                            </div>
+                        </div>
+
+                        <div class="pricing-table grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-10 sm:mt-12" data-lag="0.1">
+                            
+                            <!-- Components/Home/index/pricings.html -->
+                            {% include 'Components/Home/index/pricings.html' %}
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Pricing Table Area End -->
+
+        <!-- Components/Home/index/newsletter.html -->
+        {% include 'Components/Home/index/newsletter.html' %}
+
+        <!-- Base/footer.html -->
+        {% include 'Base/footer.html' %}
+        
+    </div>
+</div>
+
+<!-- Components/Home/index/popup.html -->
+{% include 'Components/Home/index/popup.html' %}
+
+<!-- Components/Home/index/scrollTop.html -->
+{% include 'Components/Home/index/scrollTop.html' %}
+
+<!-- Components/Home/index/symbol.html -->
+{% include 'Components/Home/index/symbol.html' %}
+
+{% endblock %}

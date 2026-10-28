@@ -1,0 +1,25 @@
+{% for item in researchs %}
+    <div class="bg-blue rounded-20 border-moving relative before:rounded-xl sm:before:rounded-2xl md:before:rounded-[20px] group p-2.5 flex flex-col gap-2.5" data-sttr-card>
+        <a href="javascript:void(0)"
+            class="w-full flex items-center justify-center bg-linear-to-b from-slateBlue/20 to-royalBlue/20 rounded-20 p-10 h-[120px]">
+            <img src="{{ item.img }}" alt="research" class="duration-300 group-hover:scale-110">
+        </a>
+        <div class="p-2.5 flex items-center justify-between">
+            <div class="flex-1">
+                <h3 class="text-lg text-offWhite font-medium font-dmSans">{{ item.name }}</h3>
+                <p class="text-sm text-offWhite/60">{{ item.title }}</p>
+            </div>
+            <a href="javascript:void(0)"
+                class="w-11 h-9 flex items-center justify-center bg-linear-to-b from-slateBlue/20 to-royalBlue/20 rounded-[10px] relative overflow-hidden">
+                <svg
+                    class="w-6 h-6 fill-current text-white transition-all duration-300 ease-in-out group-hover:translate-x-6 group-hover:-translate-y-5 group-hover:opacity-0">
+                    <use href="#arrowTopRight-icon"></use>
+                </svg>
+                <svg
+                    class="w-6 h-6 fill-current text-white absolute transform -translate-x-6 translate-y-5 transition-all duration-300 ease-in-out group-hover:translate-x-0 group-hover:-translate-y-0 opacity-0 group-hover:opacity-100">
+                    <use href="#arrowTopRight-icon"></use>
+                </svg>
+            </a>
+        </div>
+    </div>
+{% endfor %}

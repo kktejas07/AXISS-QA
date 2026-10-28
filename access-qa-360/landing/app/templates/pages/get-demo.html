@@ -1,0 +1,155 @@
+{% extends "Base/base.html" %}
+
+{% block hero_content %}
+
+{% include 'Base/navbar.html' %}
+
+<!-- Components/Home/index/preloader.html -->
+{% include 'Components/Home/index/preloader.html' %}
+
+<div id="smooth-wrapper">
+    <div id="smooth-content">
+        <div class="header-innerHeight">
+            <div class="container">
+                <div class="border-container"></div>
+            </div>
+        </div>
+        <!-- Get A Demo Area Start -->
+        <section class="section-bottom-border relative z-1">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+                    <div class="rounded-20 py-8 px-5 sm:p-9 bg-blue overflow-hidden">
+                        <div class="flex justify-between gap-10 flex-col lg:flex-row">
+                            <div class="lg:max-w-[487px] w-full flex flex-col md:flex-row lg:flex-col justify-between gap-6 sm:gap-10">
+                                <div class="sm:max-w-[487px] lg:max-w-none" data-container="process-area">
+                                    <h1 data-title class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] font-semibold -tracking-[0.4px] !leading-[1.1]" >
+                                        Get Your Free Demo
+                                    </h1>
+                                    <p data-excerpt class="mt-4 md:mt-5 text-offWhite/80" >
+                                        Book a personalized demo and discover how RiteFlow fits your workflow. We'll show you real use cases, answer questions, and tailor solutions to your goals.
+                                    </p>
+                                </div>
+                                <div class="flex flex-col gap-4" data-sttr-wrapper data-lag="0.1">
+                                    <div class="px-5 pt-5 pb-6 md:pb-10 rounded-20 bg-linear-to-b from-slateBlue/20 to-royalBlue/20 border border-lineColor/70 relative overflow-hidden">
+                                        <div class="flex items-center gap-4" data-sttr-card>
+                                            <img class="w-10.5 h-10.5 object-cover rounded-full" src="{{ url_for('static', filename='assets/img/home/testimonial/testimonial-05.jpg') }}" alt="Photo of Michael Tan – Product Manager at NexaCore">
+                                            <div class="flex-1">
+                                                <h3 class="font-dmSans text-offWhite text-base leading-tight font-normal">Michael Tan</h3>
+                                                <p class="text-offWhite/60 text-sm leading-tight mt-1">Product Manager, NexaCore</p>
+                                            </div>
+                                        </div>
+                                        <div class="my-4 md:my-5 lg:my-6 gradient-border w-full h-[1px]" data-sttr-card></div>
+                                        <p class="text-offWhite" data-sttr-card>"We integrated RiteFlow into our dev pipeline and were blown away. The AI suggestions saved us from endless backlog grooming and helped ship 2x faster."</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="lg:max-w-[561px] w-full" data-sttr-wrapper>
+                                <form id="demoForm" novalidate action="#" class="grid sm:grid-cols-2 gap-y-4 sm:gap-y-5 gap-x-4">
+                                    <div class="" data-sttr-card>
+                                        <label for="name" class="block text-offWhite font-normal text-sm sm:text-base mb-2 sm:mb-3">Full Name</label>
+                                        <div class="relative w-full">
+                                            <input
+                                                class="h-[45px] 
+                                                w-full p-3 rounded-[10px] border border-lineColor 
+                                                bg-linear-to-b from-slateBlue/20 to-royalBlue/20 
+                                                text-offWhite placeholder:text-offWhite/60 
+                                                outline-none duration-300 
+                                                focus:border-primary 
+                                                valid:border-green-500"
+                                                type="text"
+                                                placeholder="Enter your full name"
+                                                name="name"
+                                                id="name"
+                                                autocomplete="name"
+                                                required
+                                                aria-describedby="name-error"
+                                            >
+                                            <p id="name-error" class="hidden mt-1 text-sm text-red-400 transition-opacity duration-300">
+                                                This field is required.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="" data-sttr-card>
+                                        <label for="email-input" class="block text-offWhite font-normal text-sm sm:text-base mb-2 sm:mb-3">Email</label>
+                                        <div class="relative w-full">
+                                            <input
+                                                class="h-[45px] 
+                                                w-full p-3 rounded-[10px] border border-lineColor 
+                                                bg-linear-to-b from-slateBlue/20 to-royalBlue/20 
+                                                text-offWhite placeholder:text-offWhite/60 
+                                                outline-none duration-300 
+                                                focus:border-primary 
+                                                valid:border-green-500"
+                                                type="email"
+                                                placeholder="Enter your email address"
+                                                name="email"
+                                                id="email-input"
+                                                autocomplete="email"
+                                                required
+                                                aria-describedby="email-input-error"
+                                            >
+                                            <p id="email-input-error" class="hidden mt-1 text-sm text-red-400 transition-opacity duration-300">
+                                                This field is required.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-2" data-sttr-card>
+                                        <label for="project-name" class="block text-offWhite font-normal text-sm sm:text-base mb-2 sm:mb-3">Project Name</label>
+                                        <div class="relative w-full">
+                                            <input
+                                                class="h-[45px] 
+                                                w-full p-3 rounded-[10px] border border-lineColor 
+                                                bg-linear-to-b from-slateBlue/20 to-royalBlue/20 
+                                                text-offWhite placeholder:text-offWhite/60 
+                                                outline-none duration-300 
+                                                focus:border-primary 
+                                                valid:border-green-500"
+                                                type="text"
+                                                placeholder="What's your project called?"
+                                                name="project-name"
+                                                id="project-name"
+                                                autocomplete="off"
+                                                required
+                                                aria-describedby="project-name-error"
+                                            >
+                                            <p id="project-name-error" class="hidden mt-1 text-sm text-red-400 transition-opacity duration-300">
+                                                This field is required.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="sm:col-span-2" data-sttr-card>
+                                        <label for="message" class="block text-offWhite font-normal text-sm sm:text-base mb-2 sm:mb-3">Message</label>
+                                        <textarea class="h-[129px] w-full p-3 bg-linear-to-b from-slateBlue/20 to-royalBlue/20 border border-lineColor rounded-[10px] outline-none duration-300 focus:border-primary text-offWhite placeholder:text-offWhite/60" name="message" placeholder="Write your message here..." id="message"></textarea>
+                                    </div>
+                                    <div class="sm:col-span-2" data-sttr-card>
+                                        <button id="demoBtn" type="submit" class="inline-flex items-center justify-center px-[22px] py-3 text-white font-medium text-sm leading-normal rounded-[10px] relative z-1 overflow-hidden text-center w-full bg-linear-to-b from-slateBlue to-royalBlue">
+                                            <span class="btn-text">Send</span>
+                                            <svg class="loader hidden ml-2 w-5 h-5 animate-spin" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                            </svg>
+                                        </button>
+                                        <div id="formMessage" class="hidden sm:col-span-2 mt-3 text-center text-sm"></div>
+                                    </div>  
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Get A Demo Area End -->
+
+        <!-- Base/footer.html -->
+        {% include 'Base/footer.html' %}
+
+    </div>
+</div>
+    
+<!-- Components/Home/index/scrollTop.html -->
+{% include 'Components/Home/index/scrollTop.html' %}
+
+<!-- Components/Home/index/symbol.html -->
+{% include 'Components/Home/index/symbol.html' %}
+    
+{% endblock %}

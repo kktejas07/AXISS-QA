@@ -1,0 +1,92 @@
+{% extends "Base/base.html" %}
+
+{% block hero_content %}
+
+{% include 'Base/navbar.html' %}
+
+<!-- Components/Home/index/preloader.html -->
+{% include 'Components/Home/index/preloader.html' %}
+
+<div id="smooth-wrapper">
+    <div id="smooth-content">
+        <div class="header-innerHeight">
+            <div class="container">
+                <div class="border-container"></div>
+            </div>
+        </div>
+        <!-- Banner Area Start -->
+        <section class="section-bottom-border relative z-1">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+                    <div class="flex items-center justify-between gap-7 md:gap-10 flex-col md:flex-row" data-sttr-wrapper>
+                        <div class="md:max-w-[560px] w-full rounded-xl sm:rounded-2xl md:rounded-3xl overflow-hidden" data-sttr-card>
+                            <img class="w-full h-full object-cover" src="{{ url_for('static', filename='assets/img/about/banner-thumb.jpg') }}" alt="about banner thumb" data-lag="0.1">
+                        </div>
+                        <div class="md:max-w-[560px] w-full">
+                            <h1 class="text-4xl sm:text-5xl lg:text-[51px] font-semibold gradient-text" data-sttr-card>Our Mission</h1>
+                            <p class="mt-3 sm:mt-5" data-sttr-card>At RiteFlow, our mission is to empower every professional with the power of AI. We simplify complex workflows, automate daily tasks, and inspire innovation across all domains — from business to creativity. Our goal is to make AI accessible, reliable, and impactful for everyone, driving smarter and faster results.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Banner Area End -->
+
+        <!-- Team Area Start -->
+        <section class="section-bottom-border relative z-1">
+            <div class="container">
+                <div class="border-container section-spacing-lg" >
+                    <!-- Section Title -->
+                    <div class="max-w-[450px] sm:max-w-[520px] lg:max-w-[600px] mx-auto text-center mb-10 sm:mb-12 md:mb-16 xl:mb-20" data-section-title>
+                        <span class="badge-button mb-5 !hidden" data-subtitle></span>
+                        <h2 class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] !leading-[1.2] font-semibold -tracking-[0.4px] overflow-hidden" data-title>Our Team</h2>
+                        <p class="mt-4 md:mt-5 text-offWhite/80 overflow-hidden" data-excerpt>A passionate group of innovators, designers, and AI experts dedicated to shaping the future of intelligent, efficient, and human-centered work.</p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-sttr-wrapper>
+
+                        <!-- Components/About/team.html -->
+                        {% include 'Components/About/team.html' %}
+
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Team Area End -->
+
+        <!-- Research Area Start -->
+        <section class="section-bottom-border relative z-1 overflow-hidden">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+                    <div class="flex items-center justify-between gap-10 flex-col lg:flex-row">
+                        <div class="max-w-[600px] lg:max-w-[434px] w-full mx-auto lg:mx-0 text-center lg:text-left" data-container="process-area">
+                            <h2 data-title class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] font-semibold -tracking-[0.4px] !leading-[1.1]" >AI Research</h2>
+                            <p data-excerpt class="mt-4 md:mt-5 text-offWhite/80" >At RiteFlow, our AI research drives innovation that transforms ideas into intelligent solutions. We explore cutting-edge machine learning, automation, and data science to build tools that think, learn, and adapt — empowering businesses and individuals to achieve more with the power of AI.</p>
+                        </div>
+                        <div class="lg:max-w-[677px] w-full grid sm:grid-cols-2 gap-6" data-sttr-wrapper>
+
+                            <!-- Components/About/research.html -->
+                            {% include 'Components/About/research.html' %}
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Research Area End -->
+
+        <!-- Components/Home/index/newsletter.html -->
+        {% include 'Components/Home/index/newsletter.html' %}
+
+        <!-- Base/footer.html -->
+        {% include 'Base/footer.html' %}
+
+    </div>
+</div>
+    
+<!-- Components/Home/index/scrollTop.html -->
+{% include 'Components/Home/index/scrollTop.html' %}
+ 
+<!-- Components/Home/index/symbol.html -->
+{% include 'Components/Home/index/symbol.html' %}
+    
+{% endblock %}

@@ -1,0 +1,28 @@
+{% for item in blogs %}
+    <div class="p-2.5 bg-blue rounded-xl sm:rounded-2xl md:rounded-[20px] group border-moving relative before:rounded-xl sm:before:rounded-2xl md:before:rounded-[20px] flex flex-col gap-5 border border-lineColor/70" data-sttr-card>
+        <a href="{{ url_for('main.blog_details', title=slugify(item.title)) }}" class="rounded-20 overflow-hidden border border-lineColor/70 border-b-0 relative block" data-lag="0.02">
+            <img src="{{ item.img }}" alt="blog thumb"
+                class="group-hover:scale-105 transition-all duration-500 ease-in-out w-full h-auto">
+            <div class="absolute w-full h-full bottom-0 left-0 z-10 bg-linear-to-b from-secondary/0 to-secondary/50 duration-300 group-hover:h-0"></div>
+        </a>
+        <div class="rounded-20 border border-lineColor/70 bg-blue p-5">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="bg-linear-to-b from-slateBlue/20 to-royalBlue/20 rounded-[10px] py-1.5 px-3 inline-block text-sm text-offWhite/80 font-medium hover:text-white transition-all duration-300 ease-in-out">
+                    {{ item.tag }}
+                </div>
+                <a href="{{ url_for('main.blog_details', title=slugify(item.title)) }}"
+                    class="w-11 h-9 flex items-center justify-center bg-linear-to-b from-slateBlue/20 to-royalBlue/20 rounded-[10px] relative overflow-hidden">
+                    <svg class="w-6 h-6 fill-current text-white transition-all duration-300 ease-in-out group-hover:translate-x-6 group-hover:-translate-y-5 group-hover:opacity-0">
+                        <use href="#arrowTopRight-icon"></use>
+                    </svg>
+                    <svg class="w-6 h-6 fill-current text-white absolute transform -translate-x-6 translate-y-5 transition-all duration-300 ease-in-out group-hover:translate-x-0 group-hover:-translate-y-0 opacity-0 group-hover:opacity-100">
+                        <use href="#arrowTopRight-icon"></use>
+                    </svg>
+                </a>
+            </div>
+            <div class="my-5 gradient-border w-full h-[1px]"></div>
+            <h3 class="text-xl text-offWhite font-medium"><a href="{{ url_for('main.blog_details', title=slugify(item.title)) }}" class="text-underline text-offWhite">{{ item.title }}</a></h3>
+            <p class="mt-4 text-offWhite/60">{{ item.desc }}</p>
+        </div>
+    </div>
+{% endfor %}

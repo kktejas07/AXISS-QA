@@ -1,0 +1,16 @@
+{% for item in testimonials[0:6] %}
+    <div class="swiper-slide">
+        <div class="px-5 pt-5 pb-6 md:pb-10 bg-blue rounded-xl sm:rounded-2xl lg:rounded-[20px] border border-lineColor/70 relative">
+            <div class="flex items-center gap-4">
+                <img class="w-10.5 h-10.5 object-cover rounded-full" src="{{ item.img }}"
+                    alt="testimonial author">
+                <div class="flex-1">
+                    <h3 class="font-dmSans text-offWhite text-base leading-tight font-normal">{{ item.name }}</h3>
+                    <p class="text-offWhite/60 text-sm leading-tight mt-1">{{ item.title }}</p>
+                </div>
+            </div>
+            <div class="my-4 md:my-5 lg:my-6 gradient-border w-full h-px"></div>
+            <p class="text-offWhite">{{ item.desc }} </p>
+        </div>
+    </div>
+{% endfor %}
