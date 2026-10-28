@@ -20,26 +20,34 @@ services:
       retries: 10
 
   api:
-    build: ./backend
+    build: ./access-qa-360/backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/axiss_qa
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/axiss_qa
       CORS_ORIGIN: "*"
-      PORT: "3000"
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     ports:
-      - "3000:3000"
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
 
-  web:
+  landing:
+    build: ./access-qa-360/landing
+    restart: unless-stopped
+    environment:
+      FLASK_ENV: ${FLASK_ENV:-production}
+    ports:
+      - "5000:5000"
+
+  frontend:
     build:
-      context: ./frontend
+      context: ./access-qa-360/frontend
       args:
-        EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:3000}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "5173:80"
     depends_on:
       - api
 
