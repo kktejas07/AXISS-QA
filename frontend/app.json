@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "AXISS QA",
+    "slug": "axiss-qa",
+    "scheme": "axissqa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#05070A",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#05070A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.axissqa.app"
+    },
+    "android": {
+      "package": "com.axissqa.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#05070A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "AXISS QA",
+      "shortName": "AXISS QA",
+      "themeColor": "#05070A",
+      "backgroundColor": "#05070A"
+    }
+  }
+}

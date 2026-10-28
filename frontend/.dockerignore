@@ -1,0 +1,10 @@
+node_modules
+dist
+.expo
+.expo-shared
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+npm-debug.log*

@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# env files (never commit real credentials)
+.env
+.env.*
+!.env.example
+
+# builds
+dist/
+build/
+web-build/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+
+# native
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# logs / OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/
+.idea/
