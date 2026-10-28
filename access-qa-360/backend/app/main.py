@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import auth, projects, suites, runs, webhooks, scans, vulnerabilities, gaps, test_cases, reports
 
 app = FastAPI(
-    title="Access QA 360 API",
-    description="AI-native QA platform by AXISS Group",
+    title="Wiseflow API",
+    description="AI-native QA platform by Wiseflow",
     version="0.1.0",
 )
 
@@ -30,4 +30,4 @@ app.include_router(reports.router, prefix="/api/v1")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "access-qa-360"}
+    return {"status": "ok", "service": "wiseflow"}

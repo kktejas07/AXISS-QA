@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     ANTHROPIC_API_KEY: str
     AWS_REGION: str = "us-east-1"
-    AWS_S3_BUCKET: str = "access-qa-360-screenshots"
+    AWS_S3_BUCKET: str = "wiseflow-screenshots"
     ENVIRONMENT: str = "development"
 
     class Config:
