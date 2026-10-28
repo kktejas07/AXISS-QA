@@ -1,0 +1,11 @@
+<svg width="180" height="32" viewBox="0 0 180 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="2" width="28" height="28" rx="7" fill="url(#logo_grad)"/>
+  <text x="14" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" fill="white" text-anchor="middle">QA</text>
+  <text x="36" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" fill="#FBFBFB">Access QA 360</text>
+  <defs>
+    <linearGradient id="logo_grad" x1="0" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+  </defs>
+</svg>

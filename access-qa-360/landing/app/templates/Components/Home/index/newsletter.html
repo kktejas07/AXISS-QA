@@ -1,0 +1,33 @@
+<section class="section-bottom-border">
+    <div class="container">
+        <div class="border-container section-spacing-lg">
+            <div data-lag="0.15">
+                <div class="bg-blue sm:bg-transparent rounded-20 border border-lineColor/70 px-4 sm:px-6 md:px-9 py-10 sm:py-14 md:py-20 lg:py-[90px] relative z-1 overflow-hidden" data-newsletter-wrapper>
+                    <video class="hidden sm:block absolute top-0 right-0 w-full h-full object-cover bg-top-right -z-1"
+                        src="{{ url_for('static', filename='assets/img/newsletter.webm') }}"
+                        autoplay
+                        loop
+                        muted
+                        playsinline
+                        data-news-video
+                        >
+                    </video>
+                    <img src="{{ url_for('static', filename='assets/img/newsletter-shape.png') }}" alt="newsletter-shape" class="block sm:hidden absolute top-0 right-0 z-[-1] w-[30%] lg:w-auto">
+                    <img src="{{ url_for('static', filename='assets/img/newsletter-top-glow-shape.png') }}" alt="newsletter-shape" class="block sm:hidden absolute top-0 right-0 z-[-1]">
+                    <img src="{{ url_for('static', filename='assets/img/newsletter-bottom-glow-shape.png') }}" alt="newsletter-shape" class="block sm:hidden absolute bottom-0 left-0 z-[-1]">
+
+                    <!-- Content -->
+                    <div class="w-full sm:w-[80%] lg:w-full max-w-[400px] md:max-w-[580px]">
+                        <h3 data-news-title class="gradient-text !leading-[1.2] text-4xl md:text-5xl lg:text-[51px] font-semibold">Start Testing Smarter Today</h3>
+                        <p data-news-excerpt class="mt-4 sm:mt-5">Join thousands of engineering teams shipping faster with AI-powered QA. Free tier available — no credit card required.</p>
+                        <div data-news-button class="mt-5 sm:mt-8 lg:mt-12">
+                            <a href="http://localhost:5173/login" class="button-primary inline-flex items-center justify-center px-[22px] py-3 text-white font-medium text-sm leading-normal rounded-[10px] relative z-1 overflow-hidden text-center ">
+                                Get Started Free
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

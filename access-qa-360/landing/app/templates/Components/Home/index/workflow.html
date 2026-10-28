@@ -1,0 +1,21 @@
+<div>
+    <div class="bg-blue rounded-xl sm:rounded-2xl md:rounded-[20px] border border-lineColor/70 px-4 sm:px-6 md:px-9 pt-8 sm:pt-12 pb-10 sm:pb-20 md:pb-24 lg:pb-[150px] relative z-1 overflow-hidden flex items-center sm:items-start justify-between gap-10 flex-col sm:flex-row" data-container="apps-section">
+        <!-- Content -->
+        <div class="w-full max-w-[400px] sm:max-w-[590px] text-center sm:text-left">
+            <h3 data-title class="gradient-text !leading-[1.2] text-3xl md:text-4xl lg:text-5xl xl:text-[51px] font-semibold">Integrate Into Your CI/CD Pipeline</h3>
+            <p data-excerpt class="mt-4 sm:mt-5">Trigger security scans and test runs on every PR via GitHub Actions, Jenkins, or GitLab CI. Block merges on critical vulnerabilities, get results in Slack, and track findings in Jira — all automatically.</p>
+            <div data-button class="mt-5 sm:mt-8 lg:mt-9">
+                <a href="{{ url_for('main.features') }}" class="button-primary inline-flex items-center justify-center px-[22px] py-3 text-white font-medium text-sm leading-normal rounded-[10px] relative z-1 overflow-hidden text-center ">
+                    Explore Integrations
+                </a>
+            </div>
+        </div>
+        <div class="max-w-[351px] w-full" data-thumbnail>
+            <img class="w-full" src="{{ url_for('static', filename='assets/img/home/workflow-icons.svg') }}" alt="workflow-icons" data-lag="0.2">
+        </div>
+
+        <!-- Shapes -->
+        <img data-bg-shape src="{{ url_for('static', filename='assets/img/home/workflow-shape.png') }}" alt="workflow-shape" class="absolute bottom-0 left-0 -z-1">
+        <img data-glow-shape src="{{ url_for('static', filename='assets/img/newsletter-top-glow-shape.png') }}" alt="newsletter-shape" class="absolute top-0 right-0 -z-1">
+    </div>
+</div>

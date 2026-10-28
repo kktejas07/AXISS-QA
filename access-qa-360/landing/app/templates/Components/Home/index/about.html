@@ -1,0 +1,32 @@
+<div class="flex justify-between gap-8 sm:gap-10 flex-col md:flex-row" data-container="trail-section">
+    <div data-video class="md:max-w-[560px] w-full relative rounded-20 overflow-hidden cursor-pointer">
+        <video id="aboutVideoPreview" data-lag="0.2" class="md:absolute top-0 left-0 w-full h-full object-cover rounded-20 min-h-[300px]"
+            src="{{ url_for('static', filename='assets/img/home/about.mp4') }}"
+            autoplay
+            loop
+            muted
+            playsinline>
+        </video>
+    </div>
+    <div class="md:max-w-[575px] w-full md:py-5">
+        <h2 data-title class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] font-semibold -tracking-[0.4px] !leading-[1.1]" >Why Teams Choose Access QA 360</h2>
+        <p data-excerpt class="mt-4 md:mt-5 text-offWhite/80" >No other tool combines OWASP vulnerability scanning with AI-generated QA test cases in a single workflow. Paste a URL, get a unified report with security findings, coverage gaps, and production-ready test suites — Playwright, pytest, k6, and more. When tests fail, AI triages the results and tells you exactly what broke and why.</p>
+        <img data-line-top class="my-5 lg:my-9" src="{{ url_for('static', filename='assets/img/gradient-border.svg') }}" alt="gradient Border">
+        <ul data-list class="font-medium text-offWhite/80 space-y-4" >
+            <li class="flex items-center gap-3">
+                <img src="{{ url_for('static', filename='assets/img/home/list-check.svg') }}" alt="check">
+                <span>Replaces 6 tools: ZAP, Burp Suite, TestRail, Selenium IDE, Snyk & more.</span>
+            </li>
+            <li class="flex items-center gap-3">
+                <img src="{{ url_for('static', filename='assets/img/home/list-check.svg') }}" alt="check">
+                <span>Save $1,273/month — from $1,472 across six tools to $199 with Pro.</span>
+            </li>
+        </ul>
+        <img data-line-bottom class="my-5 lg:my-9" src="{{ url_for('static', filename='assets/img/gradient-border.svg') }}" alt="gradient Border">
+        <div data-button class="" >
+            <a href="http://localhost:5173/login" class="button-primary inline-flex items-center justify-center px-[22px] py-3 text-white font-medium text-sm leading-normal rounded-[10px] relative z-1 overflow-hidden text-center ">
+                Start Your Free Trial
+            </a>
+        </div>
+    </div>
+</div>

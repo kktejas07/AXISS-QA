@@ -1,0 +1,57 @@
+{% extends "Base/base.html" %}
+
+{% block hero_content %}
+
+{% include 'Base/navbar.html' %}
+
+<!-- Components/Home/index/preloader.html -->
+{% include 'Components/Home/index/preloader.html' %}
+
+<div id="smooth-wrapper">
+    <div id="smooth-content">
+        <div class="header-innerHeight">
+            <div class="container">
+                <div class="border-container"></div>
+            </div>
+        </div>
+        <!-- Banner Area Start -->
+        <section class="section-bottom-border relative z-1">
+            <div class="container">
+                <div class="border-container section-spacing-lg">
+                    <!-- Section Title -->
+                    <div class="max-w-[450px] sm:max-w-[520px] lg:max-w-[600px] mx-auto text-center mb-10 sm:mb-12 md:mb-16 xl:mb-20" data-section-title>
+                        <span class="badge-button mb-5" data-subtitle>Why Choose RiteFlow</span>
+                        <h1 class="gradient-text text-3xl sm:text-4xl lg:text-5xl xl:text-[51px] !leading-[1.2] font-semibold -tracking-[0.4px] overflow-hidden" data-title>
+                            Intuitive AI That Works Beside You, Seamlessly
+                        </h1>
+                        <p class="mt-4 md:mt-5 text-offWhite/80 overflow-hidden" data-excerpt>
+                            Our AI tools are built to simplify work, spark ideas, and scale with you. From automation to insights, explore the benefits that set RiteFlow apart.
+                        </p>
+                    </div>
+                    <div class="flex flex-col gap-5" >
+                        
+                        <!-- Components/Home/index-2/feature.html -->
+                        {% include 'Components/Home/index-2/feature.html' %}
+
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Banner Area End -->
+
+        <!-- Components/Home/index/newsletter.html -->
+        {% include 'Components/Home/index/newsletter.html' %}
+
+        <!-- Base/footer.html -->
+        {% include 'Base/footer.html' %}
+
+    </div>
+</div>
+    
+<!-- Components/Home/index/scrollTop.html -->
+{% include 'Components/Home/index/scrollTop.html' %}
+
+<!-- Components/Home/index/symbol.html -->
+{% include 'Components/Home/index/symbol.html' %}
+    
+{% endblock %}

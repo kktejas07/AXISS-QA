@@ -1,0 +1,17 @@
+{% for item in process %}
+    <div class="md:sticky sticky-card">
+        <div class="px-5 pt-5 pb-5 md:pb-10 bg-blue rounded-[20px] border border-lineColor/70">
+            <div class="flex items-center justify-between gap-5">
+                <div class="w-10.5 h-10.5 flex items-center justify-center bg-primary rounded-[10px]">
+                    <svg class="w-4 h-[22px] fill-current text-white">
+                        <use href="{{ item.icon }}"></use>
+                    </svg>
+                </div>
+                <span class="py-1.5 px-3 text-sm font-medium leading-normal tracking-[-0.1px] rounded-[10px] inline-block bg-linear-to-b from-slateBlue/20 to-royalBlue/20 text-tertiary">{{ item.name }}</span>
+            </div>
+            <h3 class="text-xl text-offWhite font-medium leading-normal mt-7.5">{{ item.title }}</h3>
+            <div class="my-4 gradient-border w-full h-[1px]"></div>
+            <p class="text-offWhite/60">{{ item.desc }}</p>
+        </div>
+    </div>
+{% endfor %}

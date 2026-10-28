@@ -1,0 +1,25 @@
+{% for item in teams %}
+    <div class="p-2.5 bg-blue rounded-20 border-moving relative before:rounded-xl sm:before:rounded-2xl md:before:rounded-[20px] group"  data-sttr-card>
+        <div class="overflow-hidden rounded-20">
+            <a data-fslightbox="gallery" href="{{ item.img }}">
+            <img src="{{ item.img }}" alt="team member" class="w-full h-full object-cover duration-300 group-hover:scale-110">
+            </a>
+        </div>
+        <div class="absolute w-full bottom-0 left-0 z-20 p-5">
+            <div class="p-5 bg-blue rounded-20 flex items-center justify-between gap-5 w-full">
+                <div class="flex-1">
+                    <h3 class="text-lg text-offWhite font-medium font-dmSans">{{ item.name }}</h3>
+                    <p class="text-sm text-offWhite/60">{{ item.title }}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="javascript:void(0)" class="w-9 h-9 flex items-center justify-center bg-primary rounded-[10px]">
+                        <svg class="w-4.5 h-4.5 fill-current text-white">
+                            <use href="{{ item.icon }}"></use>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="absolute w-full h-full bottom-0 left-0 z-10 bg-linear-to-b from-secondary/0 to-secondary/50 duration-300 group-hover:h-0"></div>
+    </div>
+{% endfor %}

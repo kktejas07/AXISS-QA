@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        {% block meta %}
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <meta name="description" content="Access QA 360 — AI-powered QA platform that generates Playwright tests from plain English, runs them in parallel, and auto-triages failures.">
+        {% endblock %}
+        <title>{% block title %}Access QA 360 — AI-Powered Testing Platform | AXISS Group{% endblock %}</title>
+
+        <link rel="icon" href="{{ url_for('static', filename='assets/img/favicon.svg') }}" type="image/svg+xml" sizes="32x32">
+
+        <link href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css" rel="stylesheet">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/output.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/plugin.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}">
+        {% block css %}{% endblock %}
+    </head>
+    <body class="overflow-hidden">
+
+        <main>
+            {% block hero_content %}
+                {{ hero_content}}
+            {% endblock %}
+        </main>
+
+        <script src="{{ url_for('static', filename='assets/js/gsap-latest-beta.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='assets/js/plugin.js') }}"></script>
+        <script src="{{ url_for('static', filename='assets/js/loader.js') }}"></script>
+        <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+        <script src="{{ url_for('static', filename='assets/js/active.js') }}"></script>
+        {% block scripts %}{% endblock %}
+    </body>
+</html>
