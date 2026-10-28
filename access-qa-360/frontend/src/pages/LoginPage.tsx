@@ -23,7 +23,7 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-brand-900 mb-1">Access QA 360</h1>
+        <h1 className="text-2xl font-bold text-brand-900 mb-1">Wiseflow</h1>
         <p className="text-gray-500 mb-6 text-sm">Sign in to your workspace</p>
         {error && (
           <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-2 mb-4">{error}</div>

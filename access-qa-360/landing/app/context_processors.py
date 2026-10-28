@@ -30,7 +30,7 @@ def global_process():
             'icon': '#processIcon-01',
             'name': 'Step 1',
             'title': 'Paste Any URL',
-            'desc': 'Enter any web application URL — staging, production, or API endpoint. Access QA 360 auto-discovers sub-pages, API surfaces, and JavaScript-rendered content via Playwright.',
+            'desc': 'Enter any web application URL — staging, production, or API endpoint. Wiseflow auto-discovers sub-pages, API surfaces, and JavaScript-rendered content via Playwright.',
         },
         {
             'icon': '#processIcon-02',
@@ -94,7 +94,7 @@ def global_testimonials():
             'img': '/static/assets/img/home/testimonial/testimonial-01.jpg',
             'name': 'Sarah Chen',
             'title': 'QA Lead, FinTech Startup',
-            'desc': 'We replaced OWASP ZAP, Burp Suite, and TestRail with one platform. Access QA 360 found 14 vulnerabilities and generated 200+ test cases from a single URL scan.',
+            'desc': 'We replaced OWASP ZAP, Burp Suite, and TestRail with one platform. Wiseflow found 14 vulnerabilities and generated 200+ test cases from a single URL scan.',
         },
         {
             'img': '/static/assets/img/home/testimonial/testimonial-02.jpg',
@@ -112,7 +112,7 @@ def global_testimonials():
             'img': '/static/assets/img/home/testimonial/testimonial-01.jpg',
             'name': 'James Rodriguez',
             'title': 'VP Engineering, HealthTech',
-            'desc': 'HIPAA compliance testing used to take us 3 weeks. Access QA 360 generates the compliance report automatically — mapped to control requirements. Down to 2 days.',
+            'desc': 'HIPAA compliance testing used to take us 3 weeks. Wiseflow generates the compliance report automatically — mapped to control requirements. Down to 2 days.',
         },
         {
             'img': '/static/assets/img/home/testimonial/testimonial-02.jpg',
@@ -136,7 +136,7 @@ def global_testimonials():
             'img': '/static/assets/img/home/testimonial/testimonial-05.jpg',
             'name': 'Kevin Park',
             'title': 'CTO, Marketplace Startup',
-            'desc': 'We were paying $1,400/month across 5 different tools. Access QA 360 replaced all of them for $199. The ROI was immediate — first scan caught 3 critical SQL injection flaws.',
+            'desc': 'We were paying $1,400/month across 5 different tools. Wiseflow replaced all of them for $199. The ROI was immediate — first scan caught 3 critical SQL injection flaws.',
         },
         {
             'img': '/static/assets/img/home/testimonial/testimonial-06.jpg',
@@ -160,7 +160,7 @@ def global_testimonials():
             'img': '/static/assets/img/home/testimonial/testimonial-06.jpg',
             'name': 'Chris Taylor',
             'title': 'Startup Founder',
-            'desc': 'As a solo developer, I couldn\'t afford a security team AND a QA team. Access QA 360 gives me both — vulnerability scanning and full test generation — for free on the starter plan.',
+            'desc': 'As a solo developer, I couldn\'t afford a security team AND a QA team. Wiseflow gives me both — vulnerability scanning and full test generation — for free on the starter plan.',
         },
         {
             'img': '/static/assets/img/home/testimonial/testimonial-07.jpg',
@@ -237,7 +237,7 @@ def global_integrations():
         {
             'img': '/static/assets/img/integration/visualmaker.svg',
             'title': 'Jenkins',
-            'desc': 'Add Access QA 360 as a Jenkins pipeline stage. Run security scans and test suites in parallel, gate deployments on vulnerability severity thresholds.',
+            'desc': 'Add Wiseflow as a Jenkins pipeline stage. Run security scans and test suites in parallel, gate deployments on vulnerability severity thresholds.',
             'btn': 'CI/CD',
             'data': 'cicd',
         },
@@ -336,7 +336,7 @@ def global_financials():
             'symbol3': '',
             'style': '',
             'title': 'Tools Replaced',
-            'desc': 'Access QA 360 replaces OWASP ZAP, Burp Suite, TestRail, Selenium IDE, Snyk, and more — one platform for cyber + QA.',
+            'desc': 'Wiseflow replaces OWASP ZAP, Burp Suite, TestRail, Selenium IDE, Snyk, and more — one platform for cyber + QA.',
         },
         {
             'number': '0',
@@ -346,7 +346,7 @@ def global_financials():
             'symbol3': '',
             'style': 'text-tertiary',
             'title': 'Cost Savings',
-            'desc': 'Teams save $1,273/month on average — from $1,472 across six tools down to $199 with Access QA 360 Pro.',
+            'desc': 'Teams save $1,273/month on average — from $1,472 across six tools down to $199 with Wiseflow Pro.',
         },
         {
             'number': '0',
@@ -371,14 +371,14 @@ def global_blogs():
             'img': '/static/assets/img/blog/blog-01.png',
             'tag': 'Cyber + QA',
             'title': 'Why Security and QA Belong in One Platform',
-            'desc': 'The market is fragmented — security tools don\'t generate tests, and QA tools don\'t scan for vulnerabilities. Access QA 360 is the first to do both.',
+            'desc': 'The market is fragmented — security tools don\'t generate tests, and QA tools don\'t scan for vulnerabilities. Wiseflow is the first to do both.',
         },
         {
             'id': 2,
             'img': '/static/assets/img/blog/blog-02.png',
             'tag': 'OWASP',
             'title': 'OWASP Top 10: Automated Detection with AI',
-            'desc': 'From SQL injection to SSRF, learn how Access QA 360 detects and triages every OWASP category with evidence-backed findings.',
+            'desc': 'From SQL injection to SSRF, learn how Wiseflow detects and triages every OWASP category with evidence-backed findings.',
         },
         {
             'id': 3,
@@ -405,7 +405,7 @@ def global_blogs():
             'id': 6,
             'img': '/static/assets/img/blog/blog-06.png',
             'tag': 'Case Study',
-            'title': 'How One Team Replaced 6 Tools with Access QA 360',
+            'title': 'How One Team Replaced 6 Tools with Wiseflow',
             'desc': 'A 15-person engineering team consolidated their entire security and QA stack into one platform — saving $1,273/month and catching 3x more issues.',
         },
     ]
@@ -421,7 +421,7 @@ def global_blogs2():
             'img': '/static/assets/img/blog/blog-02.png',
             'tag': 'OWASP',
             'title': 'OWASP Top 10: Automated Detection with AI',
-            'desc': 'From SQL injection to SSRF, learn how Access QA 360 detects and triages every OWASP category with evidence-backed findings.',
+            'desc': 'From SQL injection to SSRF, learn how Wiseflow detects and triages every OWASP category with evidence-backed findings.',
         },
         {
             'id': 3,
