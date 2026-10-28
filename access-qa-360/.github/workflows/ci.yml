@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: qa360
+          POSTGRES_PASSWORD: qa360pass
+          POSTGRES_DB: qa360_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql+asyncpg://qa360:qa360pass@localhost:5432/qa360_test
+      SYNC_DATABASE_URL: postgresql://qa360:qa360pass@localhost:5432/qa360_test
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: ci-secret-key-not-for-production
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r backend/requirements.txt
+      - run: playwright install chromium --with-deps
+        working-directory: backend
+      - run: alembic upgrade head
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          SYNC_DATABASE_URL: ${{ env.SYNC_DATABASE_URL }}
+      - run: pytest tests/ -v
+        working-directory: backend
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
