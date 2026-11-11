@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ShieldCheck, LogOut } from "lucide-react";
+import { ShieldCheck, LogOut, Layers } from "lucide-react";
 
 export function Navbar() {
   const navigate = useNavigate();
@@ -11,15 +11,23 @@ export function Navbar() {
           Access QA <span className="text-indigo-400">360</span>
         </span>
       </Link>
-      <button
-        onClick={() => {
-          localStorage.removeItem("token");
-          navigate("/login");
-        }}
-        className="flex items-center gap-1 text-sm text-indigo-300 hover:text-white"
-      >
-        <LogOut className="w-4 h-4" /> Sign out
-      </button>
+      <div className="flex items-center gap-4">
+        <Link
+          to="/audits"
+          className="flex items-center gap-1 text-sm text-indigo-300 hover:text-white"
+        >
+          <Layers className="w-4 h-4" /> Full Audit
+        </Link>
+        <button
+          onClick={() => {
+            localStorage.removeItem("token");
+            navigate("/login");
+          }}
+          className="flex items-center gap-1 text-sm text-indigo-300 hover:text-white"
+        >
+          <LogOut className="w-4 h-4" /> Sign out
+        </button>
+      </div>
     </nav>
   );
 }

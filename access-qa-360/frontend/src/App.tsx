@@ -11,6 +11,7 @@ import { VulnerabilitiesPage } from "./pages/VulnerabilitiesPage";
 import { QAGapsPage } from "./pages/QAGapsPage";
 import { TestCasesPage } from "./pages/TestCasesPage";
 import { ReportsPage } from "./pages/ReportsPage";
+import { AuditPage } from "./pages/AuditPage";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("token");
@@ -33,6 +34,9 @@ export default function App() {
         <Route path="/scans/:id/gaps" element={<RequireAuth><QAGapsPage /></RequireAuth>} />
         <Route path="/scans/:id/test-cases" element={<RequireAuth><TestCasesPage /></RequireAuth>} />
         <Route path="/scans/:id/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
+        <Route path="/audits" element={<RequireAuth><AuditPage /></RequireAuth>} />
+        <Route path="/audits/new" element={<RequireAuth><AuditPage /></RequireAuth>} />
+        <Route path="/audits/:auditId" element={<RequireAuth><AuditPage /></RequireAuth>} />
       </Routes>
     </BrowserRouter>
   );

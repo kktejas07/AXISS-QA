@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.api.routes import auth, projects, suites, runs, webhooks, scans, vulnerabilities, gaps, test_cases, reports
+from app.api.routes import auth, projects, suites, runs, webhooks, scans, vulnerabilities, gaps, test_cases, reports, audits
 from app.api.deps import get_current_user
 from app.models.user import User
 
@@ -46,6 +46,7 @@ app.include_router(vulnerabilities.router, prefix="/api/v1")
 app.include_router(gaps.router, prefix="/api/v1")
 app.include_router(test_cases.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
+app.include_router(audits.router, prefix="/api/v1")
 
 
 @app.get("/health")
