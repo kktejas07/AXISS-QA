@@ -34,29 +34,34 @@ export function RunHistoryPage() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link to={`/projects/${projectId}/suites`} className="text-sm text-indigo-600 hover:underline">
+          <Link
+            to={`/projects/${projectId}/suites`}
+            className="text-sm text-muted hover:text-accent transition-colors"
+          >
             &larr; Suites
           </Link>
-          <h1 className="text-2xl font-bold text-brand-900 mt-1">Run History</h1>
+          <h1 className="text-2xl font-bold text-fg mt-1">Run History</h1>
         </div>
         <button
           onClick={handleTrigger}
           disabled={triggering}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          className="refero-btn-primary flex items-center gap-2 text-sm px-4 py-2"
         >
-          <Play className="w-4 h-4" /> {triggering ? "Queuing…" : "Run Now"}
+          <Play className="w-4 h-4" />
+          {triggering ? "Queuing…" : "Run Now"}
         </button>
       </div>
+
       <div className="space-y-3">
         {runs.map((run) => (
-          <div key={run.id} className="bg-white border border-gray-200 rounded-xl p-4">
+          <div key={run.id} className="bg-surface-1 border border-surface-3 rounded-card p-4">
             <div className="flex items-center justify-between mb-2">
               <StatusBadge status={run.status} />
-              <span className="text-xs font-mono text-gray-400">
+              <span className="text-xs font-mono text-muted">
                 {new Date(run.created_at).toLocaleString()}
               </span>
             </div>
-            <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
+            <div className="flex flex-wrap gap-4 text-sm text-muted mt-2">
               {run.branch && (
                 <span className="flex items-center gap-1">
                   <GitBranch className="w-3.5 h-3.5" />
@@ -76,14 +81,14 @@ export function RunHistoryPage() {
               )}
             </div>
             {run.triage_summary && (
-              <div className="mt-3 bg-red-50 border border-red-100 rounded-lg p-3 text-xs text-red-700 whitespace-pre-line">
+              <div className="mt-3 bg-red-900/20 border border-red-800/40 rounded-card p-3 text-xs text-red-300 whitespace-pre-line">
                 {run.triage_summary}
               </div>
             )}
           </div>
         ))}
         {runs.length === 0 && (
-          <p className="text-center text-gray-400 py-12">
+          <p className="text-center text-muted py-12">
             No runs yet. Click "Run Now" to start your first test run.
           </p>
         )}
