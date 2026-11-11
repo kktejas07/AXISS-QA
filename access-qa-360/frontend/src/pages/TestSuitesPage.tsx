@@ -6,9 +6,9 @@ import type { Suite } from "../types";
 import { Plus, CheckCircle, Clock, Code } from "lucide-react";
 
 const statusIcon = (status: Suite["status"]) => {
-  if (status === "active") return <CheckCircle className="w-4 h-4 text-emerald-500" />;
-  if (status === "draft") return <Clock className="w-4 h-4 text-amber-500" />;
-  return <Code className="w-4 h-4 text-gray-400" />;
+  if (status === "active") return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+  if (status === "draft") return <Clock className="w-4 h-4 text-yellow-400" />;
+  return <Code className="w-4 h-4 text-muted" />;
 };
 
 export function TestSuitesPage() {
@@ -23,37 +23,41 @@ export function TestSuitesPage() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link to="/" className="text-sm text-indigo-600 hover:underline">
-            &larr; Projects
+          <Link
+            to="/"
+            className="text-sm text-muted hover:text-accent transition-colors"
+          >
+            ← Projects
           </Link>
-          <h1 className="text-2xl font-bold text-brand-900 mt-1">Test Suites</h1>
+          <h1 className="text-2xl font-semibold text-fg mt-1">Test Suites</h1>
         </div>
         <Link
           to={`/projects/${projectId}/suites/new`}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          className="refero-btn-primary flex items-center gap-2 px-4 py-2 text-sm"
         >
           <Plus className="w-4 h-4" /> Generate Tests
         </Link>
       </div>
-      <div className="space-y-3">
+
+      <div className="space-y-2">
         {suites.map((s) => (
           <div
             key={s.id}
-            className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between"
+            className="bg-surface-1 border border-surface-3 rounded-card p-4 flex items-center justify-between hover:bg-surface-2 transition-colors"
           >
             <div className="flex items-center gap-3">
               {statusIcon(s.status)}
               <div>
-                <p className="font-medium text-brand-900">{s.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{s.feature_description}</p>
+                <p className="font-medium text-fg text-sm">{s.name}</p>
+                <p className="text-xs text-muted mt-0.5 line-clamp-1">{s.feature_description}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                className={`text-xs font-semibold px-2 py-0.5 rounded-badge border ${
                   s.status === "active"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-amber-100 text-amber-700"
+                    ? "bg-emerald-900/20 text-emerald-400 border-emerald-800/40"
+                    : "bg-yellow-900/20 text-yellow-400 border-yellow-800/40"
                 }`}
               >
                 {s.status}
@@ -61,18 +65,19 @@ export function TestSuitesPage() {
               {s.status === "active" && (
                 <Link
                   to={`/projects/${projectId}/suites/${s.id}/runs`}
-                  className="text-sm text-indigo-600 hover:underline font-medium"
+                  className="text-sm text-accent hover:text-accent-dim font-medium transition-colors"
                 >
-                  Run history &rarr;
+                  Run history →
                 </Link>
               )}
             </div>
           </div>
         ))}
         {suites.length === 0 && (
-          <p className="text-center text-gray-400 py-12">
-            No test suites yet. Click "Generate Tests" to create your first one.
-          </p>
+          <div className="text-center text-muted py-16 bg-surface-1 border border-surface-3 rounded-card">
+            <p className="font-medium text-fg-soft">No test suites yet.</p>
+            <p className="text-sm mt-1">Click "Generate Tests" to create your first one.</p>
+          </div>
         )}
       </div>
     </Layout>

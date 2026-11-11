@@ -1,4 +1,71 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: #08090a;
+    color: #f0f0ef;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #111214;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2b2f;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3b3f;
+  }
+
+  /* Range input accent */
+  input[type="range"] {
+    accent-color: #c8f135;
+  }
+
+  /* Select and input base dark styles */
+  select option {
+    background-color: #1c1d20;
+    color: #f0f0ef;
+  }
+}
+
+@layer components {
+  .refero-card {
+    @apply bg-surface-1 border border-surface-3 rounded-card;
+  }
+
+  .refero-input {
+    @apply w-full px-3 py-2 bg-surface-2 border border-surface-3 rounded-badge text-fg text-sm
+           focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent
+           placeholder:text-muted-dim disabled:opacity-40 transition-colors;
+  }
+
+  .refero-btn-primary {
+    @apply bg-accent hover:bg-accent-dim text-app font-semibold rounded-badge
+           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .refero-btn-secondary {
+    @apply bg-surface-2 hover:bg-surface-3 text-fg border border-surface-3
+           font-medium rounded-badge transition-colors;
+  }
+
+  .refero-label {
+    @apply block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5;
+  }
+}

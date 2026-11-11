@@ -66,20 +66,23 @@ export function ReportsPage() {
 
   return (
     <Layout>
-      <Link to={`/scans/${id}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-4">
-        <ArrowLeft className="w-4 h-4" /> Back to Scan Results
+      <Link
+        to={`/scans/${id}`}
+        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-accent transition-colors mb-5"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" /> Back to Scan Results
       </Link>
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-brand-900 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-indigo-500" /> Reports
+          <h1 className="text-2xl font-semibold text-fg flex items-center gap-2">
+            <FileText className="w-5 h-5 text-accent" /> Reports
           </h1>
-          <p className="text-gray-500 text-sm mt-1">{reports.length} reports generated</p>
+          <p className="text-muted text-sm mt-0.5">{reports.length} reports generated</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          className="refero-btn-primary flex items-center gap-2 px-4 py-2 text-sm"
         >
           <Plus className="w-4 h-4" /> Generate Report
         </button>
@@ -87,15 +90,15 @@ export function ReportsPage() {
 
       {/* Generate Form */}
       {showForm && (
-        <div className="bg-white border border-indigo-200 rounded-xl p-5 mb-6">
-          <h3 className="font-semibold text-brand-900 mb-4">New Report</h3>
+        <div className="bg-surface-1 border border-surface-3 rounded-card p-5 mb-5">
+          <h3 className="font-semibold text-fg mb-4 text-sm">New Report</h3>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
+              <label className="refero-label">Report Type</label>
               <select
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value as ReportType)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                className="refero-input"
               >
                 {(Object.keys(reportTypeLabels) as ReportType[]).map((t) => (
                   <option key={t} value={t}>{reportTypeLabels[t]}</option>
@@ -103,11 +106,11 @@ export function ReportsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Format</label>
+              <label className="refero-label">Format</label>
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value as ReportFormat)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                className="refero-input"
               >
                 {reportFormatOptions[reportType].map((f) => (
                   <option key={f} value={f}>{formatLabels[f]}</option>
@@ -118,47 +121,54 @@ export function ReportsPage() {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+            className="refero-btn-primary flex items-center gap-2 px-4 py-2 text-sm"
           >
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-            Generate
+            {generating ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+            ) : (
+              <><FileText className="w-3.5 h-3.5" /> Generate</>
+            )}
           </button>
         </div>
       )}
 
       {/* Reports List */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface-1 border border-surface-3 rounded-card overflow-hidden">
         {reports.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">No reports yet</p>
+          <div className="text-center py-14 text-muted">
+            <FileText className="w-8 h-8 mx-auto mb-3 opacity-30" />
+            <p className="font-medium text-fg-soft">No reports yet</p>
             <p className="text-sm mt-1">Generate your first report from scan data</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-surface-3">
             {reports.map((r) => (
               <div key={r.id} className="flex items-center gap-4 px-5 py-4">
-                <FileText className="w-8 h-8 text-indigo-400 shrink-0" />
+                <div className="w-9 h-9 rounded-badge bg-accent/10 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4 text-accent" />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-brand-900 text-sm">{reportTypeLabels[r.report_type]}</p>
-                  <p className="text-xs text-gray-500">
-                    {formatLabels[r.format]} &middot; {new Date(r.created_at).toLocaleString()}
+                  <p className="font-medium text-fg text-sm">{reportTypeLabels[r.report_type]}</p>
+                  <p className="text-xs text-muted mt-0.5">
+                    {formatLabels[r.format]} · {new Date(r.created_at).toLocaleString()}
                   </p>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  r.status === "ready" ? "bg-emerald-100 text-emerald-700" :
-                  r.status === "generating" ? "bg-indigo-100 text-indigo-700 animate-pulse" :
-                  "bg-red-100 text-red-700"
+                <span className={`text-xs px-2 py-0.5 rounded-badge font-medium border ${
+                  r.status === "ready"
+                    ? "bg-emerald-900/20 text-emerald-400 border-emerald-800/40"
+                    : r.status === "generating"
+                    ? "bg-accent/15 text-accent border-accent/30 animate-pulse"
+                    : "bg-red-900/20 text-red-400 border-red-800/40"
                 }`}>
                   {r.status}
                 </span>
                 {r.status === "ready" && r.download_url && (
                   <a
                     href={r.download_url}
-                    className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                    className="flex items-center gap-1.5 text-accent hover:text-accent-dim text-sm font-medium transition-colors"
                     download
                   >
-                    <Download className="w-4 h-4" /> Download
+                    <Download className="w-3.5 h-3.5" /> Download
                   </a>
                 )}
               </div>

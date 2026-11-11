@@ -1,16 +1,18 @@
 import type { Severity } from "../types";
 
 const colours: Record<Severity, string> = {
-  critical: "bg-red-100 text-red-700",
-  high: "bg-orange-100 text-orange-700",
-  medium: "bg-yellow-100 text-yellow-800",
-  low: "bg-blue-100 text-blue-700",
-  informational: "bg-gray-100 text-gray-600",
+  critical: "bg-red-900/40 text-red-400 border border-red-800/60",
+  high: "bg-orange-900/40 text-orange-400 border border-orange-800/60",
+  medium: "bg-yellow-900/40 text-yellow-400 border border-yellow-800/60",
+  low: "bg-blue-900/40 text-blue-400 border border-blue-800/60",
+  informational: "bg-surface-2 text-muted border border-surface-3",
 };
 
 export function SeverityBadge({ severity }: { severity: Severity }) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${colours[severity]}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-badge text-xs font-semibold tracking-wide ${colours[severity]}`}
+    >
       {severity.toUpperCase()}
     </span>
   );

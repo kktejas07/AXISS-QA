@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { createScan } from "../api/scans";
 import type { ScanType, ScanProfile, AuthConfig } from "../types";
-import { Globe, ChevronDown, ChevronUp, Radar, Loader2 } from "lucide-react";
+import { Globe, ChevronDown, ChevronUp, Radar, Loader2, Lock } from "lucide-react";
 
 export function ScanPage() {
   const navigate = useNavigate();
@@ -38,7 +38,6 @@ export function ScanPage() {
       });
 
       const scanId = data.id;
-      // Stream real-time progress via SSE
       const apiBase = import.meta.env.VITE_API_URL || "";
       const token = localStorage.getItem("access_token");
       const evtSource = new EventSource(
@@ -72,7 +71,7 @@ export function ScanPage() {
 
   const scanTypes: { value: ScanType; label: string; desc: string }[] = [
     { value: "passive", label: "Passive", desc: "Read-only, zero writes" },
-    { value: "active", label: "Active", desc: "Form submissions, state mutations" },
+    { value: "active", label: "Active", desc: "Form submissions & mutations" },
     { value: "hybrid", label: "Hybrid", desc: "Balanced approach" },
   ];
 
@@ -85,65 +84,65 @@ export function ScanPage() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-brand-900 flex items-center gap-2">
-            <Radar className="w-6 h-6 text-indigo-500" /> New Scan
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Enter a URL to scan for vulnerabilities, QA gaps, and generate test cases
+          <div className="flex items-center gap-2 mb-1">
+            <Radar className="w-5 h-5 text-accent" />
+            <h1 className="text-2xl font-semibold text-fg">New Scan</h1>
+          </div>
+          <p className="text-muted text-sm">
+            Paste a URL to scan for vulnerabilities, QA gaps, and auto-generate test cases
           </p>
         </div>
 
         {/* URL Input */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Target URL</label>
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com"
-                className="w-full pl-11 pr-4 py-3.5 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                disabled={scanning}
-              />
-            </div>
+        <div className="mb-5">
+          <label className="refero-label">Target URL</label>
+          <div className="relative">
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-dim" />
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com"
+              className="refero-input pl-10 py-3 text-base"
+              disabled={scanning}
+            />
           </div>
-          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+          {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
         </div>
 
         {/* Scan Type */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Scan Mode</label>
-          <div className="grid grid-cols-3 gap-3">
+        <div className="mb-5">
+          <label className="refero-label">Scan Mode</label>
+          <div className="grid grid-cols-3 gap-2">
             {scanTypes.map((t) => (
               <button
                 key={t.value}
                 onClick={() => setScanType(t.value)}
                 disabled={scanning}
-                className={`p-3 rounded-lg border text-left transition ${
+                className={`p-3 rounded-card border text-left transition-colors ${
                   scanType === t.value
-                    ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "border-accent bg-accent/10 text-fg"
+                    : "border-surface-3 bg-surface-1 hover:bg-surface-2 text-fg"
                 }`}
               >
-                <p className="font-medium text-sm text-brand-900">{t.label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
+                <p className="font-semibold text-sm">{t.label}</p>
+                <p className="text-xs text-muted mt-0.5">{t.desc}</p>
               </button>
             ))}
           </div>
         </div>
 
         {/* Profile */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Scan Profile</label>
+        <div className="mb-5">
+          <label className="refero-label">Scan Profile</label>
           <select
             value={profile}
             onChange={(e) => setProfile(e.target.value as ScanProfile)}
             disabled={scanning}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+            className="refero-input"
           >
             {profiles.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
@@ -152,36 +151,36 @@ export function ScanPage() {
         </div>
 
         {/* Scope */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Include Paths</label>
+            <label className="refero-label">Include Paths</label>
             <input
               type="text"
               value={includePaths}
               onChange={(e) => setIncludePaths(e.target.value)}
               placeholder="/api/v2/*, /app/*"
               disabled={scanning}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="refero-input"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Exclude Paths</label>
+            <label className="refero-label">Exclude Paths</label>
             <input
               type="text"
               value={excludePaths}
               onChange={(e) => setExcludePaths(e.target.value)}
               placeholder="/admin/*, /static/*"
               disabled={scanning}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="refero-input"
             />
           </div>
         </div>
 
         {/* Crawl Depth & Rate Limit */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Crawl Depth: <span className="text-indigo-600 font-semibold">{crawlDepth}</span>
+            <label className="refero-label">
+              Crawl Depth: <span className="text-accent normal-case font-bold">{crawlDepth}</span>
             </label>
             <input
               type="range"
@@ -190,14 +189,14 @@ export function ScanPage() {
               value={crawlDepth}
               onChange={(e) => setCrawlDepth(Number(e.target.value))}
               disabled={scanning}
-              className="w-full accent-indigo-600"
+              className="w-full mt-2"
             />
-            <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <div className="flex justify-between text-xs text-muted-dim mt-1">
               <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Rate Limit (req/s)</label>
+            <label className="refero-label">Rate Limit (req/s)</label>
             <input
               type="number"
               min={1}
@@ -205,27 +204,34 @@ export function ScanPage() {
               value={rateLimit}
               onChange={(e) => setRateLimit(Number(e.target.value))}
               disabled={scanning}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="refero-input"
             />
           </div>
         </div>
 
         {/* Auth Config */}
-        <div className="mb-6 border border-gray-200 rounded-lg">
+        <div className="mb-6 bg-surface-1 border border-surface-3 rounded-card overflow-hidden">
           <button
             onClick={() => setShowAuth(!showAuth)}
-            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-fg hover:bg-surface-2 transition-colors"
           >
-            Authentication Configuration
-            {showAuth ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            <span className="flex items-center gap-2 text-muted">
+              <Lock className="w-3.5 h-3.5" />
+              Authentication Configuration
+            </span>
+            {showAuth ? (
+              <ChevronUp className="w-4 h-4 text-muted-dim" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-muted-dim" />
+            )}
           </button>
           {showAuth && (
-            <div className="px-4 pb-4 space-y-3">
+            <div className="px-4 pb-4 space-y-3 border-t border-surface-3 pt-4">
               <select
                 value={auth.type}
                 onChange={(e) => setAuth({ type: e.target.value as AuthConfig["type"] })}
                 disabled={scanning}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                className="refero-input"
               >
                 <option value="none">No Authentication</option>
                 <option value="cookie">Cookie-based</option>
@@ -239,7 +245,7 @@ export function ScanPage() {
                   placeholder="Bearer token value"
                   value={auth.value || ""}
                   onChange={(e) => setAuth({ ...auth, value: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="refero-input"
                 />
               )}
               {auth.type === "cookie" && (
@@ -248,7 +254,7 @@ export function ScanPage() {
                   placeholder="Cookie header value"
                   value={auth.value || ""}
                   onChange={(e) => setAuth({ ...auth, value: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="refero-input"
                 />
               )}
               {auth.type === "basic" && (
@@ -258,14 +264,14 @@ export function ScanPage() {
                     placeholder="Username"
                     value={auth.username || ""}
                     onChange={(e) => setAuth({ ...auth, username: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    className="refero-input"
                   />
                   <input
                     type="password"
                     placeholder="Password"
                     value={auth.password || ""}
                     onChange={(e) => setAuth({ ...auth, password: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    className="refero-input"
                   />
                 </div>
               )}
@@ -276,16 +282,16 @@ export function ScanPage() {
         {/* Progress Bar */}
         {scanning && (
           <div className="mb-6">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-600 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                Scan in progress...
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-muted flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                Scanning in progress…
               </span>
-              <span className="text-indigo-600 font-medium">{progress}%</span>
+              <span className="text-accent font-semibold">{progress}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div className="w-full bg-surface-2 rounded-full h-1.5 overflow-hidden">
               <div
-                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
+                className="bg-accent h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -296,12 +302,12 @@ export function ScanPage() {
         <button
           onClick={handleScan}
           disabled={scanning || !url.trim()}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition flex items-center justify-center gap-2 text-lg"
+          className="refero-btn-primary w-full py-3.5 flex items-center justify-center gap-2 text-base"
         >
           {scanning ? (
-            <><Loader2 className="w-5 h-5 animate-spin" /> Scanning...</>
+            <><Loader2 className="w-4 h-4 animate-spin" /> Scanning…</>
           ) : (
-            <><Radar className="w-5 h-5" /> Start Scan</>
+            <><Radar className="w-4 h-4" /> Start Scan</>
           )}
         </button>
       </div>

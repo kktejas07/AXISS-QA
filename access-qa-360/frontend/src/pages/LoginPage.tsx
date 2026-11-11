@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../api/auth";
+import { ShieldCheck } from "lucide-react";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -21,47 +22,66 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-brand-900 mb-1">Wiseflow</h1>
-        <p className="text-gray-500 mb-6 text-sm">Sign in to your workspace</p>
-        {error && (
-          <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-2 mb-4">{error}</div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+    <div className="min-h-screen bg-app flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        {/* Logo mark */}
+        <div className="flex items-center gap-2 mb-10 justify-center">
+          <div className="bg-accent rounded-badge p-2">
+            <ShieldCheck className="w-5 h-5 text-app" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 rounded-lg transition"
-          >
-            Sign in
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-gray-500">
-          No account?{" "}
-          <Link to="/register" className="text-indigo-600 font-medium">
-            Register
-          </Link>
-        </p>
+          <span className="text-fg font-semibold text-lg">
+            Access QA <span className="text-accent">360</span>
+          </span>
+        </div>
+
+        <div className="bg-surface-1 border border-surface-3 rounded-card p-8">
+          <h1 className="text-xl font-semibold text-fg mb-1">Sign in</h1>
+          <p className="text-muted text-sm mb-6">Enter your credentials to continue</p>
+
+          {error && (
+            <div className="bg-red-900/20 border border-red-800/40 text-red-400 text-sm rounded-badge px-4 py-2.5 mb-5">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="refero-label">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="you@company.com"
+                className="refero-input"
+              />
+            </div>
+            <div>
+              <label className="refero-label">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                className="refero-input"
+              />
+            </div>
+            <button
+              type="submit"
+              className="refero-btn-primary w-full py-2.5 mt-2"
+            >
+              Sign in
+            </button>
+          </form>
+
+          <p className="mt-5 text-center text-sm text-muted">
+            No account?{" "}
+            <Link to="/register" className="text-accent font-medium hover:text-accent-dim">
+              Register
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

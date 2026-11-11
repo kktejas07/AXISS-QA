@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { createProject } from "../api/projects";
+import { FolderPlus } from "lucide-react";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
@@ -23,45 +24,49 @@ export function ProjectsPage() {
 
   return (
     <Layout>
-      <h1 className="text-2xl font-bold text-brand-900 mb-6">New Project</h1>
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-2xl">
+      <div className="mb-6 flex items-center gap-2">
+        <FolderPlus className="w-5 h-5 text-accent" />
+        <h1 className="text-2xl font-semibold text-fg">New Project</h1>
+      </div>
+
+      <div className="bg-surface-1 border border-surface-3 rounded-card p-6 max-w-xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project name</label>
+            <label className="refero-label">Project name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               placeholder="e.g. My Web App"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="refero-input"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+            <label className="refero-label">Base URL</label>
             <input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               required
               placeholder="https://your-app.com"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="refero-input"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+            <label className="refero-label">Description (optional)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Brief description of your project"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+              className="refero-input resize-none"
             />
           </div>
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold py-2 rounded-lg transition"
+            className="refero-btn-primary w-full py-2.5"
           >
-            {submitting ? "Creating..." : "Create Project"}
+            {submitting ? "Creating…" : "Create Project"}
           </button>
         </form>
       </div>

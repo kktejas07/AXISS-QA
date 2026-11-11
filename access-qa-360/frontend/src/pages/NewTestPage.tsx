@@ -25,44 +25,54 @@ export function NewTestPage() {
 
   return (
     <Layout>
-      <Link to={`/projects/${projectId}/suites`} className="text-sm text-indigo-600 hover:underline">
-        &larr; Back to Suites
+      <Link
+        to={`/projects/${projectId}/suites`}
+        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-accent transition-colors mb-5"
+      >
+        ← Back to Suites
       </Link>
-      <h1 className="text-2xl font-bold text-brand-900 mt-2 mb-6">Generate Test Suite</h1>
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-2xl">
-        <div className="flex items-center gap-2 mb-4 text-indigo-600">
-          <Sparkles className="w-5 h-5" />
-          <span className="text-sm font-semibold">
+
+      <h1 className="text-2xl font-semibold text-fg mt-1 mb-6">Generate Test Suite</h1>
+
+      <div className="bg-surface-1 border border-surface-3 rounded-card p-6 max-w-2xl">
+        {/* AI badge */}
+        <div className="flex items-center gap-2 mb-5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-badge w-fit">
+          <Sparkles className="w-4 h-4 text-accent" />
+          <span className="text-xs font-semibold text-accent">
             Claude Sonnet will generate Playwright tests from your description
           </span>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Suite name</label>
+            <label className="refero-label">Suite name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               placeholder="e.g. User login flow"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="refero-input mt-1"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Feature description</label>
+            <label className="refero-label">Feature description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
               rows={5}
               placeholder="Describe what to test in plain English. E.g. 'Test that a user can log in with valid credentials, see their dashboard, and that invalid passwords show an error message.'"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+              className="refero-input mt-1 resize-none"
             />
           </div>
+
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold py-2 rounded-lg transition"
+            className="refero-btn-primary w-full py-2.5 flex items-center justify-center gap-2"
           >
+            <Sparkles className="w-4 h-4" />
             {submitting ? "Sending to Claude…" : "Generate Tests with AI"}
           </button>
         </form>

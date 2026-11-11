@@ -4,14 +4,14 @@ import { GitBranch, Clock } from "lucide-react";
 
 export function RunCard({ run }: { run: Run }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
+    <div className="bg-surface-1 border border-surface-3 rounded-card p-4">
       <div className="flex items-center justify-between mb-2">
         <StatusBadge status={run.status} />
-        <span className="text-xs font-mono text-gray-400">
+        <span className="text-xs font-mono text-muted-dim">
           {new Date(run.created_at).toLocaleString()}
         </span>
       </div>
-      <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-2">
+      <div className="flex flex-wrap gap-4 text-sm text-muted mt-2">
         {run.branch && (
           <span className="flex items-center gap-1">
             <GitBranch className="w-3.5 h-3.5" />
@@ -25,13 +25,13 @@ export function RunCard({ run }: { run: Run }) {
           </span>
         )}
         {run.tests_total != null && (
-          <span>
+          <span className="text-fg-soft">
             {run.tests_passed}/{run.tests_total} passed
           </span>
         )}
       </div>
       {run.triage_summary && (
-        <div className="mt-3 bg-red-50 border border-red-100 rounded-lg p-3 text-xs text-red-700 whitespace-pre-line">
+        <div className="mt-3 bg-red-900/20 border border-red-800/40 rounded-badge p-3 text-xs text-red-400 whitespace-pre-line">
           {run.triage_summary}
         </div>
       )}

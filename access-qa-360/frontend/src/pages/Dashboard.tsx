@@ -1,165 +1,201 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
-import { getProjects } from "../api/projects";
 import { getScans } from "../api/scans";
-import type { Project, Scan } from "../types";
-import { FolderOpen, Plus, Radar, Shield, BarChart3, TestTubeDiagonal } from "lucide-react";
+import { getProjects } from "../api/projects";
+import type { Scan, Project } from "../types";
+import {
+  Radar,
+  ShieldAlert,
+  CheckCircle2,
+  FolderOpen,
+  Plus,
+  ArrowRight,
+  TrendingUp,
+} from "lucide-react";
+
+function RiskGrade({ grade }: { grade: string }) {
+  const map: Record<string, string> = {
+    A: "text-emerald-400 bg-emerald-900/30 border-emerald-800/50",
+    B: "text-accent bg-accent/15 border-accent/30",
+    C: "text-yellow-400 bg-yellow-900/30 border-yellow-800/50",
+    D: "text-orange-400 bg-orange-900/30 border-orange-800/50",
+    F: "text-red-400 bg-red-900/30 border-red-800/50",
+  };
+  const cls = map[grade] ?? "text-muted bg-surface-2 border-surface-3";
+  return (
+    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-badge border text-xs font-bold ${cls}`}>
+      {grade}
+    </span>
+  );
+}
 
 export function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>([]);
   const [scans, setScans] = useState<Scan[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
-    getProjects().then((r) => setProjects(r.data)).catch(() => {});
-    getScans().then((r) => setScans(r.data)).catch(() => {});
+    getScans().then((r) => setScans(r.data.slice(0, 8)));
+    getProjects().then((r) => setProjects(r.data.slice(0, 6)));
   }, []);
 
-  const totalVulns = scans.reduce((sum, s) => {
-    const vc = s.vulnerability_count;
-    return sum + (vc ? vc.critical + vc.high + vc.medium + vc.low + vc.informational : 0);
-  }, 0);
-  const avgCoverage = scans.length > 0
-    ? Math.round(scans.reduce((sum, s) => sum + (s.coverage_percent || 0), 0) / scans.length)
-    : 0;
-  const recentScans = scans.slice(0, 5);
+  const totalVulns = scans.reduce((s, sc) => s + (sc.vulnerabilities_count ?? 0), 0);
+  const criticalCount = scans.reduce((s, sc) => s + (sc.critical_count ?? 0), 0);
+  const passedScans = scans.filter((s) => s.risk_grade === "A" || s.risk_grade === "B").length;
+
+  const stats = [
+    {
+      label: "Total Scans",
+      value: scans.length,
+      icon: Radar,
+      iconColor: "text-accent",
+      iconBg: "bg-accent/10",
+    },
+    {
+      label: "Vulnerabilities",
+      value: totalVulns,
+      icon: ShieldAlert,
+      iconColor: "text-red-400",
+      iconBg: "bg-red-900/20",
+    },
+    {
+      label: "Critical Issues",
+      value: criticalCount,
+      icon: TrendingUp,
+      iconColor: "text-orange-400",
+      iconBg: "bg-orange-900/20",
+    },
+    {
+      label: "Clean Scans",
+      value: passedScans,
+      icon: CheckCircle2,
+      iconColor: "text-emerald-400",
+      iconBg: "bg-emerald-900/20",
+    },
+  ];
 
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-brand-900">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Your QA & Security intelligence at a glance</p>
+          <h1 className="text-2xl font-semibold text-fg">Dashboard</h1>
+          <p className="text-muted text-sm mt-0.5">Monitor your security and QA posture</p>
         </div>
-        <div className="flex gap-3">
-          <Link
-            to="/projects/new"
-            className="flex items-center gap-2 bg-white border border-gray-200 hover:border-indigo-300 text-brand-900 text-sm font-semibold px-4 py-2 rounded-lg transition"
-          >
-            <Plus className="w-4 h-4" /> New Project
-          </Link>
-          <Link
-            to="/scans/new"
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-          >
-            <Radar className="w-4 h-4" /> New Scan
-          </Link>
-        </div>
+        <Link
+          to="/scan"
+          className="refero-btn-primary flex items-center gap-2 px-4 py-2.5 text-sm"
+        >
+          <Radar className="w-4 h-4" />
+          New Scan
+        </Link>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <Radar className="w-5 h-5 text-indigo-500" />
-            <span className="text-xs text-gray-500 font-medium">Total Scans</span>
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        {stats.map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-surface-1 border border-surface-3 rounded-card p-5"
+          >
+            <div className={`inline-flex items-center justify-center w-9 h-9 rounded-badge ${stat.iconBg} mb-3`}>
+              <stat.icon className={`w-4.5 h-4.5 ${stat.iconColor}`} />
+            </div>
+            <p className="text-2xl font-bold text-fg">{stat.value}</p>
+            <p className="text-xs text-muted mt-0.5">{stat.label}</p>
           </div>
-          <p className="text-3xl font-bold text-brand-900">{scans.length}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <Shield className="w-5 h-5 text-red-500" />
-            <span className="text-xs text-gray-500 font-medium">Open Vulnerabilities</span>
-          </div>
-          <p className="text-3xl font-bold text-brand-900">{totalVulns}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <BarChart3 className="w-5 h-5 text-emerald-500" />
-            <span className="text-xs text-gray-500 font-medium">Avg QA Coverage</span>
-          </div>
-          <p className="text-3xl font-bold text-brand-900">{avgCoverage}%</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <FolderOpen className="w-5 h-5 text-yellow-500" />
-            <span className="text-xs text-gray-500 font-medium">Active Projects</span>
-          </div>
-          <p className="text-3xl font-bold text-brand-900">{projects.length}</p>
-        </div>
+        ))}
       </div>
 
-      {/* Recent Scans */}
-      <div className="bg-white border border-gray-200 rounded-xl mb-8">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-brand-900">Recent Scans</h2>
-          <Link to="/scans/new" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</Link>
-        </div>
-        {recentScans.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <Radar className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">No scans yet</p>
-            <p className="text-sm mt-1">Start your first scan to detect vulnerabilities and QA gaps</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Recent scans */}
+        <div className="lg:col-span-2 bg-surface-1 border border-surface-3 rounded-card">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
+            <h2 className="text-sm font-semibold text-fg">Recent Scans</h2>
+            <Link
+              to="/scan"
+              className="flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors"
+            >
+              New scan <ArrowRight className="w-3 h-3" />
+            </Link>
           </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {recentScans.map((s) => {
-              const vc = s.vulnerability_count;
-              const total = vc ? vc.critical + vc.high + vc.medium + vc.low + vc.informational : 0;
-              return (
-                <Link key={s.id} to={`/scans/${s.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
-                    s.risk_grade === "A" ? "bg-emerald-100 text-emerald-700" :
-                    s.risk_grade === "B" ? "bg-blue-100 text-blue-700" :
-                    s.risk_grade === "C" ? "bg-yellow-100 text-yellow-700" :
-                    s.risk_grade === "D" ? "bg-orange-100 text-orange-700" :
-                    "bg-red-100 text-red-700"
-                  }`}>
-                    {s.risk_grade || "?"}
-                  </div>
+          {scans.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-muted">
+              <Radar className="w-8 h-8 mb-3 opacity-30" />
+              <p className="text-sm font-medium text-fg-soft">No scans yet</p>
+              <p className="text-xs mt-1">Run your first scan to see results here</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-surface-3">
+              {scans.map((scan) => (
+                <Link
+                  key={scan.id}
+                  to={`/scans/${scan.id}`}
+                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-2 transition-colors"
+                >
+                  {scan.risk_grade && <RiskGrade grade={scan.risk_grade} />}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-brand-900 truncate font-mono">{s.url}</p>
-                    <p className="text-xs text-gray-500">{new Date(s.created_at).toLocaleString()}</p>
+                    <p className="text-sm font-medium text-fg truncate">{scan.url}</p>
+                    <p className="text-xs text-muted mt-0.5">
+                      {new Date(scan.created_at).toLocaleDateString()} ·{" "}
+                      {scan.vulnerabilities_count ?? 0} findings
+                    </p>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span>{total} vulns</span>
-                    <span>{s.coverage_percent}% covered</span>
-                    <span>{s.test_cases_generated} tests</span>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    s.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                    s.status === "failed" ? "bg-red-100 text-red-700" :
-                    "bg-indigo-100 text-indigo-700 animate-pulse"
-                  }`}>
-                    {s.status.toUpperCase()}
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-badge font-medium border ${
+                      scan.status === "completed"
+                        ? "bg-emerald-900/20 text-emerald-400 border-emerald-800/40"
+                        : scan.status === "running"
+                        ? "bg-accent/15 text-accent border-accent/30"
+                        : scan.status === "failed"
+                        ? "bg-red-900/20 text-red-400 border-red-800/40"
+                        : "bg-surface-2 text-muted border-surface-3"
+                    }`}
+                  >
+                    {scan.status}
                   </span>
                 </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Projects Grid */}
-      <div className="mb-4">
-        <h2 className="font-semibold text-brand-900 mb-4">Projects</h2>
-        {projects.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 bg-white border border-gray-200 rounded-xl">
-            <FolderOpen className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">No projects yet</p>
-            <p className="text-sm mt-1">Create your first project to start generating tests</p>
+        {/* Projects */}
+        <div className="bg-surface-1 border border-surface-3 rounded-card">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
+            <h2 className="text-sm font-semibold text-fg">Projects</h2>
+            <Link
+              to="/projects/new"
+              className="flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors"
+            >
+              <Plus className="w-3 h-3" /> New
+            </Link>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((p) => (
-              <Link
-                key={p.id}
-                to={`/projects/${p.id}/suites`}
-                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-indigo-300 hover:shadow-sm transition group"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <TestTubeDiagonal className="w-5 h-5 text-indigo-500" />
-                  <span className="text-xs font-mono text-gray-400">
-                    {new Date(p.created_at).toLocaleDateString()}
-                  </span>
+          {projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-muted">
+              <FolderOpen className="w-8 h-8 mb-3 opacity-30" />
+              <p className="text-sm font-medium text-fg-soft">No projects</p>
+              <p className="text-xs mt-1">Create a project to group scans</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-surface-3">
+              {projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-surface-2 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-badge bg-surface-2 border border-surface-3 flex items-center justify-center shrink-0">
+                    <FolderOpen className="w-3.5 h-3.5 text-muted" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-fg truncate">{project.name}</p>
+                    <p className="text-xs text-muted truncate font-mono">{project.base_url}</p>
+                  </div>
                 </div>
-                <h3 className="font-semibold text-brand-900 group-hover:text-indigo-600 transition">{p.name}</h3>
-                <p className="text-xs text-gray-500 mt-1 truncate">{p.base_url}</p>
-                {p.description && <p className="text-sm text-gray-600 mt-2 line-clamp-2">{p.description}</p>}
-              </Link>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );
