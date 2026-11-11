@@ -31,8 +31,14 @@ async def create_report(
         format=body.format,
     )
     db.add(report)
-    await db.flush()
-    # TODO: Wire to report generation service (PDF/DOCX/JSON/CSV)
+    await db.commit()
+    await db.refresh(report)
+
+    # Generate report async (fire and forget — polling /reports for file_path)
+    import asyncio
+    from app.services.report_generator import generate_report
+    asyncio.create_task(generate_report(report.id))
+
     return report
 
 

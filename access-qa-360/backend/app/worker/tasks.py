@@ -1,11 +1,14 @@
+import asyncio
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+
 from app.worker.celery_app import celery_app
 from app.services.runner import run_playwright_tests
 from app.services.triage import triage_failure
 from app.core.database import AsyncSessionLocal
 from app.models.run import Run, RunStatus
-from sqlalchemy import select
-from datetime import datetime, timezone
-import asyncio
+from app.models.scan import Scan, ScanStatus
 
 
 @celery_app.task(bind=True, max_retries=1)
@@ -43,5 +46,33 @@ def execute_test_run(self, run_id: str, test_code: str):
                 run.triage_summary = triage_failure(test_result["stdout"], test_result["error"])
 
             await db.commit()
+
+    asyncio.run(_run())
+
+
+@celery_app.task(bind=True, max_retries=1)
+def scan_url(self, scan_id: str):
+    """
+    Celery task: full scan pipeline.
+      1. Crawl target URL with Playwright
+      2. Run passive/active OWASP security probes
+      3. Use Claude Haiku to classify findings and detect QA gaps
+      4. Persist Vulnerability + QAGap records
+      5. Mark scan completed (or failed on error)
+    """
+    async def _run():
+        try:
+            from app.services.scanner import run_scan
+            await run_scan(scan_id)
+        except Exception as exc:
+            # Mark scan failed on unhandled exception
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Scan).where(Scan.id == scan_id))
+                scan = result.scalar_one_or_none()
+                if scan:
+                    scan.status = ScanStatus.failed
+                    scan.progress = 0
+                    await db.commit()
+            raise self.retry(exc=exc, countdown=0, max_retries=0)
 
     asyncio.run(_run())

@@ -17,7 +17,13 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 async def create_scan(body: ScanCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     scan = Scan(**body.model_dump(), created_by=user.id)
     db.add(scan)
-    await db.flush()
+    await db.commit()
+    await db.refresh(scan)
+
+    # Dispatch async scan task
+    from app.worker.tasks import scan_url as scan_url_task
+    scan_url_task.delay(scan.id)
+
     return scan
 
 

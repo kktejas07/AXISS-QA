@@ -9,7 +9,7 @@ export function ScanPage() {
   const navigate = useNavigate();
   const [url, setUrl] = useState("");
   const [scanType, setScanType] = useState<ScanType>("passive");
-  const [profile, setProfile] = useState<ScanProfile>("owasp-top-10");
+  const [profile, setProfile] = useState<ScanProfile>("owasp_top10");
   const [showAuth, setShowAuth] = useState(false);
   const [auth, setAuth] = useState<AuthConfig>({ type: "none" });
   const [includePaths, setIncludePaths] = useState("");
@@ -24,7 +24,7 @@ export function ScanPage() {
     if (!url.trim()) { setError("URL is required"); return; }
     setError("");
     setScanning(true);
-    setProgress(10);
+    setProgress(5);
     try {
       const { data } = await createScan({
         url: url.trim(),
@@ -36,8 +36,33 @@ export function ScanPage() {
         crawl_depth: crawlDepth,
         rate_limit: rateLimit,
       });
-      setProgress(100);
-      navigate(`/scans/${data.id}`);
+
+      const scanId = data.id;
+      // Stream real-time progress via SSE
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const token = localStorage.getItem("access_token");
+      const evtSource = new EventSource(
+        `${apiBase}/api/v1/scans/${scanId}/stream?token=${encodeURIComponent(token || "")}`
+      );
+
+      evtSource.addEventListener("progress", (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          setProgress(payload.progress ?? 0);
+        } catch {}
+      });
+
+      evtSource.addEventListener("done", () => {
+        evtSource.close();
+        setProgress(100);
+        navigate(`/scans/${scanId}`);
+      });
+
+      evtSource.addEventListener("error", () => {
+        evtSource.close();
+        navigate(`/scans/${scanId}`);
+      });
+
     } catch (err: any) {
       setError(err.response?.data?.detail || "Scan failed to start");
       setScanning(false);
@@ -52,8 +77,8 @@ export function ScanPage() {
   ];
 
   const profiles: { value: ScanProfile; label: string }[] = [
-    { value: "owasp-top-10", label: "OWASP Top 10" },
-    { value: "pci-dss", label: "PCI-DSS" },
+    { value: "owasp_top10", label: "OWASP Top 10" },
+    { value: "pci_dss", label: "PCI-DSS" },
     { value: "hipaa", label: "HIPAA" },
     { value: "custom", label: "Custom" },
   ];

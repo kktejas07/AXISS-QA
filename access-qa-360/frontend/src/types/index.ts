@@ -47,7 +47,7 @@ export interface Run {
 }
 
 export type ScanType = "passive" | "active" | "hybrid";
-export type ScanProfile = "owasp-top-10" | "pci-dss" | "hipaa" | "custom";
+export type ScanProfile = "owasp_top10" | "pci_dss" | "hipaa" | "custom";
 export type ScanStatus = "queued" | "crawling" | "scanning" | "analyzing" | "completed" | "failed";
 export type Severity = "critical" | "high" | "medium" | "low" | "informational";
 export type CoverageStatus = "covered" | "partial" | "uncovered";
