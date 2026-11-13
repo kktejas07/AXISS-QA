@@ -18,7 +18,7 @@ from collections import Counter
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.ai import ai_client, ai_context
+from app.core.ai import ai_client, ai_context, org_context
 from app.core.config import settings
 from app.models.audit_job import AuditJob
 from app.models.wise import WiseDocument
@@ -126,16 +126,33 @@ async def gather(db: AsyncSession, org_id: str, user_id: str, audit_id: str | No
     return passages + [p for doc in docs for p in document_passages(doc)]
 
 
-def actions(question: str) -> list[dict]:
-    """Links to the screen that does what was asked. Wise points; the person acts."""
+_EVERY = [("daily", r"\b(every day|daily|each day|nightly)\b"), ("weekly", r"\b(every week|weekly|each week)\b"), ("monthly", r"\b(every month|monthly|each month)\b")]
+
+
+def actions(question: str, audit_id: str | None = None) -> list[dict]:
+    """
+    What Wise offers to do about the question. An entry with "do" is something Wise
+    carries out itself, but only after the person presses the button and confirms;
+    an entry with "path" is a link to the screen where they can do it themselves.
+    """
     q = question.lower()
     out = []
-    url = _URL.search(question)
-    if re.search(r"\b(scan|test|audit|check)\b", q) and url:
-        out.append({"label": f"Start a scan of {url.group(0)[:60]}", "path": f"/scans/new?url={url.group(0)}"})
+    found = _URL.search(question)
+    url = found.group(0).rstrip(".,;!?") if found else None
+    frequency = next((name for name, pattern in _EVERY if re.search(pattern, q)), None)
+    asks_schedule = bool(frequency) or bool(re.search(r"\b(schedul|recurring|automat)", q))
+    if url and asks_schedule:
+        out.append({"label": f"Scan {url[:50]} {frequency or 'weekly'}", "do": {"kind": "create_schedule", "target": url, "frequency": frequency or "weekly"},
+                    "confirm": f"Wise will add a schedule that scans {url} {frequency or 'weekly'}. Each run uses one scan."})
+    elif url and re.search(r"\b(scan|test|audit|check)\b", q):
+        out.append({"label": f"Start a scan of {url[:50]}", "do": {"kind": "start_scan", "target": url},
+                    "confirm": f"Wise will start a security scan of {url} and write test cases for it. This uses one scan."})
+    elif audit_id and re.search(r"\b(re-?scan|re-?run|scan (it|this) again|run (it|this) again|again)\b", q):
+        out.append({"label": "Scan this again", "do": {"kind": "rescan", "audit_id": audit_id},
+                    "confirm": "Wise will scan the same target again with the same settings. This uses one scan."})
     elif re.search(r"\b(new|start|run|begin)\b.*\bscan\b", q):
         out.append({"label": "Start a new scan", "path": "/scans/new"})
-    if re.search(r"\b(schedul|every (day|week|month)|daily|weekly|monthly|recurring|automat)", q):
+    if asks_schedule and not url:
         out.append({"label": "Set up a schedule", "path": "/schedules"})
     if re.search(r"\b(slack|teams|jira|github|linear|pull request|webhook|api key|two-step|2fa|password)\b", q):
         out.append({"label": "Open Settings", "path": "/settings"})
@@ -171,10 +188,10 @@ async def answer(db: AsyncSession, org_id: str, user_id: str, messages: list[dic
         if (p["title"], p["link"]) not in seen:
             seen.add((p["title"], p["link"]))
             sources.append({"title": p["title"], "link": p["link"], "kind": p["kind"]})
-    out = {"sources": sources[:6], "actions": actions(question), "used_ai": False}
+    out = {"sources": sources[:6], "actions": actions(question, audit_id), "used_ai": False}
     if _ai_ready() and found:
         passages = "\n\n".join(f"[{i + 1}] ({p['kind']}) {p['title']}\n{p['text'][:1200]}" for i, p in enumerate(found))
-        token = ai_context.set({"organization_id": org_id, "audit_id": audit_id})
+        token = ai_context.set(await org_context(db, org_id, audit_id))
         try:
             reply = await ai_client("wise").messages.create(
                 model=MODEL, max_tokens=700, system=SYSTEM.format(passages=passages),

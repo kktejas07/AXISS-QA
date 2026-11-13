@@ -75,6 +75,7 @@ export interface Connections {
   teams: { connected: boolean; events?: "automatic" | "all" };
   github: { connected: boolean; login?: string; repo?: string | null; fail_on?: "critical" | "high" | "never"; webhook_url?: string; webhook_secret?: string };
   linear: { connected: boolean; team_key?: string; team_name?: string };
+  azure: { connected: boolean; organization?: string; project?: string; work_item_type?: string };
 }
 export type ConnectionKind = keyof Connections;
 
@@ -82,4 +83,10 @@ export const getConnections = () => api.get<Connections>("/org/connections");
 export const saveChat = (kind: "slack" | "teams", body: { webhook_url: string; events: "automatic" | "all" }) => api.put<Connections["slack"]>(`/org/connections/${kind}`, body);
 export const saveGitHub = (body: { token: string; repo?: string; fail_on: string }) => api.put<Connections["github"]>("/org/github", body);
 export const saveLinear = (body: { api_key: string; team_key: string }) => api.put<Connections["linear"]>("/org/linear", body);
+export const saveAzure = (body: { organization: string; project: string; token: string; work_item_type: string }) => api.put<Connections["azure"]>("/org/azure", body);
+
+export interface AiSettings { quality: "fast" | "balanced" | "best"; own_key: boolean; key_ending: string | null }
+export const getAiSettings = () => api.get<AiSettings>("/org/ai");
+/** `api_key` left out keeps the saved key; an empty string removes it. */
+export const saveAiSettings = (body: { quality: AiSettings["quality"]; api_key?: string }) => api.put<AiSettings>("/org/ai", body);
 export const disconnect = (kind: ConnectionKind) => api.delete(`/org/connections/${kind}`);

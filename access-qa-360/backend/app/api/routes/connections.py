@@ -19,7 +19,7 @@ from app.models.organization import Organization
 from app.services import github, notify, scan_control, schedules, trackers
 
 router = APIRouter(tags=["connections"])
-KINDS = ("slack", "teams", "github", "linear")
+KINDS = ("slack", "teams", "github", "linear", "azure")
 
 
 async def _row(db: AsyncSession, org_id: str, kind: str) -> Integration | None:
@@ -49,6 +49,8 @@ def _describe(kind: str, row: Integration | None, org_id: str, can_edit: bool) -
         return {"connected": True, "events": cfg.get("events", "automatic")}
     if kind == "linear":
         return {"connected": True, "team_key": cfg.get("team_key"), "team_name": cfg.get("team_name")}
+    if kind == "azure":
+        return {"connected": True, **{k: cfg.get(k) for k in ("organization", "project", "work_item_type")}}
     out = {"connected": True, "login": cfg.get("login"), "repo": cfg.get("repo"), "fail_on": cfg.get("fail_on", "high"), "webhook_url": webhook_url(org_id)}
     if can_edit:   # needed to set the webhook up on GitHub; not shown to members and viewers
         out["webhook_secret"] = decrypt(cfg.get("webhook_secret", ""))
@@ -118,8 +120,59 @@ async def save_linear(body: LinearSave, db: AsyncSession = Depends(get_db), ctx:
     return _describe("linear", row, ctx.org.id, True)
 
 
+class AzureSave(BaseModel):
+    organization: str = Field(pattern=f"^{trackers.AZURE_NAME}$")
+    project: str = Field(pattern=f"^{trackers.AZURE_NAME}$")
+    token: str = Field(min_length=10, max_length=400)
+    work_item_type: Literal["Bug", "Issue", "Task"] = "Bug"
+
+
+@router.put("/org/azure")
+async def save_azure(body: AzureSave, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Connect Azure Boards with a personal access token, to turn findings into work items."""
+    ctx.require("org.edit")
+    try:
+        project = await trackers.azure_check(body.organization, body.project, body.token.strip())
+    except trackers.TrackerError as e:
+        raise HTTPException(400, str(e))
+    row = await _save(db, ctx, "azure", {"organization": body.organization, "project": project, "work_item_type": body.work_item_type}, body.token.strip())
+    return _describe("azure", row, ctx.org.id, True)
+
+
+# ---- AI settings ---------------------------------------------------------------
+
+class AiSave(BaseModel):
+    quality: Literal["fast", "balanced", "best"]
+    # The organisation's own Anthropic key. Left out: the saved key, if any, is kept. Empty string: it is removed.
+    api_key: str | None = Field(default=None, max_length=400)
+
+
+def _ai_out(org: Organization) -> dict:
+    key = decrypt(org.ai_key_encrypted) if org.ai_key_encrypted else None
+    return {"quality": org.ai_quality or "balanced", "own_key": bool(key), "key_ending": key[-4:] if key else None}
+
+
+@router.get("/org/ai")
+async def get_ai(ctx: OrgContext = Depends(get_org_context)):
+    return _ai_out(ctx.org)
+
+
+@router.put("/org/ai")
+async def save_ai(body: AiSave, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Choose speed against quality for this organisation's AI work, and optionally use its own Anthropic key."""
+    ctx.require("org.edit")
+    ctx.org.ai_quality = body.quality
+    if body.api_key is not None:
+        key = body.api_key.strip()
+        if key and not (key.startswith("sk-ant-") and len(key) >= 24):
+            raise HTTPException(422, "That does not look like an Anthropic API key. They start with sk-ant-")
+        ctx.org.ai_key_encrypted = encrypt(key) if key else None
+    await db.flush()
+    return _ai_out(ctx.org)
+
+
 @router.delete("/org/connections/{kind}", status_code=204)
-async def disconnect(kind: Literal["slack", "teams", "github", "linear"], db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+async def disconnect(kind: Literal["slack", "teams", "github", "linear", "azure"], db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     ctx.require("org.edit")
     row = await _row(db, ctx.org.id, kind)
     if row:

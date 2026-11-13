@@ -57,6 +57,37 @@ describe("Wise", () => {
     expect(await screen.findByRole("link", { name: /Start a scan of/ })).toHaveAttribute("href", "/scans/new?url=https://shop.example.com");
   });
 
+  it("does what it offered only after the person ticks permission and presses the button, and only once", async () => {
+    const offer = { label: "Start a scan of https://shop.example.com", do: { kind: "start_scan" as const, target: "https://shop.example.com" }, confirm: "This uses one scan." };
+    vi.mocked(api.askWise).mockResolvedValue(reply("I can start that for you.", { actions: [offer] }));
+    vi.mocked(api.doWiseAction).mockResolvedValue({ data: { message: "The scan of shop.example.com has started.", path: "/audits/a1" } } as never);
+    await open();
+    await userEvent.type(screen.getByLabelText("Your question for Wise"), "scan https://shop.example.com{Enter}");
+    const go = await screen.findByRole("button", { name: "Yes, do it" });
+    expect(go).toBeDisabled();
+    expect(api.doWiseAction).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("checkbox", { name: /permission to test/ }));
+    await userEvent.click(go);
+    expect(api.doWiseAction).toHaveBeenCalledWith(offer.do);
+    expect(await screen.findByText("The scan of shop.example.com has started.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open it/ })).toHaveAttribute("href", "/audits/a1");
+    expect(screen.queryByRole("button", { name: "Yes, do it" })).not.toBeInTheDocument();
+  });
+
+  it("leaves things alone when told not now, and shows why when the action is refused", async () => {
+    const offer = { label: "Scan this again", do: { kind: "rescan" as const, audit_id: "a1" }, confirm: "This uses one scan." };
+    vi.mocked(api.askWise).mockResolvedValue(reply("I can do that.", { actions: [offer] }));
+    vi.mocked(api.doWiseAction).mockRejectedValue({ response: { data: { detail: "Your organisation has used all 2 scans for this month." } } });
+    await open();
+    await userEvent.type(screen.getByLabelText("Your question for Wise"), "again{Enter}");
+    await userEvent.click(await screen.findByRole("checkbox", { name: /permission to test/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Yes, do it" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("used all 2 scans for this month");
+    await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(screen.queryByRole("button", { name: "Yes, do it" })).not.toBeInTheDocument();
+    expect(api.doWiseAction).toHaveBeenCalledTimes(1);
+  });
+
   it("includes the scan being looked at, and keeps the conversation going", async () => {
     vi.mocked(api.askWise).mockResolvedValue(reply("It is a critical finding."));
     await open("/audits/11111111-2222-3333-4444-555555555555");

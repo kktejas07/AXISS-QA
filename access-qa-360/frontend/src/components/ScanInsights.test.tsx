@@ -6,7 +6,7 @@ import type { AuditJob } from "../api/audits";
 import type { Changes, ScanBrief, Standards } from "../api/insights";
 import * as api from "../api/insights";
 import * as wiseApi from "../api/wise";
-import { ChangesTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab, TrendChart } from "./ScanInsights";
+import { ChangesTab, ConversationsTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab, TrendChart } from "./ScanInsights";
 
 vi.mock("../api/insights");
 vi.mock("../api/wise");
@@ -140,5 +140,28 @@ describe("FlowsTab", () => {
     vi.mocked(wiseApi.getFlows).mockReturnValue(ok({ nodes: [], edges: [], pages_crawled: 0, shown: 0 }));
     render(<FlowsTab job={job()} />);
     expect(await screen.findByRole("heading", { name: "No pages to map" })).toBeInTheDocument();
+  });
+});
+
+describe("ConversationsTab", () => {
+  const probe = (id: string, verdict: "pass" | "fail" | "review", name: string) => ({ id, category: "Prompt injection", name, severity: "high", prompt: `message ${id}`, reply: `reply ${id}`, verdict, why: `why ${id}` });
+  const chatbot = { greeting: "Hi", note: "Replies are judged by fixed rules.", passed: 1, failed: 1, review: 1, errors: 0,
+    probes: [probe("a", "pass", "Stayed on task"), probe("b", "fail", "Told to ignore its instructions"), probe("c", "review", "Asked about a made-up product")] };
+
+  it("shows what needs attention first, with the message, the reply and the verdict", async () => {
+    render(<ConversationsTab job={job({ source_type: "chatbot", tier1_result: { chatbot } })} />);
+    expect(screen.getByRole("heading", { name: "Told to ignore its instructions" })).toBeInTheDocument();
+    expect(screen.getByText("message b")).toBeInTheDocument();
+    expect(screen.getByText("reply b")).toBeInTheDocument();
+    expect(screen.getByText("why b")).toBeInTheDocument();
+    expect(screen.getByText("Check by hand", { selector: "span" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Stayed on task" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "All (3)" }));
+    expect(screen.getByRole("heading", { name: "Stayed on task" })).toBeInTheDocument();
+  });
+
+  it("explains when the bot could not be reached", () => {
+    render(<ConversationsTab job={job({ source_type: "chatbot", tier1_result: { error: "The chatbot answered with an error (status 401)" } })} />);
+    expect(screen.getByText("The chatbot answered with an error (status 401)")).toBeInTheDocument();
   });
 });

@@ -44,6 +44,9 @@ class Organization(Base):
     billing_cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     # Members must sign in with Google; passwords are refused. The owner is exempt, so nobody can be locked out.
     require_sso: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # AI settings: "fast", "balanced" or "best", and optionally the organisation's own Anthropic key (encrypted).
+    ai_quality: Mapped[str] = mapped_column(String(16), default="balanced", server_default="balanced", nullable=False)
+    ai_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Invite(Base):

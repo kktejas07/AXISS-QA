@@ -26,10 +26,10 @@ from app.services.web_auditor import (
 )
 from app.services.mobile_auditor import run_mobile_audit
 from app.services.api_auditor import run_api_audit
-from app.services import api_spec_auditor, code_auditor
+from app.services import api_spec_auditor, chatbot_auditor, code_auditor
 from app.core.secrets import decrypt
 
-from app.core.ai import ai_client, ai_context
+from app.core.ai import ai_client, ai_context, org_context
 from app.core.config import settings
 from app.core.storage import storage_path
 
@@ -397,6 +397,7 @@ async def _run_audit(audit_job_id: str):
         depth = job.depth or "standard"
         is_code = job.is_code
         is_api = job.source_type == "api"
+        is_chatbot = job.source_type == "chatbot"
         login = None
         if job.login_encrypted:
             try:
@@ -404,13 +405,16 @@ async def _run_audit(audit_job_id: str):
             except ValueError:
                 login = None
         # AI calls made during this scan are counted against its organisation.
-        ai_context.set({"organization_id": job.organization_id, "audit_id": job.id})
+        ai_context.set(await org_context(db, job.organization_id, job.id))
 
     if is_code:
         await _run_code_audit(audit_job_id)
         return
     if is_api:
         await _run_api_spec_audit(audit_job_id)
+        return
+    if is_chatbot:
+        await _run_chatbot_audit(audit_job_id, login)
         return
 
     max_depth, max_pages = DEPTH_LIMITS.get(depth, DEPTH_LIMITS["standard"])
@@ -715,6 +719,46 @@ async def _run_api_spec_audit(audit_job_id: str) -> None:
         if path and os.path.exists(path):
             os.remove(path)
     await _finish(audit_job_id, tier_states, critical, high, tier1_data, {}, tier3_data)
+
+
+async def _run_chatbot_audit(audit_job_id: str, secret: dict | None) -> None:
+    """A scan of a chatbot or AI app: a fixed set of test messages is sent and each reply is judged."""
+    async with AsyncSessionLocal() as db:
+        job = (await db.execute(select(AuditJob).where(AuditJob.id == audit_job_id))).scalar_one()
+        endpoint, config = job.target_url, job.chatbot_config or {}
+        outputs = set(job.outputs or ALL_OUTPUTS)
+    skipped = {"skipped": "The chatbot could not be reached"}
+    await _set_progress(audit_job_id, 5, status=AuditStatus.running, tier1_status="running",
+                        tier2_status="skipped", tier2_result={"skipped": "No mobile build provided"})
+
+    async def progress(done: int, total: int) -> None:
+        await _set_progress_only(audit_job_id, progress=5 + int(60 * done / total))
+
+    try:
+        result = await chatbot_auditor.run(endpoint, config, (secret or {}).get("header"), on_progress=progress)
+    except chatbot_auditor.ChatbotError as e:
+        await _set_progress(audit_job_id, 100, status=AuditStatus.failed, tier1_status="failed", tier1_result={"error": str(e)},
+                            tier3_status="skipped", tier3_result=skipped, tier4_status="skipped", tier4_result=skipped,
+                            tier5_status="skipped", tier5_result=skipped, completed_at=datetime.now(timezone.utc))
+        return
+    tier1_data = {"chatbot": result}
+    await _set_progress(audit_job_id, 68, tier1_status="completed", tier1_result=tier1_data, total_pages_audited=len(result["probes"]))
+    critical = high = 0
+    tier3_data: dict = {"skipped": "Security audit not selected"}
+    if "security" in outputs:
+        found = chatbot_auditor.findings(result, endpoint)
+        critical, high = _count(found, "critical"), _count(found, "high")
+        tier3_data = {"findings": found, "subdomains_found": [], "js_secrets": []}
+        await _set_progress(audit_job_id, 74, tier3_status="completed", tier3_result=tier3_data, critical_count=critical, high_count=high)
+    else:
+        await _set_progress(audit_job_id, 74, tier3_status="skipped", tier3_result=tier3_data)
+    if "manual" in outputs:
+        cases = chatbot_auditor.test_cases()
+        await _set_progress(audit_job_id, 80, tier4_status="completed", total_test_cases=len(cases),
+                            tier4_result={"test_cases": cases, "total": len(cases), "jira_csv": _to_jira_csv(cases)})
+    else:
+        await _set_progress(audit_job_id, 80, tier4_status="skipped", tier4_result={"skipped": "Manual test cases not selected"})
+    await _finish(audit_job_id, ["completed"], critical, high, tier1_data, {}, tier3_data)
 
 
 async def _finish(audit_job_id: str, tier_states: list[str], critical: int, high: int,

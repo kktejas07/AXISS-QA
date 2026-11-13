@@ -1,7 +1,9 @@
 import api from "./client";
 
 export interface WiseSource { title: string; link: string; kind: string }
-export interface WiseAction { label: string; path: string }
+export interface WiseDo { kind: "start_scan" | "create_schedule" | "rescan"; target?: string; frequency?: string; audit_id?: string }
+/** Either a link to a screen (`path`), or something Wise does itself once the person confirms (`do`). */
+export interface WiseAction { label: string; path?: string; do?: WiseDo; confirm?: string }
 export interface WiseReply { answer: string; sources: WiseSource[]; actions: WiseAction[]; used_ai: boolean }
 export interface WiseMessage { role: "user" | "assistant"; content: string; sources?: WiseSource[]; actions?: WiseAction[] }
 export interface WisePrompt { id: string; label: string; text: string }
@@ -9,6 +11,8 @@ export interface WiseDocument { id: string; name: string; size: number; created_
 
 export const askWise = (messages: WiseMessage[], auditId?: string) =>
   api.post<WiseReply>("/wise/chat", { messages: messages.slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 4000) })), audit_id: auditId });
+/** Carries out something Wise offered. `confirmed` is the person saying they may test this target. */
+export const doWiseAction = (action: WiseDo) => api.post<{ message: string; path: string }>("/wise/actions", { ...action, confirmed: true });
 export const getWisePrompts = () => api.get<WisePrompt[]>("/wise/prompts");
 export const getWiseDocuments = () => api.get<WiseDocument[]>("/wise/documents");
 export const addWiseDocument = (file: File) => {

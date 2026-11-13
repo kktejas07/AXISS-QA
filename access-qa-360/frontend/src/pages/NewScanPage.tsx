@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, Code2, GitBranch, Globe, Smartphone, Upload, Braces } from "lucide-react";
+import { ArrowRight, Code2, GitBranch, Globe, Smartphone, Upload, Bot, Braces } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { ScanSteps } from "../components/ScanSteps";
@@ -9,7 +9,7 @@ import type { SourceType } from "../api/audits";
 import { useCan } from "../hooks/useMe";
 import { apiError } from "../utils/errors";
 
-type Source = "web" | "mobile" | "code" | "repo" | "api";
+type Source = "web" | "mobile" | "code" | "repo" | "api" | "chatbot";
 
 const sources: { id: Source; label: string; hint: string; icon: LucideIcon; ready: boolean }[] = [
   { id: "web", label: "Web app", hint: "Paste a URL", icon: Globe, ready: true },
@@ -17,6 +17,7 @@ const sources: { id: Source; label: string; hint: string; icon: LucideIcon; read
   { id: "code", label: "Source code", hint: "Upload a .zip", icon: Code2, ready: true },
   { id: "repo", label: "Repository", hint: "GitHub, GitLab or Bitbucket", icon: GitBranch, ready: true },
   { id: "api", label: "API", hint: "Upload an OpenAPI file", icon: Braces, ready: true },
+  { id: "chatbot", label: "Chatbot", hint: "Test an AI assistant", icon: Bot, ready: true },
 ];
 
 const field = "h-[52px] w-full rounded-[10px] border border-gray-400 bg-white px-3.5 text-[15px]";
@@ -38,6 +39,7 @@ export function NewScanPage() {
   const [url, setUrl] = useState(query.get("url") ?? "");
   const [repo, setRepo] = useState("");
   const [apiUrl, setApiUrl] = useState("");
+  const [bot, setBot] = useState({ url: "", body: '{"messages": [{"role": "user", "content": "{{message}}"}]}', reply_path: "choices.0.message.content", header_name: "", header_value: "" });
   const [appName, setAppName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -82,7 +84,13 @@ export function NewScanPage() {
     setBusy(true);
     try {
       const name = appName.trim() || undefined;
-      if (source === "web") {
+      if (source === "chatbot") {
+        const { data } = await createDraft({
+          source_type: "chatbot", target_url: bot.url.trim(), app_name: name,
+          chatbot: { body: bot.body, reply_path: bot.reply_path.trim(), ...(bot.header_name.trim() ? { header_name: bot.header_name.trim(), header_value: bot.header_value } : {}) },
+        });
+        navigate(`/audits/${data.id}/setup${after}`);
+      } else if (source === "web") {
         const { data } = await createDraft({ source_type: "web", target_url: url.trim(), app_name: name });
         navigate(`/audits/${data.id}/setup${after}`);
       } else if (source === "repo") {
@@ -111,7 +119,7 @@ export function NewScanPage() {
       </div>
 
       <form onSubmit={submit} className="flex max-w-3xl flex-col gap-6">
-        <div role="group" aria-label="Type of app" className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
+        <div role="group" aria-label="Type of app" className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {sources.map(({ id, label, hint, icon: Icon, ready }) => {
             const on = source === id;
             return (
@@ -138,7 +146,39 @@ export function NewScanPage() {
         </div>
 
         <div className="flex flex-col gap-5 rounded-2xl border border-gray-300 bg-white p-7">
-          {source === "web" ? (
+          {source === "chatbot" ? (
+            <div className="flex flex-col gap-4">
+              <label className="flex flex-col gap-2 font-semibold">
+                Where messages are sent
+                <input type="url" required value={bot.url} onChange={(e) => setBot({ ...bot, url: e.target.value })} placeholder="https://api.example.com/chat" className={`${field} font-mono`} />
+                <span className="text-[13.5px] font-normal text-body">The address your chat window posts each message to. It must start with https:// and be reachable from the internet.</span>
+              </label>
+              <label className="flex flex-col gap-2 font-semibold">
+                What to send
+                <textarea required rows={3} value={bot.body} onChange={(e) => setBot({ ...bot, body: e.target.value })} spellCheck={false}
+                  className="w-full rounded-[10px] border border-gray-400 bg-white px-3.5 py-3 font-mono text-[14px]" />
+                <span className="text-[13.5px] font-normal text-body">The JSON your app sends, with <span className="font-mono">{"{{message}}"}</span> where the person's message goes.</span>
+              </label>
+              <label className="flex flex-col gap-2 font-semibold">
+                Where the reply is in the answer
+                <input required value={bot.reply_path} onChange={(e) => setBot({ ...bot, reply_path: e.target.value })} placeholder="choices.0.message.content" className={`${field} font-mono`} />
+                <span className="text-[13.5px] font-normal text-body">Names and numbers joined by dots. For an answer like {'{"reply": "Hello"}'} write <span className="font-mono">reply</span>.</span>
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 font-semibold">
+                  Header name (optional)
+                  <input value={bot.header_name} onChange={(e) => setBot({ ...bot, header_name: e.target.value })} placeholder="Authorization" autoComplete="off" className={`${field} font-mono`} />
+                </label>
+                <label className="flex flex-col gap-2 font-semibold">
+                  Header value
+                  <input type="password" value={bot.header_value} onChange={(e) => setBot({ ...bot, header_value: e.target.value })} placeholder="Bearer …" autoComplete="new-password" className={`${field} font-mono`} />
+                </label>
+              </div>
+              <span className="text-[13.5px] text-body">
+                Use a test key if the bot needs one. It is stored encrypted and deleted when the scan ends. The scan sends 15 messages, one at a time.
+              </span>
+            </div>
+          ) : source === "web" ? (
             <label className="flex flex-col gap-2 font-semibold">
               Web app address
               <input

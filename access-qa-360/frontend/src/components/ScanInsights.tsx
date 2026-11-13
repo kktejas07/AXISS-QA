@@ -419,3 +419,63 @@ export function FlowsTab({ job }: { job: AuditJob }) {
     </div>
   );
 }
+
+const verdictLook: Record<string, [string, string]> = {
+  pass: ["Passed", "bg-emerald-100 text-emerald-900"],
+  fail: ["Failed", "bg-red-100 text-red-900"],
+  review: ["Check by hand", "bg-amber-100 text-amber-900"],
+  error: ["No answer", "bg-gray-200 text-ink"],
+};
+
+/** Chatbot scans: every test message, what the bot replied, and the verdict. */
+export function ConversationsTab({ job }: { job: AuditJob }) {
+  const result = job.tier1_result?.chatbot;
+  const [show, setShow] = useState<"all" | "problems">("problems");
+  if (!result) {
+    return (
+      <EmptyPanel art={<ShieldList />} title="The chatbot was not tested">
+        {job.tier1_result?.error ?? "No test messages have been sent yet."}
+      </EmptyPanel>
+    );
+  }
+  const problems = result.probes.filter((p) => p.verdict !== "pass");
+  const shown = show === "all" ? result.probes : problems;
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="max-w-[72ch] text-body">{result.note}</p>
+      <dl className="grid gap-4 sm:grid-cols-4">
+        {[["Passed", result.passed, ""], ["Failed", result.failed, result.failed ? "text-red-800" : ""], ["Check by hand", result.review, ""], ["No answer", result.errors, ""]].map(([k, v, tone]) => (
+          <div key={k} className={`${card} p-5`}>
+            <dt className="text-[13.5px] font-semibold text-body">{k}</dt>
+            <dd className={`text-2xl font-extrabold ${tone}`}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div role="group" aria-label="Which conversations to show" className="flex gap-1 self-start rounded-[11px] border border-gray-300 bg-white p-1">
+        {([["problems", `Needs attention (${problems.length})`], ["all", `All (${result.probes.length})`]] as const).map(([id, text]) => (
+          <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)} className={`min-h-[40px] rounded-[8px] px-3.5 text-sm font-semibold ${show === id ? "bg-ink text-white" : "text-ink"}`}>
+            {text}
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
+        <p className={`${card} px-6 py-10 text-center text-body`}>Every test message got a safe reply.</p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {shown.map((p, i) => (
+            <li key={p.id} className={`${card} wf-fade-up flex flex-col gap-3 p-5`} style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-bold ${verdictLook[p.verdict][1]}`}>{verdictLook[p.verdict][0]}</span>
+                <span className="text-[13.5px] font-semibold text-body">{p.category}</span>
+                <h2 className="w-full text-lg font-bold">{p.name}</h2>
+              </div>
+              <p className="max-w-[90%] self-end whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-ink px-3.5 py-2.5 text-[15px] text-white">{p.prompt}</p>
+              {p.reply && <p className="max-w-[90%] self-start whitespace-pre-wrap break-words rounded-2xl rounded-bl-md bg-soft px-3.5 py-2.5 text-[15px]">{p.reply}</p>}
+              <p className="text-[15px]"><span className="font-semibold">Verdict:</span> {p.why}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

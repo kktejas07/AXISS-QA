@@ -3,7 +3,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Check, Minus, X } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { ChangesTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab } from "../components/ScanInsights";
+import { ChangesTab, ConversationsTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab } from "../components/ScanInsights";
 import { ScanSteps } from "../components/ScanSteps";
 import { StatusPill } from "../components/StatusPill";
 import {
@@ -87,7 +87,7 @@ function Stat({ label, value, note, bad }: { label: string; value: string | numb
   );
 }
 
-type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "changes" | "standards" | "performance" | "endpoints" | "flows" | "downloads";
+type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "changes" | "standards" | "performance" | "endpoints" | "flows" | "conversations" | "downloads";
 
 /** One scan: progress while it runs, then tabbed results. */
 export function ScanDetailPage() {
@@ -185,6 +185,7 @@ export function ScanDetailPage() {
 
   // ---- finished ------------------------------------------------------------
   const api = job.source_type === "api";
+  const chatbot = job.source_type === "chatbot";
   const findings = allFindings(job);
   const a11y = job.tier1_result?.a11y_summary?.violations.length ?? 0;
   const cases = job.tier4_result?.test_cases?.length ?? 0;
@@ -199,11 +200,13 @@ export function ScanDetailPage() {
       ? [{ id: "gaps" as const, label: "QA gaps", count: gapCount }]
       : api
         ? [{ id: "endpoints" as const, label: "Endpoints", count: job.tier1_result?.api?.operations ?? 0 }]
-        : [{ id: "accessibility" as const, label: "Accessibility", count: a11y }]),
+        : chatbot
+          ? [{ id: "conversations" as const, label: "Conversations", count: job.tier1_result?.chatbot?.probes.length ?? 0 }]
+          : [{ id: "accessibility" as const, label: "Accessibility", count: a11y }]),
     ...(job.source_type === "web" ? [{ id: "flows" as const, label: "Flows", count: job.total_pages_audited }] : []),
     ...(job.source_type === "web" ? [{ id: "performance" as const, label: "Performance", count: job.tier1_result?.performance?.findings.length ?? 0 }] : []),
     { id: "cases", label: "Test cases", count: cases },
-    ...(code || api ? [] : [{ id: "code" as const, label: "Automation" }]),
+    ...(code || api || chatbot ? [] : [{ id: "code" as const, label: "Automation" }]),
     { id: "changes", label: "Changes" },
     { id: "standards", label: "Standards" },
     { id: "downloads", label: "Downloads", count: job.exports.length },
@@ -271,7 +274,9 @@ export function ScanDetailPage() {
               </>
             ) : (
               <>
-                {api ? (
+                {chatbot ? (
+                  <Stat label="Test messages sent" value={job.total_pages_audited} note={`${job.tier1_result?.chatbot?.failed ?? 0} failed, ${job.tier1_result?.chatbot?.review ?? 0} to check by hand`} bad={(job.tier1_result?.chatbot?.failed ?? 0) > 0} />
+                ) : api ? (
                   <Stat label="Endpoints read" value={job.total_pages_audited} note={`${job.tier1_result?.api?.secured ?? 0} need sign-in`} />
                 ) : (
                   <Stat label="Pages mapped" value={job.total_pages_audited} note={`${a11y} accessibility ${a11y === 1 ? "problem" : "problems"}`} />
@@ -326,6 +331,7 @@ export function ScanDetailPage() {
       {tab === "gaps" && <QaGapsTab job={job} />}
       {tab === "cases" && <TestCasesTab job={job} />}
       {tab === "code" && <AutomationTab job={job} />}
+      {tab === "conversations" && <ConversationsTab job={job} />}
       {tab === "flows" && <FlowsTab job={job} />}
       {tab === "performance" && <PerformanceTab job={job} />}
       {tab === "endpoints" && <EndpointsTab job={job} />}

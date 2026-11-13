@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Copy } from "lucide-react";
-import { disconnect, getConnections, saveChat, saveGitHub, saveLinear } from "../api/insights";
+import { disconnect, getConnections, saveAzure, saveChat, saveGitHub, saveLinear } from "../api/insights";
 import type { ConnectionKind, Connections } from "../api/insights";
 import { apiError } from "../utils/errors";
 import { errorBox, field, hint, label } from "./ui";
@@ -9,12 +9,13 @@ const section = "overflow-hidden rounded-2xl border border-gray-300 bg-white p-6
 const smallButton = "h-11 rounded-[10px] border-[1.5px] border-gray-400 bg-white px-3.5 text-sm font-semibold disabled:opacity-50";
 const darkButton = "h-12 rounded-[10px] bg-ink px-5 font-bold text-white disabled:opacity-50";
 
-const names: Record<ConnectionKind, string> = { slack: "Slack", teams: "Microsoft Teams", github: "GitHub", linear: "Linear" };
+const names: Record<ConnectionKind, string> = { slack: "Slack", teams: "Microsoft Teams", github: "GitHub", linear: "Linear", azure: "Azure Boards" };
 const about: Record<ConnectionKind, string> = {
   slack: "Post scan results to a Slack channel.",
   teams: "Post scan results to a Teams channel.",
   github: "Scan every pull request and report on it, and turn findings into GitHub issues.",
   linear: "Turn a finding into a Linear issue from any scan's Security tab.",
+  azure: "Turn a finding into an Azure Boards work item from any scan's Security tab.",
 };
 
 function CopyRow({ name, value }: { name: string; value: string }) {
@@ -38,7 +39,7 @@ function CopyRow({ name, value }: { name: string; value: string }) {
 export function ConnectionsSection({ canEdit }: { canEdit: boolean }) {
   const [all, setAll] = useState<Connections | null>(null);
   const [editing, setEditing] = useState<ConnectionKind | null>(null);
-  const [form, setForm] = useState({ webhook_url: "", events: "automatic", token: "", repo: "", fail_on: "high", api_key: "", team_key: "" });
+  const [form, setForm] = useState({ webhook_url: "", events: "automatic", token: "", repo: "", fail_on: "high", api_key: "", team_key: "", organization: "", project: "", work_item_type: "Bug" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -68,7 +69,8 @@ export function ConnectionsSection({ canEdit }: { canEdit: boolean }) {
       const { data } =
         kind === "github" ? await saveGitHub({ token: form.token.trim(), repo: form.repo.trim() || undefined, fail_on: form.fail_on })
         : kind === "linear" ? await saveLinear({ api_key: form.api_key.trim(), team_key: form.team_key.trim() })
-        : await saveChat(kind, { webhook_url: form.webhook_url.trim(), events: form.events as "automatic" | "all" });
+        : kind === "azure" ? await saveAzure({ organization: form.organization.trim(), project: form.project.trim(), token: form.token.trim(), work_item_type: form.work_item_type })
+        : await saveChat(kind as "slack" | "teams", { webhook_url: form.webhook_url.trim(), events: form.events as "automatic" | "all" });
       setAll((a) => a && { ...a, [kind]: data });
       setEditing(null);
       setForm({ ...form, webhook_url: "", token: "", api_key: "" });
@@ -89,7 +91,8 @@ export function ConnectionsSection({ canEdit }: { canEdit: boolean }) {
       return [["Account", g.login ?? ""], ["Issues go to", g.repo ?? "Not set"], ["A pull request fails on", g.fail_on === "never" ? "Nothing: results are reported only" : `New findings at ${g.fail_on} severity or above`]];
     }
     if (kind === "linear") return [["Team", `${all.linear.team_name} (${all.linear.team_key})`]];
-    return [["Posts", all[kind].events === "all" ? "Every finished scan" : "Scheduled and pull-request scans"]];
+    if (kind === "azure") return [["Project", `${all.azure.project} in ${all.azure.organization}`], ["Work items are created as", all.azure.work_item_type ?? "Bug"]];
+    return [["Posts", (all[kind] as Connections["slack"]).events === "all" ? "Every finished scan" : "Scheduled and pull-request scans"]];
   };
 
   return (
@@ -174,6 +177,32 @@ export function ConnectionsSection({ canEdit }: { canEdit: boolean }) {
                             <option value="high">A high or critical finding</option>
                             <option value="critical">A critical finding</option>
                             <option value="never">Never: report only</option>
+                          </select>
+                        </label>
+                      </div>
+                    )}
+                    {kind === "azure" && (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className={label}>
+                          Organisation
+                          <input required value={form.organization} onChange={set("organization")} placeholder="acme" className={`${field} font-mono`} />
+                          <span className={hint}>The name after dev.azure.com/ in the address.</span>
+                        </label>
+                        <label className={label}>
+                          Project
+                          <input required value={form.project} onChange={set("project")} placeholder="Shop" className={field} />
+                        </label>
+                        <label className={label}>
+                          Personal access token
+                          <input type="password" required minLength={10} value={form.token} onChange={set("token")} autoComplete="off" className={`${field} font-mono`} />
+                          <span className={hint}>Create one in Azure DevOps under User settings, with Work Items read and write access.</span>
+                        </label>
+                        <label className={label}>
+                          Create findings as
+                          <select value={form.work_item_type} onChange={set("work_item_type")} className={field}>
+                            <option>Bug</option>
+                            <option>Issue</option>
+                            <option>Task</option>
                           </select>
                         </label>
                       </div>
