@@ -5,7 +5,9 @@ import { getChanges, getStandards, standardsCsvPath } from "../api/insights";
 import type { Changes, FlatFinding, ScanBrief, Standards } from "../api/insights";
 import type { AuditJob } from "../api/audits";
 import { downloadFromApi } from "../utils/download";
-import { ApiBraces, CompareSheets, EmptyPanel, ShieldList, SpeedGauge } from "./Illustrations";
+import { getFlows } from "../api/wise";
+import type { FlowNode, Flows } from "../api/wise";
+import { ApiBraces, CompareSheets, EmptyPanel, FlowMap, ShieldList, SpeedGauge } from "./Illustrations";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { SeverityTag } from "./ScanResults";
 import { card, errorBox } from "./ui";
@@ -304,6 +306,116 @@ export function EndpointsTab({ job }: { job: AuditJob }) {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+/** The crawled pages as a map: columns by how many clicks from the start page, arrows for links. */
+export function FlowsTab({ job }: { job: AuditJob }) {
+  const [data, setData] = useState<Flows | null>(null);
+  const [error, setError] = useState("");
+  const [picked, setPicked] = useState(0);
+
+  useEffect(() => {
+    getFlows(job.id).then((r) => setData(r.data)).catch(() => setError("The map could not be loaded. Try again."));
+  }, [job.id]);
+
+  if (error) return <p role="alert" className={errorBox}>{error}</p>;
+  if (!data) return <LoadingSpinner label="Drawing the map" />;
+  if (data.nodes.length === 0) {
+    return (
+      <EmptyPanel art={<FlowMap />} title="No pages to map">
+        The map is drawn from the pages a website scan visits. This scan has none.
+      </EmptyPanel>
+    );
+  }
+  const columns: FlowNode[][] = [];
+  data.nodes.forEach((n) => (columns[n.depth] ??= []).push(n));
+  const W = 190, H = 58, GX = 70, GY = 18;
+  const place = new Map<number, { x: number; y: number }>();
+  columns.forEach((col, c) => col?.forEach((n, r) => place.set(n.id, { x: 12 + c * (W + GX), y: 12 + r * (H + GY) })));
+  const width = 24 + columns.length * W + (columns.length - 1) * GX;
+  const height = 24 + Math.max(...columns.map((c) => c?.length ?? 0)) * (H + GY) - GY;
+  const node = data.nodes[picked] ?? data.nodes[0];
+  const touches = (e: { from: number; to: number }) => e.from === node.id || e.to === node.id;
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="max-w-[72ch] text-body">
+        How the pages link to each other, starting from the address you gave. Pick a page to see its forms and the requests it makes.
+        {data.pages_crawled > data.shown && ` The first ${data.shown} of ${data.pages_crawled} pages are shown.`}
+      </p>
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+        <div className={`${card} relative overflow-x-auto p-2`}>
+          <svg viewBox={`0 0 ${width} ${height}`} style={{ width, minWidth: "100%", height }} role="group" aria-label="Map of the pages and the links between them">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0l10 5-10 5z" fill="#818cf8" />
+              </marker>
+              <marker id="arrow-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0l10 5-10 5z" fill="#101014" />
+              </marker>
+            </defs>
+            {data.edges.map((e, i) => {
+              const a = place.get(e.from)!, b = place.get(e.to)!;
+              const forward = b.x > a.x;
+              const x1 = forward ? a.x + W : a.x, x2 = forward ? b.x : b.x + (b.x === a.x ? 0 : W);
+              const y1 = a.y + H / 2, y2 = b.y + H / 2, bend = forward ? GX / 2 : -GX / 2;
+              const on = touches(e);
+              return (
+                <path key={i} d={`M${x1} ${y1}C${x1 + bend} ${y1} ${x2 - bend} ${y2} ${x2} ${y2}`} fill="none" stroke={on ? "#101014" : "#c7d2fe"} strokeWidth={on ? 2.2 : 1.4}
+                  markerEnd={`url(#${on ? "arrow-on" : "arrow"})`} className={on ? "wf-flow" : undefined} />
+              );
+            })}
+            {data.nodes.map((n) => {
+              const { x, y } = place.get(n.id)!;
+              const on = n.id === node.id;
+              return (
+                <g key={n.id} role="button" tabIndex={0} aria-pressed={on} aria-label={`Page ${n.path}`} className="cursor-pointer outline-none [&:focus-visible>rect]:stroke-[3]"
+                  onClick={() => setPicked(n.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPicked(n.id); } }}>
+                  {on && <rect x={x + 5} y={y + 5} width={W} height={H} rx="10" fill="#3730a3" />}
+                  <rect x={x} y={y} width={W} height={H} rx="10" fill={on ? "#eef2ff" : "#fff"} stroke={on ? "#101014" : "#9ca3af"} strokeWidth={on ? 2.2 : 1.2} />
+                  <text x={x + 12} y={y + 24} fontSize="13" fontWeight="700" fontFamily="Roboto Mono, monospace" fill="#101014">{n.path.length > 20 ? `${n.path.slice(0, 19)}…` : n.path}</text>
+                  <text x={x + 12} y={y + 43} fontSize="11.5" fill="#4b4f5c">{(n.title || "Untitled").slice(0, 26)}</text>
+                  {n.forms > 0 && <circle cx={x + W - 16} cy={y + 16} r="6" fill="#4338ca" />}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <aside aria-label="The page you picked" className={`${card} wf-fade-up flex flex-col gap-3 self-start p-5`} key={node.id}>
+          <h2 className="break-all font-mono text-lg font-bold">{node.path}</h2>
+          <p className="text-body">{node.title || "This page has no title."}</p>
+          <dl className="grid grid-cols-2 gap-3 text-[15px]">
+            {[
+              ["Links out", data.edges.filter((e) => e.from === node.id).length],
+              ["Links in", data.edges.filter((e) => e.to === node.id).length],
+              ["Accessibility problems", node.a11y],
+              ["Largest paint", seconds(node.lcp_ms)],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <dt className="text-[13px] font-semibold text-body">{k}</dt>
+                <dd className="font-bold">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <div>
+            <h3 className="text-[13px] font-semibold text-body">Form fields</h3>
+            {node.form_fields.length ? (
+              <ul className="mt-1 flex flex-wrap gap-1.5">{node.form_fields.map((f, i) => <li key={i} className="rounded-full bg-brand-50 px-2.5 py-0.5 font-mono text-[12.5px] text-brand-700">{f}</li>)}</ul>
+            ) : (
+              <p>{node.forms ? `${node.forms} form${node.forms === 1 ? "" : "s"}, fields not recorded` : "No forms on this page"}</p>
+            )}
+          </div>
+          <div>
+            <h3 className="text-[13px] font-semibold text-body">Requests the page makes</h3>
+            {node.api_calls.length ? (
+              <ul className="mt-1 flex flex-col gap-1">{node.api_calls.map((c, i) => <li key={i} className="break-all font-mono text-[12.5px]">{c}</li>)}</ul>
+            ) : (
+              <p>None seen</p>
+            )}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

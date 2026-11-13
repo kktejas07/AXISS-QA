@@ -46,6 +46,38 @@ async def changes(audit_id: str, against: str | None = None, db: AsyncSession = 
     return out
 
 
+@router.get("/{audit_id}/flows")
+async def flows(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """The crawled pages as a map: each page is a node, each link between two crawled pages an arrow."""
+    job = await _job(db, ctx, audit_id)
+    pages = [p for p in (job.tier1_result or {}).get("pages") or [] if not p.get("error")]
+    by_url = {p["url"].rstrip("/"): i for i, p in enumerate(pages)}
+    edges, seen = [], set()
+    for i, p in enumerate(pages):
+        for link in p.get("links") or []:
+            j = by_url.get(str(link).rstrip("/"))
+            if j is not None and j != i and (i, j) not in seen:
+                seen.add((i, j))
+                edges.append({"from": i, "to": j})
+    # How many clicks each page is from the start page, for laying the map out in columns.
+    depth = {0: 0} if pages else {}
+    queue = [0] if pages else []
+    while queue:
+        at = queue.pop(0)
+        for e in edges:
+            if e["from"] == at and e["to"] not in depth:
+                depth[e["to"]] = depth[at] + 1
+                queue.append(e["to"])
+    nodes = [{
+        "id": i, "path": p.get("path") or "/", "url": p["url"], "title": (p.get("title") or "")[:120], "status": p.get("status_code"),
+        "depth": depth.get(i, max(depth.values(), default=0) + 1), "forms": len(p.get("forms") or []),
+        "form_fields": [f.get("name") or f.get("type") or "field" for form in (p.get("forms") or [])[:3] for f in (form.get("fields") or form.get("inputs") or [])[:8]],
+        "api_calls": [f"{c.get('method', 'GET')} {c.get('url', '')}"[:160] for c in (p.get("api_calls") or [])[:8]],
+        "a11y": len(p.get("a11y_violations") or []), "lcp_ms": (p.get("performance") or {}).get("lcp_ms"),
+    } for i, p in enumerate(pages)]
+    return {"nodes": nodes, "edges": edges, "pages_crawled": (job.tier1_result or {}).get("pages_audited", len(pages)), "shown": len(nodes)}
+
+
 @router.get("/{audit_id}/standards")
 async def standards(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     return compliance.report(F.all_findings(await _job(db, ctx, audit_id)))

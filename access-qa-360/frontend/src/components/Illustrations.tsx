@@ -202,6 +202,127 @@ export function FolderStack({ className }: Props) {
   );
 }
 
+/** Wise, the assistant: a round-eyed owl in the brand indigo. Its eyes blink; pass `still` to stop that. */
+export function WiseOwl({ className, still }: Props & { still?: boolean }) {
+  const blink = still ? undefined : "wf-blink";
+  return (
+    <svg viewBox="0 0 64 64" role="presentation" aria-hidden="true" className={className ?? "h-12 w-12"} fill="none">
+      <path d="M14 14l8 8M50 14l-8 8" stroke={INK} strokeWidth="3" strokeLinecap="round" />
+      <path d="M12 12l12 6-6 8zM52 12l-12 6 6 8z" fill={DEEP} stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M32 12c13 0 21 9 21 22S45 58 32 58 11 47 11 34s8-22 21-22z" fill={MAIN} stroke={INK} strokeWidth="3" />
+      <path d="M32 40c8 0 13 5 13 11-3 4-8 7-13 7s-10-3-13-7c0-6 5-11 13-11z" fill={LIGHT} />
+      <circle cx="23" cy="30" r="9" fill="#fff" stroke={INK} strokeWidth="2.5" />
+      <circle cx="41" cy="30" r="9" fill="#fff" stroke={INK} strokeWidth="2.5" />
+      <circle cx="24" cy="31" r="4" fill={INK} className={blink} />
+      <circle cx="40" cy="31" r="4" fill={INK} className={blink} />
+      <circle cx="25.5" cy="29.5" r="1.3" fill="#fff" />
+      <circle cx="41.5" cy="29.5" r="1.3" fill="#fff" />
+      <path d="M32 35l-4 5h8z" fill="#fbbf24" stroke={INK} strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Wise beside two chat bubbles: ask a question. */
+export function WiseChat({ className }: Props) {
+  return (
+    <Frame className={className}>
+      <rect x="98" y="30" width="118" height="46" rx="14" fill={DEEP} transform="translate(6 6)" />
+      <rect x="98" y="30" width="118" height="46" rx="14" fill="#fff" {...line} />
+      <path d="M112 76l-10 14 22-14z" fill="#fff" {...line} />
+      <rect x="114" y="44" width="70" height="8" rx="4" fill={MID} />
+      <rect x="114" y="58" width="46" height="8" rx="4" fill={PALE} />
+      <rect x="120" y="104" width="96" height="40" rx="14" fill={MAIN} {...line} />
+      <rect x="136" y="116" width="52" height="8" rx="4" fill="#fff" />
+      <rect x="136" y="128" width="30" height="6" rx="3" fill={LIGHT} />
+      <g transform="translate(14 62) scale(1.5)">
+        <path d="M12 12l12 6-6 8zM52 12l-12 6 6 8z" fill={DEEP} stroke={INK} strokeWidth="2" strokeLinejoin="round" />
+        <path d="M32 12c13 0 21 9 21 22S45 58 32 58 11 47 11 34s8-22 21-22z" fill={MAIN} stroke={INK} strokeWidth="2.2" />
+        <path d="M32 40c8 0 13 5 13 11-3 4-8 7-13 7s-10-3-13-7c0-6 5-11 13-11z" fill={LIGHT} />
+        <circle cx="23" cy="30" r="9" fill="#fff" stroke={INK} strokeWidth="2" />
+        <circle cx="41" cy="30" r="9" fill="#fff" stroke={INK} strokeWidth="2" />
+        <circle cx="24" cy="31" r="4" fill={INK} />
+        <circle cx="40" cy="31" r="4" fill={INK} />
+        <path d="M32 35l-4 5h8z" fill="#fbbf24" stroke={INK} strokeWidth="1.6" strokeLinejoin="round" />
+      </g>
+    </Frame>
+  );
+}
+
+/** Pages joined by arrows: the map of an app's flows. */
+export function FlowMap({ className }: Props) {
+  return (
+    <Frame className={className}>
+      <path d="M78 90h30M146 62h-20v28M146 122h-20V90M190 62h10v60h-10" {...line} strokeWidth="4" stroke={MID} />
+      {[[22, 68, MAIN], [146, 40, "#fff"], [146, 100, "#fff"]].map(([x, y, fill], i) => (
+        <g key={i}>
+          <rect x={(x as number) + 5} y={(y as number) + 5} width="56" height="44" rx="8" fill={DEEP} />
+          <rect x={x as number} y={y as number} width="56" height="44" rx="8" fill={fill as string} {...line} />
+          <rect x={(x as number) + 9} y={(y as number) + 11} width="30" height="6" rx="3" fill={i ? MID : "#fff"} />
+          <rect x={(x as number) + 9} y={(y as number) + 24} width="38" height="6" rx="3" fill={i ? PALE : LIGHT} />
+        </g>
+      ))}
+      <circle cx="108" cy="90" r="9" fill="#fff" {...line} />
+      <path d="M104 90h8m-3-3 3 3-3 3" stroke={INK} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </Frame>
+  );
+}
+
+/** A row of books with a bookmark: the library of ready-made packs. */
+export function BookShelf({ className }: Props) {
+  return (
+    <Frame className={className}>
+      <rect x="34" y="146" width="180" height="12" rx="4" fill={DEEP} />
+      <rect x="28" y="140" width="180" height="12" rx="4" fill="#fff" {...line} />
+      {[[40, 60, 26, MAIN], [70, 44, 30, "#fff"], [104, 70, 24, MID], [132, 52, 28, PALE]].map(([x, y, w, fill], i) => (
+        <g key={i}>
+          <rect x={x as number} y={y as number} width={w as number} height={140 - (y as number)} rx="4" fill={fill as string} {...line} />
+          <rect x={(x as number) + 6} y={(y as number) + 14} width={(w as number) - 12} height="6" rx="3" fill={i % 2 ? MID : "#fff"} />
+        </g>
+      ))}
+      <rect x="160" y="62" width="30" height="80" rx="4" fill={LIGHT} {...line} transform="rotate(14 175 140)" />
+      <path d="M80 30v26l8-7 8 7V30z" fill="#fbbf24" {...line} strokeWidth="2.5" />
+    </Frame>
+  );
+}
+
+/** A clipboard with ticks and a pencil: a pack of test cases. */
+export function ClipboardTicks({ className }: Props) {
+  return (
+    <Frame className={className}>
+      <rect x="62" y="34" width="110" height="130" rx="12" fill={DEEP} />
+      <rect x="54" y="26" width="110" height="130" rx="12" fill="#fff" {...line} />
+      <rect x="86" y="16" width="46" height="22" rx="8" fill={MAIN} {...line} />
+      {[60, 86, 112].map((y, i) => (
+        <g key={y}>
+          <rect x="70" y={y} width="18" height="18" rx="5" fill={i < 2 ? MAIN : "#fff"} {...line} strokeWidth="2.5" />
+          {i < 2 && <path d={`M74 ${y + 9}l4 4 7-8`} stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />}
+          <rect x="98" y={y + 5} width={[50, 38, 44][i]} height="8" rx="4" fill={i < 2 ? MID : PALE} />
+        </g>
+      ))}
+      <path d="M176 70l22 22-52 52-26 6 6-26z" fill="#fbbf24" {...line} />
+      <path d="M168 78l22 22" {...line} />
+    </Frame>
+  );
+}
+
+/** A rocket leaving a launch pad: a preset that starts a scan in one click. */
+export function Rocket({ className }: Props) {
+  return (
+    <Frame className={className}>
+      <path d="M120 22c26 18 34 52 26 92h-52c-8-40 0-74 26-92z" fill={DEEP} transform="translate(6 6)" />
+      <path d="M120 22c26 18 34 52 26 92h-52c-8-40 0-74 26-92z" fill="#fff" {...line} />
+      <circle cx="120" cy="66" r="13" fill={MID} {...line} />
+      <path d="M94 92l-22 26h24zM146 92l22 26h-24z" fill={MAIN} {...line} />
+      <path d="M106 114h28l-6 14h-16z" fill={INK} />
+      <path d="M112 132c0 12 8 16 8 26 0-10 8-14 8-26z" fill="#fbbf24" {...line} strokeWidth="2.5" />
+      <path d="M40 158h160" {...line} strokeWidth="4" />
+      <circle cx="60" cy="48" r="4" fill={LIGHT} />
+      <circle cx="184" cy="36" r="5" fill={MID} />
+      <circle cx="196" cy="84" r="3" fill={LIGHT} />
+    </Frame>
+  );
+}
+
 /** A small panel that pairs an illustration with a heading, a sentence and an action: used for empty screens. */
 export function EmptyPanel({ art, title, children, action }: { art: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (

@@ -89,6 +89,63 @@ test.describe("scanning an API description", () => {
   });
 });
 
+test.describe("Wise", () => {
+  test("answers from a scan, links to the finding, and points to the right screen for a request", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await signedIn(page, request);
+    await scanTheApi(page);
+
+    await page.getByRole("button", { name: "Ask Wise, your assistant" }).click();
+    const wise = page.getByRole("dialog", { name: "Wise, your assistant" });
+    await expect(wise.getByRole("button", { name: "What are my worst findings?" })).toBeVisible();
+    await wise.getByLabel("Your question for Wise").fill("Which endpoint needs no sign-in?");
+    await wise.getByRole("button", { name: "Send" }).click();
+    await expect(wise.getByText(/Endpoint needs no sign-in/).first()).toBeVisible();
+    await expect(wise.getByRole("list", { name: "Where this came from" }).getByRole("link").first()).toHaveAttribute("href", /\/audits\/.+tab=security/);
+
+    await wise.getByLabel("Your question for Wise").fill("Can you run this every week?");
+    await wise.getByLabel("Your question for Wise").press("Enter");
+    await wise.getByRole("link", { name: "Set up a schedule" }).click();
+    await expect(page).toHaveURL(/\/schedules$/);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // The conversation is still there when Wise is opened again on another screen.
+    await page.getByRole("button", { name: "Ask Wise, your assistant" }).click();
+    await expect(page.getByRole("dialog").getByText("Which endpoint needs no sign-in?")).toBeVisible();
+  });
+
+  test("a document added in Settings is answered from", async ({ page, request }) => {
+    await signedIn(page, request);
+    await page.goto("/settings");
+    await page.getByLabel("Add a document").setInputFiles({ name: "requirements.md", mimeType: "text/markdown", buffer: Buffer.from("# Refunds\n\nA refund must reach the customer within five working days.\n") });
+    await expect(page.getByRole("status").filter({ hasText: "requirements.md added" })).toBeVisible();
+    await page.getByRole("button", { name: "Ask Wise, your assistant" }).click();
+    await page.getByLabel("Your question for Wise").fill("How fast must a refund reach the customer?");
+    await page.getByLabel("Your question for Wise").press("Enter");
+    await expect(page.getByRole("dialog").getByText(/five working days/)).toBeVisible();
+  });
+});
+
+test.describe("library", () => {
+  test("a test pack opens to show its cases, and a preset fills in step 2 of a scan", async ({ page, request }) => {
+    await signedIn(page, request);
+    await page.goto("/library");
+    await page.getByRole("button", { name: /^Payments and checkout/ }).click();
+    await expect(page.getByText("Pressing Pay twice charges once")).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download the Payments and checkout pack" }).click();
+    expect((await download).suggestedFilename()).toBe("wiseflow-payments-test-cases.csv");
+
+    await page.getByRole("listitem").filter({ hasText: "Quick security pass" }).getByRole("link", { name: "Start a scan with this preset" }).click();
+    await page.getByRole("group", { name: "Type of app" }).getByRole("button", { name: /API/ }).click();
+    await page.locator('input[type="file"]').setInputFiles(SPEC);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("group", { name: "Presets" }).getByRole("button", { name: "Quick security pass" })).toHaveAttribute("aria-pressed", "true");
+    const outputs = page.getByRole("group", { name: "Outputs" });
+    await expect(outputs.getByRole("button", { pressed: true })).toHaveCount(1);
+  });
+});
+
 test.describe("schedules", () => {
   test("add a weekly scan, pause it, resume it and delete it", async ({ page, request }) => {
     await signedIn(page, request);
@@ -166,7 +223,7 @@ test.describe("settings", () => {
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  for (const path of ["/", "/schedules", "/settings", "/scans/new", "/pricing"]) {
+  for (const path of ["/", "/schedules", "/settings", "/scans/new", "/pricing", "/library"]) {
     test(`${path} fits the screen without scrolling sideways`, async ({ page, request }) => {
       await signedIn(page, request);
       await page.goto(path);
@@ -174,4 +231,14 @@ test.describe("on a phone", () => {
       expect(await scrollsSideways(page)).toBe(false);
     });
   }
+
+  test("Wise opens within the screen", async ({ page, request }) => {
+    await signedIn(page, request);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Ask Wise, your assistant" }).click();
+    const box = await page.getByRole("dialog").boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    expect(await scrollsSideways(page)).toBe(false);
+  });
 });
