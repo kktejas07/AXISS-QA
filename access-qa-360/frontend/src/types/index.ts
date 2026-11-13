@@ -54,6 +54,9 @@ export interface Invite {
 
 export interface AdminOrg {
   id: string;
+  billing_provider?: string | null;
+  billing_status?: string | null;
+  billing_seats?: number | null;
   name: string;
   account_type: AccountType;
   status: "active" | "suspended";

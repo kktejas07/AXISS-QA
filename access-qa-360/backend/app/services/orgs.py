@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.audit_job import AuditJob
 from app.models.organization import AdminAuditLog, Invite, Organization
 from app.models.user import User
@@ -36,7 +37,10 @@ def permissions_for(role: str) -> list[str]:
 
 async def create_personal_org(db: AsyncSession, user: User) -> Organization:
     """Give a user their own one-person organisation, with them as owner."""
-    org = Organization(name=f"{user.full_name}'s workspace", account_type="individual", seat_limit=DEFAULT_SEATS["individual"])
+    org = Organization(
+        name=f"{user.full_name}'s workspace", account_type="individual", seat_limit=DEFAULT_SEATS["individual"],
+        scan_limit=settings.FREE_SCANS_PER_MONTH or None,   # the free plan's monthly allowance
+    )
     db.add(org)
     await db.flush()
     user.organization_id = org.id

@@ -5,6 +5,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { cancelInvite, changeRole, createInvite, getInvites, getMembers, getOrg, removeMember, renameOrg } from "../api/org";
 import { changePassword } from "../api/auth";
 import { ApiKeysSection, JiraSection } from "../components/IntegrationSettings";
+import { BillingSection } from "../components/BillingSection";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Invite, Member, Org, OrgRole } from "../types";
 import { apiError } from "../utils/errors";
@@ -315,6 +316,8 @@ export function SettingsPage() {
             </form>
           )}
         </section>
+
+        <BillingSection />
 
         {canEdit && <ApiKeysSection />}
         <JiraSection canEdit={canEdit} />

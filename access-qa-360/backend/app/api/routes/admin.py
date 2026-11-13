@@ -185,6 +185,9 @@ async def _org_out(db: AsyncSession, org: Organization) -> AdminOrgOut:
         scans_this_month=await scans_this_month(db, org.id),
         owner_email=owner_email,
         created_at=org.created_at,
+        billing_provider=org.billing_provider,
+        billing_status=org.billing_status,
+        billing_seats=org.billing_seats,
     )
 
 

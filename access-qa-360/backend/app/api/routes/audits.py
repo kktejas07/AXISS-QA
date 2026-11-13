@@ -137,6 +137,8 @@ async def _check_org_can_scan(db: AsyncSession, ctx: OrgContext) -> None:
     org = ctx.org
     if org.status != "active":
         raise HTTPException(403, "This organisation is suspended, so new scans cannot start. Contact support.")
+    if org.billing_provider and org.billing_status == "cancelled":
+        raise HTTPException(403, "Your subscription has ended, so new scans cannot start. An owner can renew it under Settings.")
     if org.scan_limit is not None and await scans_this_month(db, org.id) >= org.scan_limit:
         raise HTTPException(403, f"Your organisation has used all {org.scan_limit} scans for this month.")
 

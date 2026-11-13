@@ -7,7 +7,7 @@ organisation has several members, each with one of four roles.
 from datetime import datetime
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -32,6 +32,16 @@ class Organization(Base):
     scan_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)  # scans started per calendar month
     status: Mapped[str] = mapped_column(String(16), default="active", server_default="active", nullable=False)  # active | suspended
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Paid subscription, when the organisation pays by card. Organisations a super admin
+    # set up by hand have no provider and are not affected by any of this.
+    billing_provider: Mapped[str | None] = mapped_column(String(16), nullable=True)          # "stripe" | "razorpay"
+    billing_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    billing_subscription_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    billing_status: Mapped[str | None] = mapped_column(String(16), nullable=True)            # active | past_due | cancelled
+    billing_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    billing_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    billing_cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
 
 class Invite(Base):
