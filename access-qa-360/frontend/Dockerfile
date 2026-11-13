@@ -10,6 +10,10 @@ ENV VITE_API_URL=$VITE_API_URL
 # The site's public address, written into the sitemap, robots.txt, llms.txt and the page's canonical link.
 ARG SITE_URL=https://qa.vatax360.com
 ENV SITE_URL=$SITE_URL
+# Optional: the codes Google Search Console and Bing Webmaster Tools give you to prove the site is yours.
+ARG GOOGLE_SITE_VERIFICATION=
+ARG BING_SITE_VERIFICATION=
+ENV GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION BING_SITE_VERIFICATION=$BING_SITE_VERIFICATION
 COPY . .
 RUN npm run build
 

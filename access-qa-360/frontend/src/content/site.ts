@@ -25,7 +25,7 @@ export const faqs: { q: string; a: string }[] = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes. The free plan is for one person and allows two scans a month, with no card needed. Team plans add more people and more scans.",
+    a: "Yes. There is a free plan for one person with a set number of scans each month, and no card is needed. Team plans add more people and more scans. The pricing page shows the current limits.",
   },
   {
     q: "Does Wiseflow test AI chatbots?",
