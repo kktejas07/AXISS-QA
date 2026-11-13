@@ -29,6 +29,21 @@ def _engine():
     return create_engine(settings.SYNC_DATABASE_URL, pool_pre_ping=True, pool_size=2, max_overflow=2)
 
 
+class AiAllowanceUsed(Exception):
+    """The organisation has used this month's allowance on the platform's AI key."""
+
+
+# US dollars per million tokens (input, output). Models that are not listed are counted but not costed.
+PRICES = {"claude-sonnet-4-5": (3.0, 15.0), "claude-haiku-4-5": (1.0, 5.0)}
+
+
+def cost(model: str, tokens_in: int, tokens_out: int) -> float | None:
+    for name, (price_in, price_out) in PRICES.items():
+        if model.startswith(name):
+            return round(tokens_in / 1e6 * price_in + tokens_out / 1e6 * price_out, 4)
+    return None
+
+
 def record_usage(model: str, purpose: str, input_tokens: int, output_tokens: int, ok: bool, context: dict | None = None) -> None:
     """Write one row. Blocking; never raises."""
     context = context if context is not None else ai_context.get()
@@ -36,11 +51,12 @@ def record_usage(model: str, purpose: str, input_tokens: int, output_tokens: int
         with _engine().begin() as db:
             db.execute(
                 text(
-                    "INSERT INTO ai_usage (id, organization_id, audit_id, model, purpose, input_tokens, output_tokens, ok, created_at) "
-                    "VALUES (:id, :org, :audit, :model, :purpose, :inp, :out, :ok, CURRENT_TIMESTAMP)"
+                    "INSERT INTO ai_usage (id, organization_id, audit_id, model, purpose, input_tokens, output_tokens, ok, own_key, created_at) "
+                    "VALUES (:id, :org, :audit, :model, :purpose, :inp, :out, :ok, :own, CURRENT_TIMESTAMP)"
                 ),
                 {"id": str(uuid.uuid4()), "org": context.get("organization_id"), "audit": context.get("audit_id"),
-                 "model": str(model)[:64], "purpose": purpose[:64], "inp": int(input_tokens or 0), "out": int(output_tokens or 0), "ok": ok},
+                 "model": str(model)[:64], "purpose": purpose[:64], "inp": int(input_tokens or 0), "out": int(output_tokens or 0), "ok": ok,
+                 "own": bool(context.get("own_key"))},
             )
     except Exception as e:  # usage tracking must never break a scan
         log.debug("AI usage was not recorded: %s", type(e).__name__)
@@ -70,7 +86,25 @@ def ai_client(purpose: str) -> AsyncAnthropic:
     create = client.messages.create
 
     async def counted(*args, **kwargs):
+        from app.core import platform
+
         context = ai_context.get()
+        own = bool(context.get("api_key"))
+        context = {**context, "own_key": own}
+        if not own:
+            # The platform's key pays, so the organisation's monthly allowance applies.
+            org, cap = context.get("organization_id"), context.get("cap") if context.get("cap") is not None else settings.AI_MONTHLY_CAP_USD
+            if org and cap and await asyncio.to_thread(platform.month_spend, org) >= cap:
+                raise AiAllowanceUsed("This organisation has used its AI allowance for the month")
+            # And the platform's choice of provider and model.
+            if platform.ai_provider() != "anthropic" and platform.ai_key():
+                context.update(provider=platform.ai_provider(), api_key=platform.ai_key(), base_url=settings.DEFAULT_AI_BASE_URL or None)
+            if settings.DEFAULT_AI_MODEL:
+                context["model"] = settings.DEFAULT_AI_MODEL
+            # Made here, not above, so a key replaced from the console is used at once.
+            create_now = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY).messages.create if settings.ANTHROPIC_API_KEY != client.api_key else create
+        else:
+            create_now = create
         provider = context.get("provider") or "anthropic"
         if provider != "anthropic" and context.get("api_key"):
             # The organisation's own key with another provider: the same request, translated.
@@ -84,12 +118,14 @@ def ai_client(purpose: str) -> AsyncAnthropic:
         else:
             if "model" in kwargs:
                 kwargs["model"] = context.get("model") or choose_model(kwargs["model"], context.get("quality"))
-            call = AsyncAnthropic(api_key=context["api_key"]).messages.create if context.get("api_key") else create
+            call = AsyncAnthropic(api_key=context["api_key"]).messages.create if context.get("api_key") else create_now
         model = kwargs.get("model", "unknown")
         try:
             message = await call(*args, **kwargs)
-        except Exception:
+        except Exception as e:
             await asyncio.to_thread(record_usage, model, purpose, 0, 0, False, context)
+            if not own and platform.key_problem(e):
+                await asyncio.to_thread(platform.note_failure, "ai", platform.key_problem(e))
             raise
         await asyncio.to_thread(record_usage, model, purpose, *_tokens(message), True, context)
         return message
@@ -100,6 +136,10 @@ def ai_client(purpose: str) -> AsyncAnthropic:
 
 def sync_ai_client(purpose: str) -> Anthropic:
     """The same for code that runs outside the event loop (background workers)."""
+    if settings.ENVIRONMENT != "test":
+        from app.core import platform
+
+        platform.refresh_sync()
     client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
     create = client.messages.create
 
@@ -127,6 +167,7 @@ async def org_context(db, organization_id: str | None, audit_id: str | None = No
         org = await db.get(Organization, organization_id)
         if org:
             context["quality"] = org.ai_quality or "balanced"
+            context["cap"] = org.ai_monthly_cap_usd
             key = decrypt(org.ai_key_encrypted) if org.ai_key_encrypted else None
             if key:
                 # The provider, model and address only apply together with the organisation's own key.

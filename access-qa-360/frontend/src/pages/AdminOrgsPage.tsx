@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { getAdminOrg, getAdminOrgs, getAuditLog, updateAdminOrg } from "../api/admin";
+import { getAdminOrg, getAdminOrgs, getAuditLog, removeOrgAiKey, updateAdminOrg } from "../api/admin";
 import type { AccountType, AdminOrg, AuditLogEntry } from "../types";
 import { apiError } from "../utils/errors";
 
@@ -127,6 +127,7 @@ export function AdminOrgDetailPage() {
   const [type, setType] = useState<AccountType>("individual");
   const [seats, setSeats] = useState("");
   const [scans, setScans] = useState("");
+  const [cap, setCap] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -136,6 +137,7 @@ export function AdminOrgDetailPage() {
     setType(o.account_type);
     setSeats(o.seat_limit === null ? "" : String(o.seat_limit));
     setScans(o.scan_limit === null ? "" : String(o.scan_limit));
+    setCap(o.ai_monthly_cap_usd == null ? "" : String(o.ai_monthly_cap_usd));
   };
 
   useEffect(() => {
@@ -230,6 +232,56 @@ export function AdminOrgDetailPage() {
           Save plan and limits
         </button>
       </form>
+
+      <section aria-labelledby="org-ai" className="mb-7 flex flex-col gap-4 rounded-2xl border border-gray-300 bg-white p-6">
+        <div>
+          <h2 id="org-ai" className="text-lg font-bold">AI</h2>
+          <p className="text-body">
+            {org.ai_own_key
+              ? `Uses its own key with ${org.ai_provider}${org.ai_model ? `, model ${org.ai_model}` : ""}. The key is never shown.`
+              : `Uses the platform's key. Spent this month: $${(org.ai_spend_this_month ?? 0).toFixed(2)}.`}
+          </p>
+        </div>
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save({ ai_monthly_cap_usd: cap.trim() === "" ? null : Number(cap) }, "AI allowance saved.");
+          }}
+        >
+          <label className="flex min-w-0 flex-[1_1_260px] flex-col gap-1.5 text-sm font-semibold">
+            Monthly allowance on the platform's key, in US dollars
+            <input type="number" min={0} value={cap} onChange={(e) => setCap(e.target.value)}
+              placeholder={org.ai_platform_cap_usd ? `Platform figure: $${org.ai_platform_cap_usd}` : "Platform figure: no limit"} className={input} />
+            <span className="text-[13.5px] font-normal text-body">Empty uses the platform's figure. 0 means no limit. Once reached, AI features fall back to basic versions until next month.</span>
+          </label>
+          <button type="submit" disabled={busy} className="h-12 rounded-[10px] border-[1.5px] border-ink bg-white px-5 font-semibold disabled:opacity-60">Save allowance</button>
+        </form>
+        {org.ai_own_key && (
+          <div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setError("");
+                setNotice("");
+                setBusy(true);
+                try {
+                  show((await removeOrgAiKey(id)).data);
+                  setNotice("Their key was removed. They now use the platform's key.");
+                } catch (e) {
+                  setError(apiError(e, "The key could not be removed."));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="h-12 rounded-[10px] border-[1.5px] border-red-700 bg-white px-5 font-semibold text-red-800 disabled:opacity-60"
+            >
+              Remove their AI key
+            </button>
+          </div>
+        )}
+      </section>
 
       <section className={`${card} mb-7`}>
         <h2 className="px-5 py-4 text-lg font-bold">Members</h2>

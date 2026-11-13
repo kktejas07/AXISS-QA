@@ -71,6 +71,13 @@ class AdminOrgMember(BaseModel):
 
 class AdminOrgDetail(AdminOrgOut):
     members: list[AdminOrgMember]
+    # AI: whether the organisation uses its own key (the key itself is never sent), and its allowance on the platform's key.
+    ai_own_key: bool = False
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    ai_monthly_cap_usd: int | None = None
+    ai_platform_cap_usd: int = 0
+    ai_spend_this_month: float = 0
 
 
 class AdminOrgUpdate(BaseModel):
@@ -80,6 +87,8 @@ class AdminOrgUpdate(BaseModel):
     seat_limit: int | None = None
     scan_limit: int | None = None
     status: Literal["active", "suspended"] | None = None
+    # Whole US dollars a month on the platform's AI key. null means the platform-wide figure applies; 0 means no limit.
+    ai_monthly_cap_usd: int | None = None
 
 
 class AuditLogOut(BaseModel):

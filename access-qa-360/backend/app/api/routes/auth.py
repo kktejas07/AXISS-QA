@@ -18,9 +18,9 @@ from app.schemas.auth import (
 )
 from app.services import password_reset, sso, totp
 from app.core.secrets import decrypt, encrypt
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.services.mailer import email_configured, send_email
-from app.api.deps import OrgContext, get_org_context
+from app.api.deps import OrgContext, get_org_context, get_current_user
 from app.services.orgs import create_personal_org, member_count, permissions_for
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -277,6 +277,23 @@ async def sso_callback(
     await db.commit()
     # In the address fragment, which browsers never send to a server or write to its logs.
     return RedirectResponse(f"{settings.APP_URL.rstrip('/')}/sso#token={create_access_token(user.id)}", status_code=302)
+
+
+class ProfileUpdate(BaseModel):
+    full_name: str = Field(min_length=1, max_length=120)
+
+
+@router.patch("/me")
+async def update_me(body: ProfileUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Change your own name. Email and role are changed by an owner or admin, not here."""
+    if getattr(user, "via_api_key", False):
+        raise HTTPException(status_code=403, detail="API keys cannot change a profile. Sign in to do this.")
+    name = " ".join(body.full_name.split())
+    if not name:
+        raise HTTPException(status_code=422, detail="Enter your name")
+    user.full_name = name
+    await db.flush()
+    return {"full_name": name}
 
 
 @router.get("/me", response_model=MeOut)

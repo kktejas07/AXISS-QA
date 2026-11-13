@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Activity, BookOpen, Building2, CalendarClock, FolderKanban, Inbox, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookOpen, Building2, CalendarClock, FolderKanban, Inbox, KeyRound, LifeBuoy, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Permission } from "../types";
@@ -19,6 +19,7 @@ const userNav: NavItem[] = [
   { to: "/library", label: "Library", icon: BookOpen },
   { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/help", label: "Help", icon: LifeBuoy },
 ];
 
 const adminNav: NavItem[] = [
@@ -26,6 +27,7 @@ const adminNav: NavItem[] = [
   { to: "/admin/organizations", label: "Organisations", icon: Building2 },
   { to: "/admin/queue", label: "Scan queue", icon: ListChecks },
   { to: "/admin/ai-usage", label: "AI usage", icon: Sparkles },
+  { to: "/admin/keys", label: "Platform keys", icon: KeyRound },
   { to: "/admin/health", label: "System health", icon: Activity },
   { to: "/admin/audit-log", label: "Audit log", icon: ScrollText },
 ];
@@ -101,10 +103,10 @@ export function Layout({ children, variant = "user" }: { children: React.ReactNo
             )
           )}
           {me && (
-            <p className={`px-3 pt-2 text-[13px] ${admin ? "text-brand-300" : "text-body"}`}>
+            <Link to="/profile" aria-label={`Your profile, ${me.email}`} className={`block rounded-[10px] px-3 py-2 text-[13px] ${admin ? "text-brand-300 hover:text-white" : "text-body hover:bg-soft hover:text-ink"}`}>
               <span className="block truncate font-semibold">{me.organization.name}</span>
               <span className="block truncate">{me.email}</span>
-            </p>
+            </Link>
           )}
           <button
             type="button"

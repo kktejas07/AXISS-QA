@@ -10,6 +10,15 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     ANTHROPIC_API_KEY: str
+    # Which AI provider organisations without their own key use. "anthropic" uses ANTHROPIC_API_KEY;
+    # any other provider (see app/core/providers.py) uses DEFAULT_AI_KEY. The model is optional.
+    DEFAULT_AI_PROVIDER: str = "anthropic"
+    DEFAULT_AI_KEY: str = ""
+    DEFAULT_AI_MODEL: str = ""
+    DEFAULT_AI_BASE_URL: str = ""
+    # Most an organisation may spend on the platform's AI key in a calendar month, in whole US dollars.
+    # 0 means no limit. A super admin can set a different figure for one organisation.
+    AI_MONTHLY_CAP_USD: int = 0
     AWS_REGION: str = "us-east-1"
     AWS_S3_BUCKET: str = "wiseflow-screenshots"
     ENVIRONMENT: str = "development"

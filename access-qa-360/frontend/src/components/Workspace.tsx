@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Check, Download, X } from "lucide-react";
-import { getFirstSteps, getNotifications, sbomPath } from "../api/workspace";
-import type { FirstSteps, Notice } from "../api/workspace";
+import { Bell, Check, Download, Scale, X } from "lucide-react";
+import { getFirstSteps, getLicences, getNotifications, sbomPath } from "../api/workspace";
+import type { FirstSteps, LicenceReport, Notice } from "../api/workspace";
+import { apiError } from "../utils/errors";
 import { downloadFromApi } from "../utils/download";
 import { card } from "./ui";
 
@@ -143,6 +144,109 @@ export function SbomCard({ auditId, count }: { auditId: string; count: number })
         <Download className="h-4 w-4" aria-hidden="true" />
         Download SBOM
       </button>
+    </section>
+  );
+}
+
+const licenceGroups = [
+  { id: "strong", name: "May require sharing your code", look: "bg-red-100 text-red-800" },
+  { id: "unknown", name: "No licence found", look: "bg-amber-100 text-amber-900" },
+  { id: "weak", name: "Share changes to the package", look: "bg-brand-100 text-brand-950" },
+  { id: "permissive", name: "Free to use", look: "bg-emerald-100 text-emerald-900" },
+] as const;
+
+/** Code scans: the licence each package is under, with the ones that need a second look first. */
+export function LicenceCard({ auditId, canCheck }: { auditId: string; canCheck: boolean }) {
+  const [report, setReport] = useState<LicenceReport | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [all, setAll] = useState(false);
+
+  const check = () => {
+    setBusy(true);
+    setError("");
+    getLicences(auditId)
+      .then((r) => setReport(r.data))
+      .catch((e) => setError(apiError(e, "The licences could not be looked up. Try again in a minute.")))
+      .finally(() => setBusy(false));
+  };
+  useEffect(() => {
+    // Someone who cannot run the check still sees a result that is already there.
+    if (!canCheck) getLicences(auditId).then((r) => setReport(r.data)).catch(() => {});
+  }, [auditId, canCheck]);
+  const rows = report ? (all ? report.packages : report.packages.filter((p) => p.group === "strong" || p.group === "unknown")) : [];
+
+  return (
+    <section aria-labelledby="licences" className={`${card} p-5`}>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 id="licences" className="text-lg font-bold">Licence check</h2>
+          <p className="max-w-[62ch] text-body">Which licence each package is under, and which ones could oblige you to share your own code. This shows where to look; it is not legal advice.</p>
+        </div>
+        {!report && canCheck && (
+          <button type="button" onClick={check} disabled={busy} className="flex h-11 items-center gap-2 rounded-[10px] border-[1.5px] border-ink bg-white px-4 text-sm font-semibold disabled:opacity-60">
+            <Scale className="h-4 w-4" aria-hidden="true" />
+            {busy ? "Looking up licences" : "Check licences"}
+          </button>
+        )}
+      </div>
+      {error && <p role="alert" className="mt-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-red-800">{error}</p>}
+      {report && (
+        <div className="mt-4 flex flex-col gap-4">
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {licenceGroups.map((g) => (
+              <div key={g.id} className="rounded-xl border border-line px-4 py-3">
+                <dt className="text-sm font-semibold text-body">{g.name}</dt>
+                <dd className="text-[28px] font-extrabold leading-tight">{report.counts[g.id]}</dd>
+              </div>
+            ))}
+          </dl>
+          {(report.not_looked_up > 0 || report.over_limit > 0) && (
+            <p className="text-[14.5px] text-body">
+              {report.not_looked_up > 0 && `${report.not_looked_up} packages are of a kind this check does not cover yet (it covers Python and JavaScript packages). `}
+              {report.over_limit > 0 && `${report.over_limit} more were left out because the check stops at ${report.checked} packages.`}
+            </p>
+          )}
+          {rows.length === 0 ? (
+            <p className="text-body">{all ? "No packages were checked." : "Nothing needs a second look: every package checked has a licence that is free to use, or only asks you to share changes to the package itself."}</p>
+          ) : (
+            <div className="relative overflow-x-auto rounded-xl border border-line">
+              <table className="w-full min-w-[560px] border-collapse text-left text-[14.5px]">
+                <caption className="sr-only">{all ? "Every package checked" : "Packages that need a second look"}</caption>
+                <thead>
+                  <tr className="bg-soft text-[13.5px] text-body">
+                    <th scope="col" className="px-4 py-2.5 font-semibold">Package</th>
+                    <th scope="col" className="px-4 py-2.5 font-semibold">Licence</th>
+                    <th scope="col" className="px-4 py-2.5 font-semibold">What it means</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => {
+                    const g = licenceGroups.find((x) => x.id === p.group)!;
+                    return (
+                      <tr key={`${p.ecosystem}-${p.name}-${p.version}`} className="border-t border-line align-top">
+                        <td className="px-4 py-3">
+                          <span className="break-all font-mono text-[13.5px] font-semibold">{p.name} {p.version}</span>
+                          <span className="block text-[13px] text-body">{p.ecosystem}, {p.manifest}</span>
+                        </td>
+                        <td className="px-4 py-3">{p.licence}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-[13px] font-bold ${g.look}`}>{g.name}</span>
+                          <span className="mt-1 block max-w-[46ch] text-[13.5px] text-body">{report.about[p.group]}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <button type="button" onClick={() => setAll(!all)} className="self-start text-sm font-semibold text-brand-600 underline hover:text-brand-700">
+            {all ? "Show only the ones that need a second look" : `Show all ${report.checked} packages`}
+          </button>
+        </div>
+      )}
+      {!report && !canCheck && <p className="mt-3 text-body">Ask someone who can run scans to check the licences; you will then see the result here.</p>}
     </section>
   );
 }

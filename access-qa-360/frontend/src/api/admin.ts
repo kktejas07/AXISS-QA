@@ -17,7 +17,7 @@ export const getAdminOrg = (id: string) => api.get<AdminOrg>(`/admin/organizatio
 /** Send only what changes. A limit of null removes the limit. */
 export const updateAdminOrg = (
   id: string,
-  changes: { account_type?: AccountType; seat_limit?: number | null; scan_limit?: number | null; status?: "active" | "suspended" }
+  changes: { account_type?: AccountType; seat_limit?: number | null; scan_limit?: number | null; status?: "active" | "suspended"; ai_monthly_cap_usd?: number | null }
 ) => api.patch<AdminOrg>(`/admin/organizations/${id}`, changes);
 
 export const getAuditLog = () => api.get<AuditLogEntry[]>("/admin/audit-log");
@@ -85,3 +85,37 @@ export const getQueue = () => api.get<{ active: QueueRow[]; failed_last_24h: Que
 export const adminStopScan = (id: string) => api.post(`/admin/audits/${id}/stop`);
 export const getAiUsage = (days: number) => api.get<AiUsage>("/admin/ai-usage", { params: { days } });
 export const getHealth = () => api.get<Health>("/admin/health");
+
+// ---- platform keys ----------------------------------------------------------
+
+export interface PlatformField {
+  key: string;
+  label: string;
+  secret: boolean;
+  set: boolean;
+  /** "console" when it was saved here, "server" when it comes from the server's environment. */
+  source: "console" | "server" | null;
+  /** Secrets only: the last four characters, never the key. */
+  hint?: string | null;
+  value?: string;
+}
+
+export interface PlatformGroup {
+  id: string;
+  title: string;
+  about: string;
+  configured: boolean;
+  fields: PlatformField[];
+  last_check: { ok: boolean | null; detail: string; at: string } | null;
+}
+
+export interface PlatformPage {
+  groups: PlatformGroup[];
+  providers: { id: string; name: string }[];
+}
+
+export const getPlatform = () => api.get<PlatformPage>("/admin/platform");
+/** An empty value removes what was saved here, so the server's own value applies again. */
+export const savePlatform = (values: Record<string, string>) => api.put<PlatformPage>("/admin/platform", { values });
+export const testPlatform = (group: string) => api.post<{ ok: boolean | null; detail: string }>(`/admin/platform/${group}/test`);
+export const removeOrgAiKey = (id: string) => api.delete<AdminOrg>(`/admin/organizations/${id}/ai-key`);

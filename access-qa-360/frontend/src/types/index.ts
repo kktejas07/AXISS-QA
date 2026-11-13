@@ -70,6 +70,13 @@ export interface AdminOrg {
   owner_email: string | null;
   created_at: string;
   members?: { id: string; full_name: string; email: string; org_role: OrgRole; is_active: boolean }[];
+  // On the detail page only. The organisation's own AI key is never sent, only whether there is one.
+  ai_own_key?: boolean;
+  ai_provider?: string | null;
+  ai_model?: string | null;
+  ai_monthly_cap_usd?: number | null;
+  ai_platform_cap_usd?: number;
+  ai_spend_this_month?: number;
 }
 
 export interface AuditLogEntry {

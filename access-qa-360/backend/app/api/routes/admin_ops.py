@@ -19,6 +19,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_super_admin
+from app.core import platform
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.audit_job import AuditJob, AuditStatus
@@ -107,14 +108,7 @@ async def stop_scan(audit_id: str, db: AsyncSession = Depends(get_db), admin: Us
 # ---- AI usage ---------------------------------------------------------------
 
 # US dollars per million tokens (input, output). Estimates only: check your provider's invoice for the real figure.
-PRICES = {"claude-sonnet-4-5": (3.0, 15.0), "claude-haiku-4-5": (1.0, 5.0)}
-
-
-def _cost(model: str, tokens_in: int, tokens_out: int) -> float | None:
-    for name, (price_in, price_out) in PRICES.items():
-        if model.startswith(name):
-            return round(tokens_in / 1e6 * price_in + tokens_out / 1e6 * price_out, 4)
-    return None
+from app.core.ai import cost as _cost
 
 
 @router.get("/ai-usage")
@@ -164,8 +158,29 @@ async def ai_usage(days: int = 30, db: AsyncSession = Depends(get_db)):
 # ---- health -----------------------------------------------------------------
 
 def _ai_key_set() -> bool:
-    key = (settings.ANTHROPIC_API_KEY or "").strip()
-    return len(key) > 20 and not key.endswith("...")
+    return bool(platform.ai_key())
+
+
+def _key_checks(groups: list[dict]) -> list[dict]:
+    """One line per group of platform keys: not set up, set, or set but failing its last test."""
+    off = {
+        "ai": "No key set. Scans still run, but test cases, scripts and summaries fall back to basic versions.",
+        "embeddings": "Not set up. Wise searches by matching words only.",
+        "google": "Not set up. People sign in with a password.",
+        "email": "Not set up. Reset links come from a super admin; invite links are copied by hand.",
+        "stripe": "Not set up. Card payments in US dollars are off.",
+        "razorpay": "Not set up. Payments in rupees are off.",
+    }
+    out = []
+    for g in groups:
+        last = g["last_check"]
+        if not g["configured"]:
+            out.append(_check(g["title"], None, off[g["id"]], required=False))
+        elif last and last["ok"] is False:
+            out.append(_check(g["title"], False, f"{last['detail']}. Fix it under Platform keys.", required=False))
+        else:
+            out.append(_check(g["title"], True, "Set, and passed its last test." if last and last["ok"] else "Set. Test it under Platform keys to be sure it works.", required=False))
+    return out
 
 
 def _check(name: str, ok: bool | None, detail: str, required: bool = True) -> dict:
@@ -233,11 +248,7 @@ async def health(db: AsyncSession = Depends(get_db)):
     redis_check, worker, storage = await asyncio.gather(asyncio.to_thread(_redis), asyncio.to_thread(_worker), asyncio.to_thread(_storage))
     checks = [
         database, redis_check, worker, storage,
-        _check("AI service key", True if _ai_key_set() else None,
-               "A key is set. It is not tested here, to avoid a charge on every page view." if _ai_key_set()
-               else "No key set. Scans still run, but test cases, scripts and summaries fall back to basic versions.", required=False),
-        _check("Email", True if email_configured() else None,
-               f"Sending through {settings.SMTP_HOST}" if email_configured() else "Not set up. Reset links come from a super admin; invite links are copied by hand.", required=False),
+        *_key_checks(await platform.overview(db)),
         _check("Git", True if shutil.which("git") else False, "Available" if shutil.which("git") else "Not installed. Repository scans cannot run.", required=False),
     ]
     return {

@@ -52,6 +52,9 @@ class Organization(Base):
     ai_provider: Mapped[str] = mapped_column(String(24), default="anthropic", server_default="anthropic", nullable=False)
     ai_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
     ai_base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Most this organisation may spend on the platform's AI key in a month, in whole US dollars.
+    # None means the platform-wide figure applies.
+    ai_monthly_cap_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Invite(Base):

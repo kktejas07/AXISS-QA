@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
-import { PASSWORD, newAccount, scrollsSideways, signedIn, totp } from "./helpers";
+import { PASSWORD, newAccount, scrollsSideways, signedIn, totp, signedInAsAdmin } from "./helpers";
 
 const SPEC = "e2e/fixtures/shop-api.yaml";
 
@@ -68,6 +68,63 @@ test.describe("findings, notifications and first steps", () => {
 
     await page.getByRole("link", { name: "Overview" }).click();
     await expect(page.getByRole("region", { name: "Getting started" }).getByText("1 of 5 done")).toBeVisible();
+  });
+});
+
+test.describe("platform keys, profile and help", () => {
+  test("a super admin replaces a platform key without it ever being shown again", async ({ page, request }) => {
+    const key = "sk_live_e2e_secret_never_shown_7Q2x";
+    await signedInAsAdmin(page, request);
+    await page.goto("/admin/keys");
+    const stripe = page.getByRole("region", { name: "Stripe" });
+    await expect(stripe.getByText("Not set up")).toBeVisible();
+    await expect(stripe.getByRole("button", { name: "Test Stripe" })).toBeDisabled();
+    await stripe.getByLabel("Secret key").fill(key);
+    await stripe.getByRole("button", { name: "Save Stripe" }).click();
+    await expect(stripe.getByRole("status")).toHaveText("Saved. It is in use from now.");
+    await expect(stripe.getByText("Set, not tested")).toBeVisible();
+    await expect(stripe.getByText("A key is set (ends in 7Q2x), saved here. It is never shown in full.")).toBeVisible();
+    await expect(stripe.getByLabel("Secret key")).toHaveValue("");
+
+    await page.reload();
+    await expect(page.getByRole("region", { name: "Stripe" }).getByText("ends in 7Q2x")).toBeVisible();
+    expect(await page.content()).not.toContain(key);
+
+    await page.getByRole("link", { name: "System health" }).click();
+    await expect(page.getByRole("listitem").filter({ hasText: "Stripe" })).toContainText("Set. Test it under Platform keys");
+    await page.getByRole("link", { name: "Audit log" }).click();
+    await expect(page.getByRole("row").filter({ hasText: "Secret key" }).first()).toBeVisible();
+    expect(await page.content()).not.toContain(key);
+
+    await page.getByRole("link", { name: "Platform keys" }).click();
+    await page.getByRole("region", { name: "Stripe" }).getByRole("button", { name: "Remove Secret key" }).click();
+    await expect(page.getByRole("region", { name: "Stripe" }).getByText("Not set up")).toBeVisible();
+  });
+
+  test("someone who is not a super admin cannot open platform keys", async ({ page, request }) => {
+    await signedIn(page, request);
+    await page.goto("/admin/keys");
+    await expect(page.getByRole("heading", { name: "Platform keys" })).toHaveCount(0);
+  });
+
+  test("you can change your name and find the help page", async ({ page, request }) => {
+    const email = await signedIn(page, request);
+    await page.goto("/");
+    await page.getByRole("link", { name: `Your profile, ${email}` }).click();
+    await expect(page.getByLabel("Name")).toHaveValue("Erin Tester");
+    await expect(page.getByRole("button", { name: "Save name" })).toBeDisabled();
+    await page.getByLabel("Name").fill("Erin Q. Tester");
+    await page.getByRole("button", { name: "Save name" }).click();
+    await expect(page.getByRole("status")).toHaveText("Your name was changed.");
+    await page.reload();
+    await expect(page.getByLabel("Name")).toHaveValue("Erin Q. Tester");
+
+    await page.getByRole("link", { name: "Help" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Starting a scan from your build pipeline" })).toBeVisible();
+    await expect(page.locator("pre")).toContainText("/api/v1/audits");
+    await page.getByRole("navigation", { name: "Help topics" }).getByRole("link", { name: "Who can do what" }).click();
+    await expect(page.getByRole("heading", { name: "Who can do what" })).toBeInViewport();
   });
 });
 
@@ -368,7 +425,7 @@ test.describe("settings", () => {
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  for (const path of ["/", "/schedules", "/settings", "/scans/new", "/pricing", "/library", "/findings"]) {
+  for (const path of ["/", "/schedules", "/settings", "/scans/new", "/pricing", "/library", "/findings", "/help", "/profile"]) {
     test(`${path} fits the screen without scrolling sideways`, async ({ page, request }) => {
       await signedIn(page, request);
       await page.goto(path);

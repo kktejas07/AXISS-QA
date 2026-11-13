@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.api.routes import auth, projects, suites, runs, webhooks, scans, vulnerabilities, gaps, test_cases, reports, audits, admin, admin_ops, billing, dashboard, org, integrations, insights, schedules, connections, wise, workspace
+from app.api.routes import auth, projects, suites, runs, webhooks, scans, vulnerabilities, gaps, test_cases, reports, audits, admin, admin_ops, billing, dashboard, org, integrations, insights, schedules, connections, wise, workspace, admin_platform
 from app.api.deps import get_current_user
 from app.models.user import User
 
@@ -59,6 +59,16 @@ app.include_router(schedules.router, prefix="/api/v1")
 app.include_router(connections.router, prefix="/api/v1")
 app.include_router(wise.router, prefix="/api/v1")
 app.include_router(workspace.router, prefix="/api/v1")
+app.include_router(admin_platform.router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+async def _platform_settings():
+    """Keys saved from the admin console replace the server's own, here and every half minute after."""
+    if settings.ENVIRONMENT != "test":
+        from app.core import platform
+
+        app.state.platform_settings = asyncio.create_task(platform.keep_fresh())
 
 
 @app.on_event("startup")
