@@ -6,6 +6,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { SeverityBadge } from "../components/SeverityBadge";
 import { getDashboardSummary } from "../api/dashboard";
 import { StatusPill } from "../components/StatusPill";
+import { useCan } from "../hooks/useMe";
 import type { DashboardSummary } from "../types";
 
 function Stat({ label, value, note, tone }: { label: string; value: string | number; note: string; tone?: "bad" }) {
@@ -23,6 +24,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export function Dashboard() {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [failed, setFailed] = useState(false);
+  const canScan = useCan("scan.run");
 
   useEffect(() => {
     getDashboardSummary()
@@ -33,12 +35,14 @@ export function Dashboard() {
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-4 mb-7">
       <h1 className="text-4xl font-extrabold tracking-tight">Overview</h1>
-      <Link
-        to="/scans/new"
-        className="flex items-center gap-2 h-[52px] px-5 rounded-[10px] bg-brand-600 hover:bg-brand-700 text-white font-bold"
-      >
-        <Plus className="w-[18px] h-[18px]" strokeWidth={2.4} aria-hidden="true" /> New scan
-      </Link>
+      {canScan && (
+        <Link
+          to="/scans/new"
+          className="flex items-center gap-2 h-[52px] px-5 rounded-[10px] bg-brand-600 hover:bg-brand-700 text-white font-bold"
+        >
+          <Plus className="w-[18px] h-[18px]" strokeWidth={2.4} aria-hidden="true" /> New scan
+        </Link>
+      )}
     </div>
   );
 
@@ -87,16 +91,18 @@ export function Dashboard() {
           <p className="mx-auto mt-2 max-w-md text-body">
             Paste a web address or upload a mobile build to audit it and get test cases and scripts for it.
           </p>
-          <Link to="/scans/new" className="mt-5 inline-flex h-12 items-center rounded-[10px] bg-ink px-5 font-bold text-white">
-            Start your first scan
-          </Link>
+          {canScan && (
+            <Link to="/scans/new" className="mt-5 inline-flex h-12 items-center rounded-[10px] bg-ink px-5 font-bold text-white">
+              Start your first scan
+            </Link>
+          )}
         </section>
       ) : (
         <div className="flex flex-wrap items-start gap-7">
           <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-7">
             <section className="overflow-hidden rounded-2xl border border-gray-300 bg-white">
               <h2 className="px-5 py-4 text-lg font-bold">Recent scans</h2>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[560px] border-collapse text-left">
                   <thead>
                     <tr className="bg-soft text-[13.5px] text-body">

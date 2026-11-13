@@ -1,18 +1,25 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { FolderPlus, LayoutDashboard, ListChecks, LogOut, Plus, ShieldCheck, Users } from "lucide-react";
+import { Building2, FolderPlus, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, ShieldCheck, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
+import type { Permission } from "../types";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
+// `needs` hides an item from roles that cannot use it (viewers cannot start scans).
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; needs?: Permission };
 
 const userNav: NavItem[] = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/scans/new", label: "New scan", icon: Plus },
+  { to: "/scans/new", label: "New scan", icon: Plus, needs: "scan.run" },
   { to: "/audits", label: "Scans", icon: ListChecks },
-  { to: "/projects/new", label: "New project", icon: FolderPlus },
+  { to: "/projects/new", label: "New project", icon: FolderPlus, needs: "scan.run" },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-const adminNav: NavItem[] = [{ to: "/admin", label: "Users and platform", icon: Users, end: true }];
+const adminNav: NavItem[] = [
+  { to: "/admin", label: "Users and platform", icon: Users, end: true },
+  { to: "/admin/organizations", label: "Organisations", icon: Building2 },
+  { to: "/admin/audit-log", label: "Audit log", icon: ScrollText },
+];
 
 /**
  * App shell with a side menu. The admin variant is dark so staff can tell at a
@@ -22,7 +29,7 @@ export function Layout({ children, variant = "user" }: { children: React.ReactNo
   const navigate = useNavigate();
   const me = useMe();
   const admin = variant === "admin";
-  const nav = admin ? adminNav : userNav;
+  const nav = (admin ? adminNav : userNav).filter((item) => !item.needs || !me || me.permissions.includes(item.needs));
 
   const signOut = () => {
     localStorage.removeItem("token");
@@ -84,7 +91,12 @@ export function Layout({ children, variant = "user" }: { children: React.ReactNo
               </Link>
             )
           )}
-          {me && <p className={`px-3 pt-2 text-[13px] truncate ${admin ? "text-gray-400" : "text-body"}`}>{me.email}</p>}
+          {me && (
+            <p className={`px-3 pt-2 text-[13px] ${admin ? "text-gray-400" : "text-body"}`}>
+              <span className="block truncate font-semibold">{me.organization.name}</span>
+              <span className="block truncate">{me.email}</span>
+            </p>
+          )}
           <button
             type="button"
             onClick={signOut}

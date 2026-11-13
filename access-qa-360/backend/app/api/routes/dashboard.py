@@ -1,9 +1,9 @@
 """The signed-in user's own overview: only data from scans they created."""
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import OrgContext, get_org_context
 from app.core.database import get_db
 from app.models.audit_job import AuditJob
 from app.models.project import Project
@@ -25,7 +25,8 @@ def _value(enum_or_str) -> str:
 
 
 @router.get("/summary", response_model=DashboardSummary)
-async def dashboard_summary(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+async def dashboard_summary(db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    user = ctx.user
     mine = Scan.created_by == user.id
 
     projects = (await db.execute(select(func.count()).select_from(Project).where(Project.owner_id == user.id))).scalar() or 0
@@ -97,7 +98,11 @@ async def dashboard_summary(db: AsyncSession = Depends(get_db), user: User = Dep
     ]
 
     # ---- scans from the main flow (audit jobs). Drafts that never started are left out.
-    my_audits = (AuditJob.created_by == user.id, AuditJob.started_at.is_not(None))
+    # Everyone in the organisation sees its scans; older scans without one stay with their creator.
+    my_audits = (
+        or_(AuditJob.organization_id == ctx.org.id, and_(AuditJob.organization_id.is_(None), AuditJob.created_by == user.id)),
+        AuditJob.started_at.is_not(None),
+    )
     audit_count, audit_critical, audit_high, audit_tests = (
         await db.execute(
             select(

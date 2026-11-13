@@ -59,9 +59,9 @@ export function LoginPage() {
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-500">
-          No account?{" "}
+          No account yet?{" "}
           <Link to="/register" className="text-indigo-600 font-medium">
-            Register
+            Create one
           </Link>
         </p>
       </div>

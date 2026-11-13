@@ -4,6 +4,73 @@ export interface User {
   full_name: string;
   is_active: boolean;
   role: UserRole;
+  organization_id: string | null;
+  org_role: OrgRole;
+}
+
+export type OrgRole = "owner" | "admin" | "member" | "viewer";
+export type AccountType = "individual" | "team" | "enterprise";
+/** What a role allows. Viewers have none of these. */
+export type Permission = "scan.run" | "members.manage" | "org.edit";
+
+/** The signed-in user with their organisation and what their role allows. */
+export interface Me extends User {
+  organization: { id: string; name: string; account_type: AccountType; status: "active" | "suspended" };
+  permissions: Permission[];
+}
+
+export interface Org {
+  id: string;
+  name: string;
+  account_type: AccountType;
+  status: "active" | "suspended";
+  seat_limit: number | null;
+  scan_limit: number | null;
+  seats_used: number;
+  pending_invites: number;
+  scans_this_month: number;
+  my_role: OrgRole;
+  permissions: Permission[];
+}
+
+export interface Member {
+  id: string;
+  full_name: string;
+  email: string;
+  org_role: OrgRole;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Invite {
+  id: string;
+  email: string;
+  role: OrgRole;
+  token: string;
+  created_at: string;
+}
+
+export interface AdminOrg {
+  id: string;
+  name: string;
+  account_type: AccountType;
+  status: "active" | "suspended";
+  seat_limit: number | null;
+  scan_limit: number | null;
+  member_count: number;
+  scans_this_month: number;
+  owner_email: string | null;
+  created_at: string;
+  members?: { id: string; full_name: string; email: string; org_role: OrgRole; is_active: boolean }[];
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_email: string;
+  action: string;
+  target: string;
+  detail: string;
+  created_at: string;
 }
 
 export type UserRole = "user" | "super_admin";
@@ -42,10 +109,17 @@ export interface AdminOverview {
   open_vulnerabilities: Record<Severity, number>;
 }
 
-export interface AdminUser extends User {
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  role: UserRole;
   created_at: string;
   project_count: number;
   scan_count: number;
+  organization_name: string | null;
+  org_role: OrgRole | null;
 }
 
 export interface AdminScan {

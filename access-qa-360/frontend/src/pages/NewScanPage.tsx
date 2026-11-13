@@ -6,6 +6,7 @@ import { Layout } from "../components/Layout";
 import { ScanSteps } from "../components/ScanSteps";
 import { createDraft, uploadBuild } from "../api/audits";
 import type { SourceType } from "../api/audits";
+import { useCan } from "../hooks/useMe";
 import { apiError } from "../utils/errors";
 
 type Source = "web" | "mobile" | "code" | "repo";
@@ -31,6 +32,19 @@ export function NewScanPage() {
   const [uploaded, setUploaded] = useState<number | null>(null);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const canScan = useCan("scan.run");
+
+  if (canScan === false) {
+    return (
+      <Layout>
+        <h1 className="mb-4 text-4xl font-extrabold tracking-tight">New scan</h1>
+        <p className="max-w-xl rounded-xl border border-gray-300 bg-white px-5 py-4">
+          Your role is Viewer, so you can see scans and results but not start new ones. Ask an owner or admin of your
+          organisation to make you a member.
+        </p>
+      </Layout>
+    );
+  }
 
   const pickFile = (f: File | undefined) => {
     setError("");

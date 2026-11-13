@@ -181,7 +181,7 @@ export function AccessibilityTab({ job }: { job: AuditJob }) {
   if (a11y.violations.length === 0) return <p className={empty}>No accessibility problems were found on the pages we checked.</p>;
   return (
     <section className={card}>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[680px] border-collapse text-left">
           <thead>
             <tr className="bg-soft text-[13.5px] text-body">
@@ -332,7 +332,7 @@ const downloads: { kind: ExportKind; name: string; desc: string; format: string 
 export function DownloadsTab({ job }: { job: AuditJob }) {
   return (
     <section className={card}>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[620px] border-collapse text-left">
           <thead>
             <tr className="bg-soft text-[13.5px] text-body">

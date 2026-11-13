@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -30,7 +30,8 @@ from app.core.security import decode_token
 from app.core.storage import storage_path
 from app.models.audit_job import AuditJob, AuditStatus
 from app.models.user import User
-from app.api.deps import get_current_user
+from app.api.deps import OrgContext, get_org_context
+from app.services.orgs import scans_this_month
 
 router = APIRouter(prefix="/audits", tags=["audits"])
 
@@ -111,8 +112,16 @@ class AuditDetailOut(AuditOut):
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _get_job(audit_id: str, db: AsyncSession, user: User) -> AuditJob:
-    result = await db.execute(select(AuditJob).where(AuditJob.id == audit_id, AuditJob.created_by == user.id))
+def _visible(org_id: str | None, user_id: str):
+    """Scans the user may see: their organisation's, plus their own from before organisations existed."""
+    return or_(
+        AuditJob.organization_id == org_id,
+        and_(AuditJob.organization_id.is_(None), AuditJob.created_by == user_id),
+    )
+
+
+async def _get_job(audit_id: str, db: AsyncSession, ctx: OrgContext) -> AuditJob:
+    result = await db.execute(select(AuditJob).where(AuditJob.id == audit_id, _visible(ctx.org.id, ctx.user.id)))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(404, "Scan not found")
@@ -124,6 +133,15 @@ def _is_web_address(value: str | None) -> bool:
         return False
     parsed = urlparse(value.strip())
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+
+async def _check_org_can_scan(db: AsyncSession, ctx: OrgContext) -> None:
+    """Refuse to start when the organisation is suspended or has used its scans for the month."""
+    org = ctx.org
+    if org.status != "active":
+        raise HTTPException(403, "This organisation is suspended, so new scans cannot start. Contact support.")
+    if org.scan_limit is not None and await scans_this_month(db, org.id) >= org.scan_limit:
+        raise HTTPException(403, f"Your organisation has used all {org.scan_limit} scans for this month.")
 
 
 async def _save_upload(file: UploadFile, audit_id: str, suffix: str) -> str:
@@ -155,9 +173,10 @@ async def _save_upload(file: UploadFile, audit_id: str, suffix: str) -> str:
 async def create_audit(
     body: AuditCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    ctx: OrgContext = Depends(get_org_context),
 ):
     """Record what is being tested. Runs at once only when autostart is true and nothing else is needed."""
+    ctx.require("scan.run")
     target_url = body.target_url.strip() if body.target_url else None
     if body.source_type == "web":
         if not _is_web_address(target_url):
@@ -168,7 +187,8 @@ async def create_audit(
         raise HTTPException(422, "The app store link must start with http:// or https://")
 
     job = AuditJob(
-        created_by=user.id,
+        created_by=ctx.user.id,
+        organization_id=ctx.org.id,
         source_type=body.source_type,
         target_url=target_url,
         app_name=(body.app_name or "").strip() or None,
@@ -177,6 +197,7 @@ async def create_audit(
     # A mobile job needs its build uploaded first, so it always starts as a draft.
     autostart = body.autostart and (body.source_type == "web" or bool(body.mobile_url))
     if autostart:
+        await _check_org_can_scan(db, ctx)
         job.outputs = None  # run everything, as before
         job.started_at = datetime.now(timezone.utc)
     db.add(job)
@@ -191,11 +212,11 @@ async def create_audit(
 @router.get("", response_model=list[AuditOut])
 async def list_audits(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    ctx: OrgContext = Depends(get_org_context),
 ):
     result = await db.execute(
         select(AuditJob)
-        .where(AuditJob.created_by == user.id)
+        .where(_visible(ctx.org.id, ctx.user.id))
         .order_by(AuditJob.created_at.desc())
         .limit(50)
     )
@@ -206,9 +227,9 @@ async def list_audits(
 async def get_audit(
     audit_id: str,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    ctx: OrgContext = Depends(get_org_context),
 ):
-    return await _get_job(audit_id, db, user)
+    return await _get_job(audit_id, db, ctx)
 
 
 @router.post("/{audit_id}/upload", response_model=AuditOut)
@@ -216,10 +237,11 @@ async def upload_build(
     audit_id: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    ctx: OrgContext = Depends(get_org_context),
 ):
     """Attach an Android .apk or iOS .ipa to a scan that has not started yet."""
-    job = await _get_job(audit_id, db, user)
+    ctx.require("scan.run")
+    job = await _get_job(audit_id, db, ctx)
     if job.started_at:
         raise HTTPException(409, "This scan has already started. Create a new scan to test another build.")
 
@@ -244,13 +266,13 @@ async def upload_build(
 
 # The original two endpoints, kept so existing clients keep working.
 @router.post("/{audit_id}/upload-apk", response_model=AuditOut, include_in_schema=False)
-async def upload_apk(audit_id: str, file: UploadFile = File(...), db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    return await upload_build(audit_id, file, db, user)
+async def upload_apk(audit_id: str, file: UploadFile = File(...), db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    return await upload_build(audit_id, file, db, ctx)
 
 
 @router.post("/{audit_id}/upload-ipa", response_model=AuditOut, include_in_schema=False)
-async def upload_ipa(audit_id: str, file: UploadFile = File(...), db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    return await upload_build(audit_id, file, db, user)
+async def upload_ipa(audit_id: str, file: UploadFile = File(...), db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    return await upload_build(audit_id, file, db, ctx)
 
 
 @router.post("/{audit_id}/start", response_model=AuditOut)
@@ -258,10 +280,11 @@ async def start_audit(
     audit_id: str,
     body: AuditStart,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    ctx: OrgContext = Depends(get_org_context),
 ):
     """Step 2: record what the user wants and begin. Refuses without their confirmation of permission."""
-    job = await _get_job(audit_id, db, user)
+    ctx.require("scan.run")
+    job = await _get_job(audit_id, db, ctx)
     if job.started_at:
         raise HTTPException(409, "This scan has already started")
     if not body.ownership_confirmed:
@@ -276,6 +299,7 @@ async def start_audit(
         raise HTTPException(422, "Choose at least one output")
     if job.source_type in ("android", "ios") and not job.has_mobile_input:
         raise HTTPException(400, "Upload the app build before starting")
+    await _check_org_can_scan(db, ctx)
 
     now = datetime.now(timezone.utc)
     job.outputs = outputs
@@ -304,8 +328,9 @@ async def stream_audit_progress(
         terminal = {AuditStatus.completed.value, AuditStatus.failed.value, AuditStatus.partial.value}
         for _ in range(300):  # max 10 min
             async with db.begin():
+                viewer = await db.get(User, user_id)
                 res = await db.execute(
-                    select(AuditJob).where(AuditJob.id == audit_id, AuditJob.created_by == user_id)
+                    select(AuditJob).where(AuditJob.id == audit_id, _visible(viewer.organization_id if viewer else None, user_id))
                 )
                 job = res.scalar_one_or_none()
 
@@ -350,10 +375,10 @@ async def export_audit(
     audit_id: str,
     kind: Literal["report", "test-cases", "playwright", "appium", "results"],
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    ctx: OrgContext = Depends(get_org_context),
 ):
     """Download one output of a scan. job.exports lists the kinds that exist."""
-    job = await _get_job(audit_id, db, user)
+    job = await _get_job(audit_id, db, ctx)
     short = audit_id[:8]
     if kind not in job.exports:
         raise HTTPException(404, "That download is not available for this scan yet")
@@ -387,6 +412,6 @@ async def export_audit(
 
 
 @router.get("/{audit_id}/download", include_in_schema=False)
-async def download_audit_report(audit_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+async def download_audit_report(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     """Original PDF download address, kept for existing links."""
-    return await export_audit(audit_id, "report", db, user)
+    return await export_audit(audit_id, "report", db, ctx)
