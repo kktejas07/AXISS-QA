@@ -90,3 +90,9 @@ node scripts/install-wise-bot.mjs "/path/to/Agent Pals/Lottie Pack/Circle"
 That copies the 13 animations into `frontend/public/wise-bot/` (git-ignored) in Wiseflow's
 indigo. Add `--original` to keep the pack's own colours, or point at another bot's folder to
 use a different character. Without this step Wise shows a drawn owl and works the same.
+
+## Search engines and AI assistants
+
+The web app's build writes the landing page's full HTML into `index.html`, with the structured data search engines read, and generates `sitemap.xml`, `robots.txt` and `llms.txt`. All of them carry the site's public address, which comes from the `SITE_URL` build argument of the `web` image (default `https://qa.vatax360.com`). Change it if the domain changes, then rebuild.
+
+After the first deploy on a domain, add the site to Google Search Console and Bing Webmaster Tools and submit `/sitemap.xml`. That step needs your own accounts.

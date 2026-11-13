@@ -17,7 +17,7 @@ export default defineConfig({
   webServer: [
     { command: "./e2e/serve-backend.sh", url: "http://localhost:8010/health", reuseExistingServer: !process.env.CI, timeout: 60_000 },
     {
-      command: "VITE_API_URL=http://localhost:8010/api/v1 npx vite build --outDir dist-e2e && npx vite preview --outDir dist-e2e --port 5183 --strictPort",
+      command: "VITE_API_URL=http://localhost:8010/api/v1 npx vite build --outDir dist-e2e && SITE_URL=http://localhost:5183 npx vite-node scripts/prerender.tsx dist-e2e && npx vite preview --outDir dist-e2e --port 5183 --strictPort",
       url: "http://localhost:5183", reuseExistingServer: !process.env.CI, timeout: 120_000,
     },
   ],

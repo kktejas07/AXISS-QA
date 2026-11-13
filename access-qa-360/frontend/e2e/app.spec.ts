@@ -36,7 +36,26 @@ test.describe("landing page", () => {
     expect((await (await page.request.get("/manifest.webmanifest")).json()).name).toBe("Wiseflow");
     expect((await page.request.get("/brand/social-card.png")).headers()["content-type"]).toContain("image/png");
 
+    // Search engines and AI assistants that do not run scripts still get the whole page, and the data they read.
+    const source = await (await page.request.get("/")).text();
+    expect(source).toContain("Find what is broken before your customers do.");
+    expect(source).toContain("Does Wiseflow test AI chatbots?");
+    const blocks = [...source.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map((m) => JSON.parse(m[1]));
+    expect(blocks.map((b) => b["@type"])).toEqual(["Organization", "WebSite", "SoftwareApplication", "FAQPage"]);
+    const faq = blocks[3].mainEntity as { name: string; acceptedAnswer: { text: string } }[];
+    for (const item of faq) await expect(page.getByText(item.acceptedAnswer.text, { exact: true })).toBeAttached();      // every answer in the data is on the page
+    expect(await page.locator('link[rel="canonical"]').getAttribute("href")).toBe("http://localhost:5183/");
+    expect(await page.locator('meta[name="robots"]').getAttribute("content")).toBe("index, follow");
+    expect(await (await page.request.get("/sitemap.xml")).text()).toContain("<loc>http://localhost:5183/pricing</loc>");
+    const robots = await (await page.request.get("/robots.txt")).text();
+    expect(robots).toContain("User-agent: GPTBot");
+    expect(robots).toContain("Disallow: /settings");
+    expect(robots).toContain("Sitemap: http://localhost:5183/sitemap.xml");
+    expect(await (await page.request.get("/llms.txt")).text()).toContain("### What can Wiseflow scan?");
+
     await page.getByRole("contentinfo").getByRole("link", { name: "Privacy" }).click();
+    await expect(page).toHaveTitle("Privacy: Wiseflow");
+    expect(await page.locator('meta[name="robots"]').getAttribute("content")).toBe("noindex, nofollow");               // a draft is not offered to search engines
     await expect(page.getByRole("note")).toContainText("This is a draft");
     await page.goto("/");
     await page.getByRole("banner").getByRole("link", { name: "Start free" }).click();
@@ -50,6 +69,10 @@ test.describe("findings, notifications and first steps", () => {
     await signedIn(page, request);
     await page.goto("/");
     await expect(page.getByRole("region", { name: "Getting started" }).getByText("0 of 5 done")).toBeVisible();
+    // Signed in, the address "/" is the app: not the public page, and not for search engines.
+    await expect(page.getByRole("heading", { name: "Find what is broken before your customers do." })).toHaveCount(0);
+    await expect(page).toHaveTitle("Wiseflow");
+    expect(await page.locator('meta[name="robots"]').getAttribute("content")).toBe("noindex, nofollow");
     await scanTheApi(page);
 
     await page.getByRole("button", { name: /^Notifications/ }).click();

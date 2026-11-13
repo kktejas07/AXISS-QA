@@ -7,6 +7,9 @@ RUN npm ci || npm install
 # Same-origin by default. Set to a full URL only when the API is on another domain.
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=$VITE_API_URL
+# The site's public address, written into the sitemap, robots.txt, llms.txt and the page's canonical link.
+ARG SITE_URL=https://qa.vatax360.com
+ENV SITE_URL=$SITE_URL
 COPY . .
 RUN npm run build
 
