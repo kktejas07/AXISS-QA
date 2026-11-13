@@ -46,7 +46,7 @@ def plans() -> list[dict]:
         {
             "id": "enterprise", "name": "Enterprise", "price_usd": None, "price_inr": None, "per": None,
             "summary": "For larger organisations with their own terms.",
-            "features": ["No limit on people or scans", "Single sign-on", "Invoicing instead of a card", "A named contact at Wiseflow"],
+            "features": ["No limit on people or scans", "Limits and terms agreed with you", "Invoicing instead of a card", "A named contact at Wiseflow"],
         },
     ]
 

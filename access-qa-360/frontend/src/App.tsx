@@ -17,6 +17,7 @@ import { ScanDetailPage } from "./pages/ScanDetailPage";
 import { ScansListPage } from "./pages/ScansListPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { PricingPage } from "./pages/PricingPage";
+import { SsoPage } from "./pages/SsoPage";
 import { AdminAiUsagePage, AdminHealthPage, AdminQueuePage } from "./pages/AdminOpsPages";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/sso" element={<SsoPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
