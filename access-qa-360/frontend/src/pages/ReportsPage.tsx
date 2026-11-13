@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Layout } from "../components/Layout";
+import { QuickScanShell } from "../components/QuickScanShell";
 import { getReports, generateReport } from "../api/scans";
 import type { Report, ReportType, ReportFormat } from "../types";
 import { ArrowLeft, FileText, Download, Loader2, Plus } from "lucide-react";
@@ -80,23 +80,15 @@ export function ReportsPage() {
   };
 
   return (
-    <Layout>
-      <Link to={`/scans/${id}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-4">
-        <ArrowLeft className="w-4 h-4" /> Back to Scan Results
-      </Link>
+    <QuickScanShell id={id} tab="reports">
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-brand-900 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-indigo-500" /> Reports
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">{reports.length} reports generated</p>
-        </div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-body">{reports.length === 1 ? "1 report" : `${reports.length} reports`}</p>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          className="flex h-11 items-center gap-2 rounded-[10px] bg-brand-600 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
         >
-          <Plus className="w-4 h-4" /> Generate Report
+          <Plus className="w-4 h-4" aria-hidden="true" /> New report
         </button>
       </div>
 
@@ -106,15 +98,15 @@ export function ReportsPage() {
 
       {/* Generate Form */}
       {showForm && (
-        <div className="bg-white border border-indigo-200 rounded-xl p-5 mb-6">
-          <h3 className="font-semibold text-brand-900 mb-4">New Report</h3>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-white border border-brand-600 rounded-2xl p-5 mb-6">
+          <h3 className="font-semibold text-ink mb-4">New report</h3>
+          <div className="mb-4 grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
+              <label className="block text-sm font-medium text-ink mb-1">Report type</label>
               <select
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value as ReportType)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                className="h-12 w-full rounded-[10px] border border-gray-400 bg-white px-2.5 text-[15px]"
               >
                 {(Object.keys(reportTypeLabels) as ReportType[]).map((t) => (
                   <option key={t} value={t}>{reportTypeLabels[t]}</option>
@@ -122,11 +114,11 @@ export function ReportsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Format</label>
+              <label className="block text-sm font-medium text-ink mb-1">Format</label>
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value as ReportFormat)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                className="h-12 w-full rounded-[10px] border border-gray-400 bg-white px-2.5 text-[15px]"
               >
                 {reportFormatOptions[reportType].map((f) => (
                   <option key={f} value={f}>{formatLabels[f]}</option>
@@ -137,36 +129,36 @@ export function ReportsPage() {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+            className="flex h-11 items-center gap-2 rounded-[10px] bg-brand-600 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
           >
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-            Generate
+            Create report
           </button>
         </div>
       )}
 
       {/* Reports List */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-300 rounded-2xl overflow-hidden">
         {reports.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-body">
             <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
             <p className="font-medium">No reports yet</p>
-            <p className="text-sm mt-1">Generate your first report from scan data</p>
+            <p className="text-sm mt-1">Choose New report to create a PDF, JSON or CSV from this scan.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-line">
             {reports.map((r) => (
               <div key={r.id} className="flex items-center gap-4 px-5 py-4">
-                <FileText className="w-8 h-8 text-indigo-400 shrink-0" />
+                <FileText className="w-8 h-8 text-brand-600 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-brand-900 text-sm">{reportTypeLabels[r.report_type] ?? r.report_type}</p>
-                  <p className="text-xs text-gray-500">
-                    {formatLabels[r.format]} &middot; {new Date(r.created_at).toLocaleString()}
+                  <p className="font-medium text-ink text-sm">{reportTypeLabels[r.report_type] ?? r.report_type}</p>
+                  <p className="text-xs text-body">
+                    {formatLabels[r.format]}, {new Date(r.created_at).toLocaleString()}
                   </p>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                   r.status === "ready" ? "bg-emerald-100 text-emerald-700" :
-                  r.status === "generating" ? "bg-indigo-100 text-indigo-700 animate-pulse" :
+                  r.status === "generating" ? "bg-brand-50 text-brand-700 animate-pulse" :
                   "bg-red-100 text-red-700"
                 }`}>
                   {r.status}
@@ -175,7 +167,7 @@ export function ReportsPage() {
                   <button
                     type="button"
                     onClick={() => download(r)}
-                    className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                    className="flex items-center gap-1 text-brand-600 hover:text-indigo-800 text-sm font-medium"
                   >
                     <Download className="w-4 h-4" /> Download
                   </button>
@@ -185,6 +177,6 @@ export function ReportsPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </QuickScanShell>
   );
 }

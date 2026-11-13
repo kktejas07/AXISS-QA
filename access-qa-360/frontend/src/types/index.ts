@@ -202,23 +202,24 @@ export interface ScanConfig {
   exclude_paths: string[];
   crawl_depth: number;
   rate_limit: number;
+  project_id: string;
 }
 
+/** A quick security scan, as GET /scans/{id} returns it. The list endpoint leaves the counts out. */
 export interface Scan {
   id: string;
-  project_id?: string;
+  project_id: string;
   url: string;
   scan_type: ScanType;
-  profile: ScanProfile;
+  scan_profile: ScanProfile;
   status: ScanStatus;
   progress: number;
-  risk_grade: string;
-  vulnerability_count: { critical: number; high: number; medium: number; low: number; informational: number };
-  coverage_percent: number;
-  test_cases_generated: number;
-  routes_discovered: number;
-  started_at?: string;
-  completed_at?: string;
+  vulnerability_count?: number;
+  critical_count?: number;
+  high_count?: number;
+  gap_count?: number;
+  test_case_count?: number;
+  completed_at?: string | null;
   created_at: string;
 }
 
@@ -244,12 +245,13 @@ export interface Vulnerability {
 export interface QAGap {
   id: string;
   scan_id: string;
-  route: string;
-  coverage_status: CoverageStatus;
-  risk_level: Severity;
+  route_path: string;
+  /** "uncovered" | "partially_covered" | "missing_edge_case" | "accessibility" | "business_logic" | "orphaned_test" */
   gap_type: string;
+  risk_level: Severity;
   description: string;
-  recommendation: string;
+  recommendation: string | null;
+  category: string | null;
 }
 
 export interface TestCase {

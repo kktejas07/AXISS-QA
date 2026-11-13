@@ -1,30 +1,47 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { Clock, GitBranch, Play } from "lucide-react";
 import { Layout } from "../components/Layout";
-import { getRuns, triggerRun } from "../api/runs";
+import { LoadingSpinner } from "../components/LoadingSpinner";
 import { StatusBadge } from "../components/StatusBadge";
+import { getRuns, triggerRun } from "../api/runs";
 import type { Run } from "../types";
-import { Play, GitBranch, Clock } from "lucide-react";
+import { apiError } from "../utils/errors";
+import { backLink, card, emptyState, errorBox, pageTitle, primaryButton } from "../components/ui";
 
 export function RunHistoryPage() {
   const { projectId, suiteId } = useParams<{ projectId: string; suiteId: string }>();
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [runs, setRuns] = useState<Run[] | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const [error, setError] = useState("");
 
-  const loadRuns = () => {
-    if (projectId && suiteId) getRuns(projectId, suiteId).then((r) => setRuns(r.data));
-  };
+  const active = runs?.some((r) => r.status === "queued" || r.status === "running") ?? false;
 
   useEffect(() => {
-    loadRuns();
-  }, [projectId, suiteId]);
+    if (!projectId || !suiteId) return;
+    let alive = true;
+    const load = () =>
+      getRuns(projectId, suiteId)
+        .then((r) => alive && setRuns(r.data))
+        .catch(() => alive && setError("The runs could not be loaded. Reload the page."));
+    load();
+    // Keep asking only while a run is still going.
+    const timer = active ? setInterval(load, 3000) : undefined;
+    return () => {
+      alive = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [projectId, suiteId, active]);
 
   const handleTrigger = async () => {
     if (!projectId || !suiteId) return;
+    setError("");
     setTriggering(true);
     try {
-      await triggerRun(projectId, suiteId);
-      setTimeout(loadRuns, 1000);
+      const { data } = await triggerRun(projectId, suiteId);
+      setRuns((list) => [data, ...(list ?? [])]);
+    } catch (err) {
+      setError(apiError(err, "The run could not be started. Try again."));
     } finally {
       setTriggering(false);
     }
@@ -32,67 +49,56 @@ export function RunHistoryPage() {
 
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link
-            to={`/projects/${projectId}/suites`}
-            className="text-sm text-muted hover:text-accent transition-colors"
-          >
-            &larr; Suites
-          </Link>
-          <h1 className="text-2xl font-bold text-fg mt-1">Run History</h1>
+          <Link to={`/projects/${projectId}/suites`} className={backLink}>Test suites</Link>
+          <h1 className={`${pageTitle} mt-1`}>Runs</h1>
         </div>
-        <button
-          onClick={handleTrigger}
-          disabled={triggering}
-          className="refero-btn-primary flex items-center gap-2 text-sm px-4 py-2"
-        >
-          <Play className="w-4 h-4" />
-          {triggering ? "Queuing…" : "Run Now"}
+        <button type="button" onClick={handleTrigger} disabled={triggering} className={primaryButton}>
+          <Play className="h-[18px] w-[18px]" aria-hidden="true" />
+          {triggering ? "Starting" : "Run now"}
         </button>
       </div>
-
-      <div className="space-y-3">
-        {runs.map((run) => (
-          <div key={run.id} className="bg-surface-1 border border-surface-3 rounded-card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <StatusBadge status={run.status} />
-              <span className="text-xs font-mono text-muted">
-                {new Date(run.created_at).toLocaleString()}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-4 text-sm text-muted mt-2">
-              {run.branch && (
-                <span className="flex items-center gap-1">
-                  <GitBranch className="w-3.5 h-3.5" />
-                  {run.branch}
-                </span>
-              )}
-              {run.duration_ms != null && (
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {(run.duration_ms / 1000).toFixed(1)}s
-                </span>
-              )}
-              {run.tests_total != null && (
-                <span>
-                  {run.tests_passed}/{run.tests_total} passed
-                </span>
-              )}
-            </div>
-            {run.triage_summary && (
-              <div className="mt-3 bg-red-900/20 border border-red-800/40 rounded-card p-3 text-xs text-red-300 whitespace-pre-line">
-                {run.triage_summary}
+      {error && <p role="alert" className={`${errorBox} mb-5`}>{error}</p>}
+      {!runs ? (
+        !error && <LoadingSpinner />
+      ) : runs.length === 0 ? (
+        <p className={emptyState}>This suite has not been run yet. Choose Run now to try it against your app.</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {runs.map((run) => (
+            <li key={run.id} className={`${card} p-5`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <StatusBadge status={run.status} />
+                <span className="text-[13.5px] text-body">{new Date(run.created_at).toLocaleString()}</span>
               </div>
-            )}
-          </div>
-        ))}
-        {runs.length === 0 && (
-          <p className="text-center text-muted py-12">
-            No runs yet. Click "Run Now" to start your first test run.
-          </p>
-        )}
-      </div>
+              <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[14.5px] text-body">
+                {run.tests_total != null && (
+                  <span className="font-semibold text-ink">{run.tests_passed} of {run.tests_total} tests passed</span>
+                )}
+                {run.duration_ms != null && (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4" aria-hidden="true" />
+                    {(run.duration_ms / 1000).toFixed(1)} seconds
+                  </span>
+                )}
+                {run.branch && (
+                  <span className="flex items-center gap-1.5 font-mono text-[13px]">
+                    <GitBranch className="h-4 w-4" aria-hidden="true" />
+                    {run.branch}
+                  </span>
+                )}
+              </div>
+              {run.triage_summary && (
+                <div className="mt-3 whitespace-pre-line rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[14.5px] text-red-900">
+                  <p className="mb-1 text-[13px] font-bold">Why it failed</p>
+                  {run.triage_summary}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </Layout>
   );
 }
