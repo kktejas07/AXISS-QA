@@ -25,10 +25,10 @@ from urllib.parse import urlparse, urljoin, urldefrag
 
 from playwright.async_api import async_playwright, Page, BrowserContext, Route, Request
 
-from anthropic import AsyncAnthropic
+from app.core.ai import ai_client
 from app.core.config import settings
 
-ai = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+ai = ai_client("Web tests")
 
 # ---------------------------------------------------------------------------
 # axe-core CDN snippet (accessibility engine — injected into every page)

@@ -1,5 +1,5 @@
 from app.models.organization import Organization, Invite, AdminAuditLog
-from app.models.integration import ApiKey, Integration, TrackerIssue
+from app.models.integration import AiUsage, ApiKey, Integration, TrackerIssue
 from app.models.user import User
 from app.models.project import Project
 from app.models.suite import Suite

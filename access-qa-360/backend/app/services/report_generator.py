@@ -17,7 +17,7 @@ import textwrap
 from datetime import datetime, timezone
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from app.core.ai import ai_client
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -28,7 +28,7 @@ from app.models.vulnerability import Vulnerability
 from app.models.qa_gap import QAGap
 from app.models.report import Report, ReportFormat
 
-ai = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+ai = ai_client("Reports")
 
 EXEC_SUMMARY_PROMPT = """You are a senior security consultant writing for a C-level audience.
 Produce a concise executive summary (3 short paragraphs, max 250 words total) for this scan report.

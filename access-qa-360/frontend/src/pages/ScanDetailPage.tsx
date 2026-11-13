@@ -16,7 +16,9 @@ import {
   TestCasesTab,
   allFindings,
 } from "../components/ScanResults";
-import { getAudit, isCode, sourceName } from "../api/audits";
+import { getAudit, isCode, sourceName, stopAudit } from "../api/audits";
+import { useCan } from "../hooks/useMe";
+import { apiError } from "../utils/errors";
 import type { AuditJob, StepStatus } from "../api/audits";
 
 
@@ -92,6 +94,22 @@ export function ScanDetailPage() {
   const [params, setParams] = useSearchParams();
   const [job, setJob] = useState<AuditJob | null>(null);
   const [missing, setMissing] = useState(false);
+  const canStop = useCan("scan.run");
+  const [stopping, setStopping] = useState(false);
+  const [stopError, setStopError] = useState("");
+
+  const stop = async () => {
+    if (!id) return;
+    setStopError("");
+    setStopping(true);
+    try {
+      setJob((await stopAudit(id)).data);
+    } catch (e) {
+      setStopError(apiError(e, "The scan could not be stopped. Try again."));
+    } finally {
+      setStopping(false);
+    }
+  };
 
   const loaded = job !== null;
   const active = job?.status === "queued" || job?.status === "running";
@@ -149,6 +167,15 @@ export function ScanDetailPage() {
             <div className="h-full bg-brand-600 transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${job.progress}%` }} />
           </div>
           <span className="font-semibold">{job.progress}% done. You can leave this page; the scan keeps running and appears under Scans.</span>
+          {canStop && (
+            <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+              <button type="button" onClick={stop} disabled={stopping} className="h-11 rounded-[10px] border-[1.5px] border-red-700 bg-white px-4 text-sm font-semibold text-red-800 disabled:opacity-60">
+                {stopping ? "Stopping" : "Stop scan"}
+              </button>
+              <span className="text-[13.5px] text-body">Steps that already finished keep their results.</span>
+              {stopError && <span role="alert" className="text-[13.5px] text-red-800">{stopError}</span>}
+            </div>
+          )}
         </section>
         <StepList job={job} />
       </Layout>

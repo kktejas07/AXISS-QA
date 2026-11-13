@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Building2, FolderKanban, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, ShieldCheck, Users } from "lucide-react";
+import { Activity, Building2, FolderKanban, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Permission } from "../types";
@@ -19,6 +19,9 @@ const userNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { to: "/admin", label: "Users and platform", icon: Users, end: true },
   { to: "/admin/organizations", label: "Organisations", icon: Building2 },
+  { to: "/admin/queue", label: "Scan queue", icon: ListChecks },
+  { to: "/admin/ai-usage", label: "AI usage", icon: Sparkles },
+  { to: "/admin/health", label: "System health", icon: Activity },
   { to: "/admin/audit-log", label: "Audit log", icon: ScrollText },
 ];
 

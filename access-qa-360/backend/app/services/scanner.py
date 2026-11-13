@@ -19,7 +19,7 @@ from typing import Any
 from urllib.parse import urlparse, urljoin, parse_qs, urldefrag
 
 from playwright.async_api import async_playwright, Page, BrowserContext, Response
-from anthropic import AsyncAnthropic
+from app.core.ai import ai_client
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -30,7 +30,7 @@ from app.models.vulnerability import Vulnerability, Severity, VulnStatus, FixEff
 from app.models.qa_gap import QAGap, GapType, RiskLevel
 from app.models.test_case import TestCase
 
-ai = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+ai = ai_client("Quick scan")
 
 # ---------------------------------------------------------------------------
 # Progress helpers

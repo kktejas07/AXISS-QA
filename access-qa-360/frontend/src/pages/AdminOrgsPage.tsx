@@ -290,6 +290,7 @@ const actionName: Record<string, string> = {
   "org.suspend": "Suspended organisation",
   "org.reactivate": "Reactivated organisation",
   "user.reset_link": "Created a password reset link",
+  "scan.stop": "Stopped a scan",
 };
 
 /** What super admins changed, newest first. */

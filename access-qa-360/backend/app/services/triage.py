@@ -1,10 +1,10 @@
 """
 Failure Triage Service — uses Claude Haiku to summarise test failures cheaply.
 """
-from anthropic import Anthropic
+from app.core.ai import sync_ai_client
 from app.core.config import settings
 
-client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+client = sync_ai_client("Run triage")
 
 TRIAGE_PROMPT = """You are a QA engineer triaging an automated test failure.
 
