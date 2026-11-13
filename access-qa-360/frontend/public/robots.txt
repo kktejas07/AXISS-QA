@@ -1,0 +1,15 @@
+# The public pages may be indexed; the app itself is behind sign-in.
+User-agent: *
+Allow: /$
+Allow: /pricing
+Allow: /privacy
+Allow: /terms
+Disallow: /audits
+Disallow: /scans
+Disallow: /admin
+Disallow: /settings
+Disallow: /findings
+Disallow: /schedules
+Disallow: /library
+Disallow: /projects
+Disallow: /api/

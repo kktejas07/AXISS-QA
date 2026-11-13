@@ -1,0 +1,103 @@
+"""The findings inbox, SBOM download, notifications and the getting-started checklist."""
+from datetime import datetime, timedelta, timezone
+
+from httpx import AsyncClient
+
+from app.models.audit_job import AuditJob, AuditStatus
+from app.models.organization import Organization
+from app.models.user import User
+from tests.conftest import TestSessionLocal
+
+API = "/api/v1"
+
+
+async def org_of(client, headers) -> str:
+    return (await client.get(f"{API}/auth/me", headers=headers)).json()["organization_id"]
+
+
+async def scan(org, user, findings, days_ago=0, **more) -> str:
+    async with TestSessionLocal() as db:
+        at = datetime.now(timezone.utc) - timedelta(days=days_ago)
+        more.setdefault("target_url", "https://shop.example.com")
+        job = AuditJob(created_by=user.id, organization_id=org, source_type=more.pop("source_type", "web"), status=more.pop("status", AuditStatus.completed),
+                       created_at=at, started_at=at, completed_at=at, critical_count=sum(1 for f in findings if f["severity"] == "critical"),
+                       tier3_result={"findings": findings}, **more)
+        db.add(job)
+        await db.commit()
+        return job.id
+
+
+def finding(title, severity="high", url="https://shop.example.com/api"):
+    return {"title": title, "severity": severity, "affected_url": url}
+
+
+async def test_a_decision_about_a_finding_follows_it_to_the_next_scan(client: AsyncClient, test_user, auth_headers):
+    org = await org_of(client, auth_headers)
+    old = await scan(org, test_user, [finding("SQL injection", "critical"), finding("Missing HSTS header", "low")], days_ago=7)
+    inbox = (await client.get(f"{API}/findings", headers=auth_headers)).json()
+    assert inbox["counts"] == {"open": 2, "fixed": 0, "accepted": 0, "false_positive": 0} and [i["title"] for i in inbox["items"]] == ["SQL injection", "Missing HSTS header"]
+
+    put = lambda **body: client.put(f"{API}/findings/state", headers=auth_headers, json={"audit_id": old, "source": "security", **body})
+    assert (await put(index=1, status="accepted")).status_code == 422                                   # must say why
+    assert (await put(index=9, status="fixed")).status_code == 404
+    assert (await put(index=1, status="open", assignee_id="someone-else")).status_code == 422
+    done = await put(index=1, status="accepted", note="Behind a CDN that sets it.", assignee_id=test_user.id)
+    assert done.status_code == 200 and done.json()["status"] == "accepted"
+
+    # A newer scan of the same site: the same finding at a different position keeps its decision.
+    new = await scan(org, test_user, [finding("Missing HSTS header", "low"), finding("Open CORS policy", "medium")])
+    inbox = (await client.get(f"{API}/findings", headers=auth_headers)).json()
+    assert inbox["total"] == 2 and all(i["audit_id"] == new for i in inbox["items"])                    # only the latest scan of each target
+    hsts = next(i for i in inbox["items"] if i["title"] == "Missing HSTS header")
+    assert (hsts["status"], hsts["note"], hsts["assignee"]) == ("accepted", "Behind a CDN that sets it.", "Test User")
+    assert [i["title"] for i in (await client.get(f"{API}/findings", params={"status": "open"}, headers=auth_headers)).json()["items"]] == ["Open CORS policy"]
+    assert len((await client.get(f"{API}/findings", params={"assignee": "me"}, headers=auth_headers)).json()["items"]) == 1
+    assert len((await client.get(f"{API}/findings", params={"severity": "critical"}, headers=auth_headers)).json()["items"]) == 0
+
+
+async def test_the_inbox_is_per_organisation_and_viewers_cannot_decide(client: AsyncClient, test_user, auth_headers):
+    org = await org_of(client, auth_headers)
+    mine = await scan(org, test_user, [finding("Mine")])
+    async with TestSessionLocal() as db:
+        other = Organization(name="Other")
+        db.add(other)
+        await db.commit()
+    theirs = await scan(other.id, test_user, [finding("Theirs")], target_url="https://rival.example.com")
+    assert [i["title"] for i in (await client.get(f"{API}/findings", headers=auth_headers)).json()["items"]] == ["Mine"]
+    body = {"source": "security", "index": 0, "status": "fixed"}
+    assert (await client.put(f"{API}/findings/state", headers=auth_headers, json={"audit_id": theirs, **body})).status_code == 404
+    async with TestSessionLocal() as db:
+        (await db.get(User, test_user.id)).org_role = "viewer"
+        await db.commit()
+    assert (await client.put(f"{API}/findings/state", headers=auth_headers, json={"audit_id": mine, **body})).status_code == 403
+    assert (await client.get(f"{API}/findings", headers=auth_headers)).status_code == 200
+
+
+async def test_sbom_lists_the_packages_a_code_scan_found(client: AsyncClient, test_user, auth_headers):
+    org = await org_of(client, auth_headers)
+    code = await scan(org, test_user, [], source_type="repo", target_url=None, repo_url="https://github.com/acme/shop.git",
+                      tier1_result={"packages": [{"ecosystem": "PyPI", "name": "requests", "version": "2.31.0", "manifest": "requirements.txt"},
+                                                 {"ecosystem": "npm", "name": "left-pad", "version": "1.3.0", "manifest": "package-lock.json"}]})
+    r = await client.get(f"{API}/audits/{code}/sbom.json", headers=auth_headers)
+    doc = r.json()
+    assert r.status_code == 200 and (doc["bomFormat"], doc["specVersion"]) == ("CycloneDX", "1.5") and ".cdx.json" in r.headers["content-disposition"]
+    assert [c["purl"] for c in doc["components"]] == ["pkg:pypi/requests@2.31.0", "pkg:npm/left-pad@1.3.0"] and doc["metadata"]["component"]["name"] == "acme/shop"
+    web = await scan(org, test_user, [])
+    assert (await client.get(f"{API}/audits/{web}/sbom.json", headers=auth_headers)).status_code == 404
+
+
+async def test_notifications_and_first_steps(client: AsyncClient, test_user, auth_headers):
+    org = await org_of(client, auth_headers)
+    start = (await client.get(f"{API}/onboarding", headers=auth_headers)).json()
+    assert (start["done"], start["total"]) == (0, 5) and start["steps"][0]["id"] == "scan"
+    assert (await client.get(f"{API}/notifications", headers=auth_headers)).json() == []
+
+    await scan(org, test_user, [finding("SQL injection", "critical")], days_ago=1, app_name="Shop")
+    await scan(org, test_user, [], status=AuditStatus.failed, app_name="Blog", trigger={"kind": "schedule", "schedule_id": "s"})
+    await scan(org, test_user, [], days_ago=30, app_name="Old")
+    notes = (await client.get(f"{API}/notifications", headers=auth_headers)).json()
+    assert [n["text"] for n in notes] == ["Scheduled scan of Blog could not be completed", "Scan of Shop finished: 1 critical, 0 high"]
+    assert notes[0]["tone"] == "bad" and notes[1]["path"].startswith("/audits/")
+    await client.post(f"{API}/schedules", headers=auth_headers, json={"source_type": "web", "target": "https://shop.example.com", "frequency": "weekly", "ownership_confirmed": True})
+    now = (await client.get(f"{API}/onboarding", headers=auth_headers)).json()
+    assert now["done"] == 2 and [s["id"] for s in now["steps"] if s["done"]] == ["scan", "schedule"]

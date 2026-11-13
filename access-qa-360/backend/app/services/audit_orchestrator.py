@@ -609,6 +609,8 @@ async def _run_code_audit(audit_job_id: str) -> None:
             "qa_gaps": scan.qa_gaps,
         }
         tier_states.append("completed")
+        # Kept so a software bill of materials can be downloaded later.
+        tier1_data["packages"] = [{"ecosystem": p.ecosystem, "name": p.name, "version": p.version, "manifest": p.manifest} for p in scan.packages[:3000]]
         await _set_progress(
             audit_job_id, 40, tier1_status="completed", tier1_result=tier1_data,
             total_pages_audited=scan.files_scanned, coverage_pct=scan.qa_gaps.get("coverage_pct"),

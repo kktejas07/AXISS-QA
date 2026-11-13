@@ -5,6 +5,7 @@ import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ChangesTab, ConversationsTab, EndpointsTab, FlowsTab, SmokeTest, PerformanceTab, StandardsTab } from "../components/ScanInsights";
 import { ScanSteps } from "../components/ScanSteps";
+import { SbomCard } from "../components/Workspace";
 import { StatusPill } from "../components/StatusPill";
 import {
   AccessibilityTab,
@@ -342,7 +343,12 @@ export function ScanDetailPage() {
       {tab === "endpoints" && <EndpointsTab job={job} />}
       {tab === "changes" && <ChangesTab job={job} />}
       {tab === "standards" && <StandardsTab job={job} />}
-      {tab === "downloads" && <DownloadsTab job={job} />}
+      {tab === "downloads" && (
+        <div className="flex flex-col gap-5">
+          <DownloadsTab job={job} />
+          {(job.tier1_result?.packages?.length ?? 0) > 0 && <SbomCard auditId={job.id} count={job.tier1_result!.packages!.length} />}
+        </div>
+      )}
     </Layout>
   );
 }

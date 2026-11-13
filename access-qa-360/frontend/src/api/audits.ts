@@ -68,6 +68,8 @@ export interface WebResult {
   sign_in?: string;
   performance?: Performance;
   smoke_run?: SmokeRun;
+  /** Code scans: the packages found, for the software bill of materials. */
+  packages?: { ecosystem: string; name: string; version: string; manifest: string }[];
   /** Chatbot scans: each test message, the reply and the verdict. */
   chatbot?: ChatbotResult;
   /** API description scans. */

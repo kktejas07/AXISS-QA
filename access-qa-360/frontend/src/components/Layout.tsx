@@ -1,10 +1,11 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Activity, BookOpen, Building2, CalendarClock, FolderKanban, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookOpen, Building2, CalendarClock, FolderKanban, Inbox, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Permission } from "../types";
 import { Logo } from "./Logo";
 import { Wise } from "./Wise";
+import { NotificationBell } from "./Workspace";
 
 // `needs` hides an item from roles that cannot use it (viewers cannot start scans).
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; needs?: Permission };
@@ -13,6 +14,7 @@ const userNav: NavItem[] = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/scans/new", label: "New scan", icon: Plus, needs: "scan.run" },
   { to: "/audits", label: "Scans", icon: ListChecks },
+  { to: "/findings", label: "Findings", icon: Inbox },
   { to: "/schedules", label: "Schedules", icon: CalendarClock },
   { to: "/library", label: "Library", icon: BookOpen },
   { to: "/projects", label: "Projects", icon: FolderKanban },
@@ -66,9 +68,12 @@ export function Layout({ children, variant = "user" }: { children: React.ReactNo
         }`}
       >
         <div className="flex flex-col gap-2.5 px-2">
-          <Link to="/" aria-label="Wiseflow, home">
-            <Logo reversed={admin} />
-          </Link>
+          <div className="flex items-center justify-between gap-2">
+            <Link to="/" aria-label="Wiseflow, home">
+              <Logo reversed={admin} />
+            </Link>
+            {!admin && <NotificationBell />}
+          </div>
           {admin && (
             <span className="self-start text-xs font-bold text-ink bg-amber-400 rounded-md px-2 py-0.5">Super admin</span>
           )}
