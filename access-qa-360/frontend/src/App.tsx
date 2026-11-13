@@ -23,6 +23,9 @@ import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SchedulesPage } from "./pages/SchedulesPage";
 import { LibraryPage } from "./pages/LibraryPage";
+import { FindingsPage } from "./pages/FindingsPage";
+import { LandingPage } from "./pages/LandingPage";
+import { LegalPage } from "./pages/LegalPage";
 import { AdminAuditPage, AdminOrgDetailPage, AdminOrgsPage } from "./pages/AdminOrgsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
@@ -31,6 +34,11 @@ import { useMe } from "./hooks/useMe";
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("token");
   return token ? children : <Navigate to="/login" replace />;
+}
+
+/** Signed in: the overview. Signed out: the public page. Decided each time the page is shown, so signing in or out switches it. */
+function Home() {
+  return localStorage.getItem("token") ? <Dashboard /> : <LandingPage />;
 }
 
 /** Only super admins get in; everyone else goes back to their own overview. The API enforces this too. */
@@ -51,7 +59,11 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
-        <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+        {/* Signed in: the overview. Signed out: the public page that says what Wiseflow is. */}
+        <Route path="/" element={<Home />} />
+        <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+        <Route path="/terms" element={<LegalPage kind="terms" />} />
+        <Route path="/findings" element={<RequireAuth><FindingsPage /></RequireAuth>} />
         <Route path="/projects" element={<RequireAuth><ProjectsListPage /></RequireAuth>} />
         <Route path="/projects/new" element={<RequireAuth><ProjectsPage /></RequireAuth>} />
         <Route path="/projects/:projectId/suites" element={<RequireAuth><TestSuitesPage /></RequireAuth>} />

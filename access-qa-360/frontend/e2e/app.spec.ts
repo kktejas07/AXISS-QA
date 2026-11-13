@@ -16,6 +16,61 @@ async function scanTheApi(page: import("@playwright/test").Page) {
   await expect(page.getByText("Completed", { exact: true }).first()).toBeVisible({ timeout: 45_000 });
 }
 
+test.describe("landing page", () => {
+  test("a visitor sees what Wiseflow is, with real screenshots, and can reach sign-up, pricing and the legal pages", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Find what is broken before your customers do." })).toBeVisible();
+    await expect(page.getByText(/Free plan: 1 person, 2 scans a month/)).toBeVisible();          // read from the product, not typed into the page
+    await expect(page.getByRole("heading", { name: "Six things you can point it at" })).toBeVisible();
+    for (const alt of [/A finished Wiseflow scan/, /Wise, the assistant, answering/, /A chatbot scan/]) {
+      const image = page.getByRole("img", { name: alt });
+      await image.scrollIntoViewIfNeeded();
+      await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(1000);
+    }
+    await expect(page).toHaveTitle(/Wiseflow: AI testing and security checks/);
+    expect(await page.locator('meta[name="description"]').getAttribute("content")).toContain("Point Wiseflow at");
+    expect((await page.request.get("/robots.txt")).ok()).toBe(true);
+    expect((await (await page.request.get("/manifest.webmanifest")).json()).name).toBe("Wiseflow");
+    expect((await page.request.get("/brand/social-card.png")).headers()["content-type"]).toContain("image/png");
+
+    await page.getByRole("contentinfo").getByRole("link", { name: "Privacy" }).click();
+    await expect(page.getByRole("note")).toContainText("This is a draft");
+    await page.goto("/");
+    await page.getByRole("banner").getByRole("link", { name: "Start free" }).click();
+    await expect(page).toHaveURL(/\/register$/);
+  });
+});
+
+test.describe("findings, notifications and first steps", () => {
+  test("a new account is guided, then decides what happens to a finding", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await signedIn(page, request);
+    await page.goto("/");
+    await expect(page.getByRole("region", { name: "Getting started" }).getByText("0 of 5 done")).toBeVisible();
+    await scanTheApi(page);
+
+    await page.getByRole("button", { name: /^Notifications/ }).click();
+    await expect(page.getByRole("dialog", { name: "Notifications" }).getByRole("link", { name: /Scan of Shop API finished: 0 critical, 1 high/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("link", { name: "Findings" }).click();
+    await expect(page.getByRole("button", { name: "Open (5)" })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Decide about Endpoint needs no sign-in" }).click();
+    await page.getByLabel("What happens to it").selectOption({ label: "Risk accepted" });
+    await page.getByLabel("Owner").selectOption({ label: "Erin Tester" });
+    await page.getByLabel("Why").fill("This endpoint is public on purpose.");
+    await page.getByRole("button", { name: "Save decision" }).click();
+    await expect(page.getByRole("status")).toContainText("is now risk accepted");
+    await expect(page.getByRole("button", { name: "Open (4)" })).toBeVisible();
+    await page.getByRole("button", { name: "Risk accepted (1)" }).click();
+    await expect(page.getByText("This endpoint is public on purpose.")).toBeVisible();
+    await expect(page.getByText("Owner: Erin Tester.")).toBeVisible();
+
+    await page.getByRole("link", { name: "Overview" }).click();
+    await expect(page.getByRole("region", { name: "Getting started" }).getByText("1 of 5 done")).toBeVisible();
+  });
+});
+
 test.describe("signed out", () => {
   test("pricing shows the free plan's two scans, and sign-in offers no Microsoft button", async ({ page }) => {
     await page.goto("/pricing");
@@ -313,7 +368,7 @@ test.describe("settings", () => {
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  for (const path of ["/", "/schedules", "/settings", "/scans/new", "/pricing", "/library"]) {
+  for (const path of ["/", "/schedules", "/settings", "/scans/new", "/pricing", "/library", "/findings"]) {
     test(`${path} fits the screen without scrolling sideways`, async ({ page, request }) => {
       await signedIn(page, request);
       await page.goto(path);
@@ -321,6 +376,12 @@ test.describe("on a phone", () => {
       expect(await scrollsSideways(page)).toBe(false);
     });
   }
+
+  test("the landing page fits the screen without scrolling sideways", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    expect(await scrollsSideways(page)).toBe(false);
+  });
 
   test("Wise opens within the screen", async ({ page, request }) => {
     await signedIn(page, request);

@@ -1,0 +1,13 @@
+{
+  "name": "Wiseflow",
+  "short_name": "Wiseflow",
+  "description": "AI testing and security checks for web, mobile, code, APIs and chatbots.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3730a3",
+  "icons": [
+    { "src": "/brand/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/brand/app-icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,3 +1,4 @@
+import { FirstStepsCard } from "../components/Workspace";
 import { RadarWindow } from "../components/Illustrations";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -73,6 +74,7 @@ export function Dashboard() {
   return (
     <Layout>
       {header}
+      <FirstStepsCard />
 
       <dl className="mb-7 grid overflow-hidden rounded-2xl border-2 border-ink bg-white shadow-hard sm:grid-cols-2 lg:grid-cols-4">
         <Stat
