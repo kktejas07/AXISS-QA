@@ -9,6 +9,8 @@ class Token(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    # The six-digit code from the authenticator app, for accounts with two-step sign-in.
+    code: str | None = None
 
 
 class RegisterRequest(BaseModel):
@@ -61,3 +63,4 @@ class MeOut(UserOut):
     organization: OrgBrief
     # What this user's role allows, e.g. "scan.run", "members.manage"
     permissions: list[str]
+    two_step_enabled: bool = False

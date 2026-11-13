@@ -42,6 +42,8 @@ class Organization(Base):
     billing_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
     billing_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     billing_cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # Members must sign in with Google; passwords are refused. The owner is exempt, so nobody can be locked out.
+    require_sso: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
 
 class Invite(Base):

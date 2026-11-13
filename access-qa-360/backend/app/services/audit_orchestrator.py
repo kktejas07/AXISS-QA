@@ -17,16 +17,17 @@ import os
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
 
 from app.core.database import AsyncSessionLocal
 from app.models.audit_job import AuditJob, AuditStatus
 from app.services.web_auditor import (
-    crawl_and_audit, generate_playwright_tests, generate_manual_test_cases, summarise_a11y
+    crawl_and_audit, generate_playwright_tests, generate_manual_test_cases, summarise_a11y, summarise_performance
 )
 from app.services.mobile_auditor import run_mobile_audit
 from app.services.api_auditor import run_api_audit
-from app.services import code_auditor
+from app.services import api_spec_auditor, code_auditor
+from app.core.secrets import decrypt
 
 from app.core.ai import ai_client, ai_context
 from app.core.config import settings
@@ -367,6 +368,11 @@ async def run_audit(audit_job_id: str):
     finally:
         from app.services import notify
 
+        # The sign-in details were only needed for the crawl. Do not keep them.
+        async with AsyncSessionLocal() as db:
+            await db.execute(sa_update(AuditJob).where(AuditJob.id == audit_job_id, AuditJob.login_encrypted.is_not(None)).values(login_encrypted=None))
+            await db.commit()
+
         await notify.scan_finished(audit_job_id)
 
 
@@ -390,11 +396,21 @@ async def _run_audit(audit_job_id: str):
         outputs = set(job.outputs or ALL_OUTPUTS)
         depth = job.depth or "standard"
         is_code = job.is_code
+        is_api = job.source_type == "api"
+        login = None
+        if job.login_encrypted:
+            try:
+                login = json.loads(decrypt(job.login_encrypted) or "null")
+            except ValueError:
+                login = None
         # AI calls made during this scan are counted against its organisation.
         ai_context.set({"organization_id": job.organization_id, "audit_id": job.id})
 
     if is_code:
         await _run_code_audit(audit_job_id)
+        return
+    if is_api:
+        await _run_api_spec_audit(audit_job_id)
         return
 
     max_depth, max_pages = DEPTH_LIMITS.get(depth, DEPTH_LIMITS["standard"])
@@ -407,6 +423,7 @@ async def _run_audit(audit_job_id: str):
     tier1_data: dict = {}
     if target_url:
         await _set_progress(audit_job_id, 8, tier1_status="running")
+        crawl_report: dict = {}
         try:
             pages = await crawl_and_audit(
                 target_url,
@@ -414,6 +431,8 @@ async def _run_audit(audit_job_id: str):
                 max_pages=max_pages,
                 capture_screenshots=True,
                 run_a11y=True,
+                login=login,
+                report=crawl_report,
             )
             if not pages or all(p.error for p in pages):
                 raise RuntimeError("Could not load any page at that address")
@@ -423,6 +442,9 @@ async def _run_audit(audit_job_id: str):
                 "pages_audited": len(pages),
                 "pages": [p.to_dict() for p in pages[:20]],
                 "a11y_summary": summarise_a11y(pages),
+                "performance": summarise_performance(pages),
+                # "ok", or why the sign-in did not work. Absent when the scan was not asked to sign in.
+                **({"sign_in": crawl_report.get("login", "The sign-in was not attempted")} if login else {}),
                 "playwright_tests": playwright_tests,
                 "manual_test_cases": manual_cases,
                 "routes_found": sorted({p.path for p in pages}),
@@ -626,6 +648,72 @@ async def _run_code_audit(audit_job_id: str) -> None:
             os.remove(zip_path)
         await _set_progress_only(audit_job_id, source_path=None)
 
+    await _finish(audit_job_id, tier_states, critical, high, tier1_data, {}, tier3_data)
+
+
+async def _run_api_spec_audit(audit_job_id: str) -> None:
+    """A scan of an API from its OpenAPI or Swagger file. With a web address given, the live API is probed too."""
+    async with AsyncSessionLocal() as db:
+        job = (await db.execute(select(AuditJob).where(AuditJob.id == audit_job_id))).scalar_one()
+        path, target_url = job.source_path, job.target_url
+        outputs = set(job.outputs or ALL_OUTPUTS)
+
+    await _set_progress(audit_job_id, 5, status=AuditStatus.running, tier1_status="running",
+                        tier2_status="skipped", tier2_result={"skipped": "No mobile build provided"})
+    tier3_data: dict = {"skipped": "Security audit not selected"}
+    tier_states: list[str] = []
+    critical = high = 0
+    try:
+        try:
+            with open(path or "", "rb") as fh:
+                spec = api_spec_auditor.parse(fh.read())
+        except (OSError, api_spec_auditor.SpecError) as e:
+            reason = str(e) if isinstance(e, api_spec_auditor.SpecError) else "The uploaded file could not be found. Upload it again."
+            skipped = {"skipped": "The API description could not be read"}
+            await _set_progress(audit_job_id, 100, status=AuditStatus.failed, tier1_status="failed", tier1_result={"error": reason},
+                                tier3_status="skipped", tier3_result=skipped, tier4_status="skipped", tier4_result=skipped,
+                                tier5_status="skipped", tier5_result=skipped, completed_at=datetime.now(timezone.utc))
+            return
+        about = api_spec_auditor.overview(spec)
+        tier1_data = {"api": about, "routes_found": sorted({e["path"] for e in about["endpoints"]})}
+        tier_states.append("completed")
+        await _set_progress(audit_job_id, 40, tier1_status="completed", tier1_result=tier1_data, total_pages_audited=about["operations"])
+
+        if "security" in outputs:
+            await _set_progress(audit_job_id, 45, tier3_status="running")
+            try:
+                found = api_spec_auditor.review(spec)
+                live_note = "Only the description file was read. Add the API's web address to probe the running API as well."
+                if target_url:
+                    parts = urlparse(target_url)
+                    try:
+                        live = (await run_api_audit(f"{parts.scheme}://{parts.netloc}", discover_subdomains=False, scan_js=False)).to_dict()
+                        found += live["findings"]
+                        live_note = f"The running API at {parts.netloc} was probed as well."
+                    except Exception as e:
+                        live_note = f"The running API could not be probed: {_reason(e)}"
+                order = ["critical", "high", "medium", "low", "info"]
+                found.sort(key=lambda f: order.index(f["severity"]) if f["severity"] in order else 4)
+                tier3_data = {"findings": found, "live": live_note, "subdomains_found": [], "js_secrets": []}
+                critical, high = _count(found, "critical"), _count(found, "high")
+                tier_states.append("completed")
+                await _set_progress(audit_job_id, 70, tier3_status="completed", tier3_result=tier3_data, critical_count=critical, high_count=high)
+            except Exception as e:
+                tier3_data = {"error": _reason(e)}
+                tier_states.append("failed")
+                await _set_progress(audit_job_id, 70, tier3_status="failed", tier3_result=tier3_data)
+        else:
+            await _set_progress(audit_job_id, 70, tier3_status="skipped", tier3_result=tier3_data)
+
+        if "manual" in outputs:
+            cases = api_spec_auditor.test_cases(spec)
+            await _set_progress(audit_job_id, 80, tier4_status="completed", total_test_cases=len(cases),
+                                tier4_result={"test_cases": cases, "total": len(cases), "jira_csv": _to_jira_csv(cases)})
+        else:
+            await _set_progress(audit_job_id, 80, tier4_status="skipped", tier4_result={"skipped": "Manual test cases not selected"})
+    finally:
+        if path and os.path.exists(path):
+            os.remove(path)
     await _finish(audit_job_id, tier_states, critical, high, tier1_data, {}, tier3_data)
 
 

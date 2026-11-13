@@ -3,6 +3,7 @@ import type { Invite, Member, Org, OrgRole } from "../types";
 
 export const getOrg = () => api.get<Org>("/org");
 
+export const setRequireSso = (require_sso: boolean) => api.patch<Org>("/org", { require_sso });
 export const renameOrg = (name: string) => api.patch<Org>("/org", { name });
 
 export const getMembers = () => api.get<Member[]>("/org/members");

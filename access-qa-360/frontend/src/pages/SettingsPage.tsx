@@ -7,6 +7,7 @@ import { changePassword } from "../api/auth";
 import { ApiKeysSection, JiraSection } from "../components/IntegrationSettings";
 import { BillingSection } from "../components/BillingSection";
 import { ConnectionsSection } from "../components/ConnectionsSection";
+import { RequireSsoSection, TwoStepSection } from "../components/SecuritySettings";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Invite, Member, Org, OrgRole } from "../types";
 import { apiError } from "../utils/errors";
@@ -360,6 +361,9 @@ export function SettingsPage() {
             Change password
           </button>
         </form>
+
+        <TwoStepSection />
+        {org && <RequireSsoSection org={org} onChange={setOrg} />}
 
         {/* Permission matrix */}
         <section className={card}>

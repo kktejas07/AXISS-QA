@@ -142,6 +142,17 @@ async def create_reset_link(user_id: str, db: AsyncSession = Depends(get_db), ad
     return {"url": password_reset.reset_url(token), "expires_at": expires, "email": user.email}
 
 
+@router.post("/users/{user_id}/reset-two-step")
+async def reset_two_step(user_id: str, db: AsyncSession = Depends(get_db), admin: User = Depends(require_super_admin)):
+    """Turn off two-step sign-in for a user who has lost their authenticator app."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    user.totp_secret_encrypted = user.totp_enabled_at = user.totp_last_counter = None
+    await log_admin_action(db, admin, "user.reset_two_step", user.email)
+    return {"email": user.email}
+
+
 @router.get("/scans", response_model=list[AdminScanOut])
 async def list_all_scans(limit: int = 20, db: AsyncSession = Depends(get_db)):
     limit = max(1, min(limit, 100))

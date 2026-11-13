@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, ForeignKey
+from sqlalchemy import BigInteger, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -26,6 +26,10 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Sign-ins from before this moment stop working, so a reset signs out every other device.
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Two-step sign-in. The secret is stored encrypted; it only counts once totp_enabled_at is set.
+    totp_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    totp_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    totp_last_counter: Mapped[int | None] = mapped_column(BigInteger, nullable=True)   # the last code used, so none works twice
 
     projects: Mapped[list["Project"]] = relationship("Project", back_populates="owner", lazy="select")
 

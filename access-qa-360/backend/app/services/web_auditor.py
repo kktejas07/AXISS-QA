@@ -51,6 +51,7 @@ class PageAuditResult:
         self.api_calls: list[dict] = []          # XHR/fetch intercepted
         self.a11y_violations: list[dict] = []    # axe-core violations
         self.screenshot_b64: str = ""            # base64 PNG
+        self.performance: dict = {}              # load timings and page weight
         self.error: str = ""
 
     def to_dict(self) -> dict:
@@ -64,6 +65,7 @@ class PageAuditResult:
             "links": self.links,
             "api_calls": self.api_calls,
             "a11y_violations": self.a11y_violations,
+            "performance": self.performance,
             "screenshot_b64": self.screenshot_b64[:200] + "..." if len(self.screenshot_b64) > 200 else self.screenshot_b64,
             "error": self.error,
         }
@@ -84,6 +86,8 @@ async def crawl_and_audit(
     exclude_paths: list[str] | None = None,
     capture_screenshots: bool = True,
     run_a11y: bool = True,
+    login: dict | None = None,
+    report: dict | None = None,
 ) -> list[PageAuditResult]:
     """
     Crawl a web app with Playwright and return per-page audit results.
@@ -132,6 +136,17 @@ async def crawl_and_audit(
             })
 
         page = await context.new_page()
+
+        # Sign in first, so the pages behind the login are crawled too.
+        if login:
+            outcome = await sign_in(page, login, base_origin)
+            if report is not None:
+                report["login"] = outcome
+            if outcome == "ok":
+                exclude_paths = list(exclude_paths or []) + ["*logout*", "*log-out*", "*signout*", "*sign-out*"]   # never follow the link that ends the session
+                landed, _ = urldefrag(page.url)
+                if _in_scope(landed):
+                    queue.append((landed, 0))
 
         while queue and len(results) < max_pages:
             url, depth = queue.pop(0)
@@ -198,6 +213,8 @@ async def crawl_and_audit(
                         if depth < max_depth:
                             queue.append((r, depth + 1))
 
+                result.performance = await _measure(page)
+
                 # Accessibility audit
                 if run_a11y:
                     result.a11y_violations = await _run_axe(page)
@@ -219,6 +236,129 @@ async def crawl_and_audit(
         await browser.close()
 
     return results
+
+
+async def sign_in(page: Page, login: dict, base_origin: str) -> str:
+    """
+    Fill in and send the app's own sign-in form. Returns "ok" or a short reason it did not work.
+    The form must be on the site being scanned, so the password is never typed anywhere else.
+    """
+    url = login.get("url") or ""
+    parsed = urlparse(url)
+    if f"{parsed.scheme}://{parsed.netloc}" != base_origin:
+        return "The sign-in page must be on the site being scanned"
+    try:
+        await page.goto(url, wait_until="networkidle", timeout=20000)
+        password = page.locator("input[type=password]:visible").first
+        if await password.count() == 0:
+            return "No password field was found on the sign-in page"
+        # The name field: the first text or email box in the same form as the password box.
+        form = page.locator("form:has(input[type=password])").first
+        scope = form if await form.count() else page
+        name = scope.locator("input[type=email]:visible, input[type=text]:visible, input:not([type]):visible").first
+        if await name.count() == 0:
+            return "No email or username field was found on the sign-in page"
+        await name.fill(login.get("username") or "")
+        await password.fill(login.get("password") or "")
+        await password.press("Enter")
+        try:
+            await page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
+        await asyncio.sleep(0.5)
+        if await page.locator("input[type=password]:visible").count() > 0:
+            return "The app did not accept the sign-in details"
+        return "ok"
+    except Exception:
+        return "The sign-in page could not be loaded"
+
+
+_MEASURE_JS = """
+() => new Promise((resolve) => {
+  let lcp = null;
+  try {
+    new PerformanceObserver((list) => { const e = list.getEntries(); lcp = e[e.length - 1].startTime; })
+      .observe({ type: 'largest-contentful-paint', buffered: true });
+  } catch (e) {}
+  setTimeout(() => {
+    const nav = performance.getEntriesByType('navigation')[0];
+    const res = performance.getEntriesByType('resource');
+    const fcp = performance.getEntriesByName('first-contentful-paint')[0];
+    resolve({
+      ttfb_ms: nav ? Math.round(nav.responseStart) : null,
+      fcp_ms: fcp ? Math.round(fcp.startTime) : null,
+      lcp_ms: lcp === null ? null : Math.round(lcp),
+      load_ms: nav && nav.loadEventEnd ? Math.round(nav.loadEventEnd) : null,
+      bytes: (nav ? nav.transferSize || 0 : 0) + res.reduce((sum, r) => sum + (r.transferSize || 0), 0),
+      requests: res.length + 1,
+      dom_nodes: document.getElementsByTagName('*').length,
+    });
+  }, 150);
+})
+"""
+
+
+async def _measure(page: Page) -> dict:
+    try:
+        return await page.evaluate(_MEASURE_JS)
+    except Exception:
+        return {}
+
+
+# (metric, label, unit, "needs work" above, "poor" above). The first three follow Google's Core Web Vitals bands.
+PERF_LIMITS = [
+    ("lcp_ms", "Largest contentful paint", "ms", 2500, 4000),
+    ("fcp_ms", "First contentful paint", "ms", 1800, 3000),
+    ("ttfb_ms", "Time to first byte", "ms", 800, 1800),
+    ("bytes", "Page weight", "bytes", 1_500_000, 3_000_000),
+    ("requests", "Requests", "", 80, 150),
+    ("dom_nodes", "Page elements", "", 1500, 3000),
+]
+_PERF_FIX = {
+    "lcp_ms": "Make the largest image or block above the fold load sooner: compress it, size it correctly, preload it, and remove render-blocking scripts and styles.",
+    "fcp_ms": "Cut render-blocking CSS and JavaScript, and serve critical styles inline.",
+    "ttfb_ms": "Speed up the server response: cache pages, add a CDN, and check slow database queries.",
+    "bytes": "Compress and resize images, turn on text compression, and load only the scripts the page needs.",
+    "requests": "Bundle files, lazy-load content below the fold and drop third-party scripts that are not needed.",
+    "dom_nodes": "Simplify the page structure and render long lists in pages or on demand.",
+}
+
+
+def _show(value: float, unit: str) -> str:
+    if unit == "ms":
+        return f"{value / 1000:.1f} s"
+    if unit == "bytes":
+        return f"{value / 1_000_000:.1f} MB"
+    return str(int(value))
+
+
+def summarise_performance(pages: list[PageAuditResult]) -> dict:
+    """Per-page load figures, and a finding for each page that is slower or heavier than the usual limits."""
+    measured = [p for p in pages if p.performance and not p.error]
+    findings: list[dict] = []
+    for pg in measured:
+        for key, name, unit, ok, poor in PERF_LIMITS:
+            value = pg.performance.get(key)
+            if value is None or value <= ok:
+                continue
+            findings.append({
+                "check": key, "severity": "medium" if value > poor else "low",
+                "title": f"{name} is {'poor' if value > poor else 'slower than recommended' if unit == 'ms' else 'higher than recommended'}",
+                "description": f"{name} on this page is {_show(value, unit)}. The recommended limit is {_show(ok, unit)}.",
+                "affected_url": pg.url, "remediation": _PERF_FIX[key],
+            })
+
+    def average(key: str) -> int | None:
+        values = [p.performance[key] for p in measured if p.performance.get(key) is not None]
+        return round(sum(values) / len(values)) if values else None
+
+    return {
+        "pages_measured": len(measured),
+        "averages": {key: average(key) for key, *_ in PERF_LIMITS},
+        "pages": [{"url": p.url, **p.performance} for p in measured[:40]],
+        "findings": sorted(findings, key=lambda f: f["severity"] != "medium"),
+        "note": "Measured once per page from the scan server, on a fast connection. Real visitors on phones will see slower figures.",
+    }
 
 
 async def _extract_forms(page: Page, base_url: str) -> list[dict]:

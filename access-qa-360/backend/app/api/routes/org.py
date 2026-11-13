@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.organization import Invite, Organization
 from app.models.user import User
+from app.services import sso
 from app.services.mailer import send_email
 from app.services.orgs import (
     by_seniority,
@@ -43,10 +44,14 @@ class OrgOut(BaseModel):
     scans_this_month: int
     my_role: str
     permissions: list[str]
+    require_sso: bool = False
+    # Whether this server has Google sign-in set up; the setting above cannot be switched on without it.
+    sso_available: bool = False
 
 
 class OrgUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    require_sso: bool | None = None
 
 
 class MemberOut(BaseModel):
@@ -101,6 +106,8 @@ async def _org_out(db: AsyncSession, ctx: OrgContext) -> OrgOut:
         scans_this_month=await scans_this_month(db, org.id),
         my_role=ctx.role,
         permissions=permissions_for(ctx.role),
+        require_sso=org.require_sso,
+        sso_available=sso.providers()["google"],
     )
 
 
@@ -121,7 +128,14 @@ async def get_org(db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(
 @router.patch("/org", response_model=OrgOut)
 async def update_org(body: OrgUpdate, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     ctx.require("org.edit")
-    ctx.org.name = body.name.strip()
+    if body.name is not None:
+        ctx.org.name = body.name.strip()
+    if body.require_sso is not None and body.require_sso != ctx.org.require_sso:
+        if ctx.role != "owner":
+            raise HTTPException(403, "Only the owner can change how members sign in")
+        if body.require_sso and not sso.providers()["google"]:
+            raise HTTPException(400, "Sign in with Google is not set up on this Wiseflow server, so it cannot be required")
+        ctx.org.require_sso = body.require_sso
     await db.flush()
     return await _org_out(db, ctx)
 

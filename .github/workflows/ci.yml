@@ -51,6 +51,9 @@ jobs:
           alembic upgrade head
           alembic downgrade -1
           alembic upgrade head
+      # The crawl tests drive a real browser against a small local site.
+      - name: Browser for the crawl tests
+        run: python -m playwright install chromium --with-deps
       - name: Tests
         run: pytest -q
 

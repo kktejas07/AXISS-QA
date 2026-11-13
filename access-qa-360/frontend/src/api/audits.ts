@@ -1,6 +1,6 @@
 import api from "./client";
 
-export type SourceType = "web" | "android" | "ios" | "code" | "repo";
+export type SourceType = "web" | "android" | "ios" | "code" | "repo" | "api";
 
 export const sourceName: Record<SourceType, string> = {
   web: "Web app",
@@ -8,6 +8,7 @@ export const sourceName: Record<SourceType, string> = {
   ios: "iOS build",
   code: "Source code",
   repo: "Repository",
+  api: "API description",
 };
 export const isCode = (job: { source_type: SourceType }) => job.source_type === "code" || job.source_type === "repo";
 export type OutputKind = "security" | "manual" | "playwright" | "appium";
@@ -62,6 +63,11 @@ export interface WebResult {
   pages_audited?: number;
   routes_found?: string[];
   playwright_tests?: string;
+  /** "ok", or why signing in to the app did not work. Only when the scan was given sign-in details. */
+  sign_in?: string;
+  performance?: Performance;
+  /** API description scans. */
+  api?: { title: string; version: string; format: string; operations: number; secured: number; endpoints: { method: string; path: string; summary: string; secured: boolean }[] };
   a11y_summary?: { total_violations: number; critical: number; serious: number; moderate: number; minor: number; violations: A11yViolation[] };
   // Source code scans
   files_scanned?: number;
@@ -69,6 +75,25 @@ export interface WebResult {
   languages?: Record<string, number>;
   routes?: CodeRoute[];
   qa_gaps?: QaGaps;
+}
+
+export interface PagePerformance {
+  url: string;
+  ttfb_ms: number | null;
+  fcp_ms: number | null;
+  lcp_ms: number | null;
+  load_ms: number | null;
+  bytes: number;
+  requests: number;
+  dom_nodes: number;
+}
+
+export interface Performance {
+  pages_measured: number;
+  averages: Record<string, number | null>;
+  pages: PagePerformance[];
+  findings: Finding[];
+  note: string;
 }
 
 export interface CodeRoute {
@@ -110,6 +135,8 @@ export interface SecurityResult {
   findings?: Finding[];
   subdomains_found?: string[];
   /** Code scans: what the dependency lookup covered. */
+  /** API description scans: whether the running API was probed too. */
+  live?: string;
   dependencies?: { packages_found: number; packages_checked: number; vulnerable: number; status: "none" | "checked" | "unavailable"; reason?: string };
 }
 
@@ -170,7 +197,7 @@ export const uploadBuild = (id: string, file: File, onProgress?: (percent: numbe
 };
 
 /** Step 2: choose outputs and depth, confirm permission, and run. */
-export const startAudit = (id: string, body: { outputs: OutputKind[]; depth: Depth; ownership_confirmed: boolean }) =>
+export const startAudit = (id: string, body: { outputs: OutputKind[]; depth: Depth; ownership_confirmed: boolean; login?: { url: string; username: string; password: string } }) =>
   api.post<AuditJob>(`/audits/${id}/start`, body);
 
 export const listAudits = () => api.get<AuditJob[]>("/audits");

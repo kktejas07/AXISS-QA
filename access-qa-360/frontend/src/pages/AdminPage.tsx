@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { createResetLink, getAdminOverview, getAdminScans, getAdminUsers, updateAdminUser } from "../api/admin";
+import { createResetLink, resetTwoStep, getAdminOverview, getAdminScans, getAdminUsers, updateAdminUser } from "../api/admin";
 import { useMe } from "../hooks/useMe";
 import type { AdminOverview, AdminScan, AdminUser, UserRole } from "../types";
 import { StatusPill } from "../components/StatusPill";
@@ -45,6 +45,21 @@ export function AdminPage() {
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } }).response?.data?.detail;
       setError(detail ?? `Could not update ${user.email}. Try again.`);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const [twoStepNote, setTwoStepNote] = useState("");
+  const clearTwoStep = async (user: AdminUser) => {
+    setError("");
+    setTwoStepNote("");
+    setSavingId(user.id);
+    try {
+      await resetTwoStep(user.id);
+      setTwoStepNote(`Two-step sign-in is off for ${user.email}. They can sign in with their password and set it up again.`);
+    } catch {
+      setError(`Could not turn off two-step sign-in for ${user.email}.`);
     } finally {
       setSavingId(null);
     }
@@ -120,6 +135,7 @@ export function AdminPage() {
         </p>
       )}
 
+      {twoStepNote && <p role="status" className="mb-5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">{twoStepNote}</p>}
       {resetLink && (
         <section role="status" className="mb-5 flex flex-col gap-3 rounded-2xl border-2 border-ink bg-white p-5 shadow-hard-ink">
           <div>
@@ -219,6 +235,17 @@ export function AdminPage() {
                             className="h-11 whitespace-nowrap rounded-[10px] border-[1.5px] border-gray-400 bg-white px-3.5 text-sm font-semibold disabled:opacity-50"
                           >
                             Reset link
+                          </button>
+                        )}
+                        {u.is_active && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => clearTwoStep(u)}
+                            aria-label={`Turn off two-step sign-in for ${u.email}`}
+                            className="h-11 whitespace-nowrap rounded-[10px] border-[1.5px] border-gray-400 bg-white px-3.5 text-sm font-semibold disabled:opacity-50"
+                          >
+                            Reset two-step
                           </button>
                         )}
                       </div>
