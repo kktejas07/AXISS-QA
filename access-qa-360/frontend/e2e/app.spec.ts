@@ -22,6 +22,9 @@ test.describe("landing page", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Find what is broken before your customers do." })).toBeVisible();
     await expect(page.getByText(/Free plan: 1 person, 2 scans a month/)).toBeVisible();          // read from the product, not typed into the page
     await expect(page.getByRole("heading", { name: "Six things you can point it at" })).toBeVisible();
+    // The drifting icons are decoration: two layers on the page, and none of them can take a click meant for a button.
+    await expect(page.getByTestId("tech-backdrop")).toHaveCount(2);
+    expect(await page.getByTestId("tech-backdrop").first().evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
     for (const alt of [/A finished Wiseflow scan/, /Wise, the assistant, answering/, /A chatbot scan/]) {
       const image = page.getByRole("img", { name: alt });
       await image.scrollIntoViewIfNeeded();

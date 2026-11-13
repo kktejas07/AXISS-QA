@@ -1,3 +1,4 @@
+import { TechBackdrop } from "./TechBackdrop";
 import { Logo } from "./Logo";
 
 export const authField = "h-12 w-full rounded-[10px] border border-gray-400 bg-white px-3.5 text-[15px] disabled:bg-soft disabled:text-body";
@@ -6,8 +7,9 @@ export const authButton = "h-[52px] rounded-[10px] bg-brand-600 font-bold text-w
 /** The card every signed-out page sits in: sign in, forgot password, new password. */
 export function AuthCard({ title, intro, children }: { title: string; intro?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-soft p-4 font-sans text-ink">
-      <main className="w-full max-w-md rounded-2xl border-2 border-ink bg-white p-8 shadow-hard">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-soft p-4 font-sans text-ink">
+      <TechBackdrop variant="auth" />
+      <main className="relative w-full max-w-md rounded-2xl border-2 border-ink bg-white p-8 shadow-hard">
         <div className="mb-6">
           <Logo />
         </div>

@@ -1,3 +1,4 @@
+import { TechBackdrop } from "../components/TechBackdrop";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Logo } from "../components/Logo";
@@ -49,8 +50,9 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-soft p-4 font-sans text-ink">
-      <div className="w-full max-w-md rounded-2xl border-2 border-ink bg-white p-8 shadow-hard">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-soft p-4 font-sans text-ink">
+      <TechBackdrop variant="auth" />
+      <div className="relative w-full max-w-md rounded-2xl border-2 border-ink bg-white p-8 shadow-hard">
         <div className="mb-6">
           <Logo />
         </div>
