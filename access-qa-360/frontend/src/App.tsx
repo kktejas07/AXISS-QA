@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { Dashboard } from "./pages/Dashboard";
-import { ProjectsPage } from "./pages/ProjectsPage";
+import { ProjectsListPage, ProjectsPage } from "./pages/ProjectsPage";
 import { TestSuitesPage } from "./pages/TestSuitesPage";
 import { RunHistoryPage } from "./pages/RunHistoryPage";
 import { NewTestPage } from "./pages/NewTestPage";
@@ -46,6 +46,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+        <Route path="/projects" element={<RequireAuth><ProjectsListPage /></RequireAuth>} />
         <Route path="/projects/new" element={<RequireAuth><ProjectsPage /></RequireAuth>} />
         <Route path="/projects/:projectId/suites" element={<RequireAuth><TestSuitesPage /></RequireAuth>} />
         <Route path="/projects/:projectId/suites/new" element={<RequireAuth><NewTestPage /></RequireAuth>} />
