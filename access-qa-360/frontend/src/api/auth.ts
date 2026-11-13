@@ -12,3 +12,14 @@ export const getMe = () => api.get<Me>("/auth/me");
 
 export const previewInvite = (token: string) =>
   api.get<{ organization_name: string; email: string; role: string }>(`/invites/${token}`);
+
+/** Always succeeds; "admin" means this server sends no email and an administrator must make the link. */
+export const forgotPassword = (email: string) => api.post<{ delivery: "email" | "admin" }>("/auth/forgot-password", { email });
+
+export const checkResetLink = (token: string) => api.get<{ email: string }>(`/auth/reset-password/${encodeURIComponent(token)}`);
+
+export const resetPassword = (token: string, password: string) => api.post<{ email: string }>("/auth/reset-password", { token, password });
+
+/** Signs out other devices and returns a fresh token for this one. */
+export const changePassword = (current_password: string, new_password: string) =>
+  api.post<{ access_token: string }>("/auth/change-password", { current_password, new_password });

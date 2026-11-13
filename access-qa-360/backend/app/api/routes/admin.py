@@ -19,6 +19,7 @@ from app.models.vulnerability import Severity, VulnStatus, Vulnerability
 from app.schemas.admin import (
     AdminOrgDetail, AdminOrgMember, AdminOrgOut, AdminOrgUpdate, AdminOverview, AdminScanOut, AdminUserOut, AdminUserUpdate, AuditLogOut,
 )
+from app.services import password_reset
 from app.services.orgs import DEFAULT_SEATS, by_seniority, log_admin_action, member_count, scans_this_month
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_super_admin)])
@@ -126,6 +127,19 @@ async def update_user(
         project_count=await _count(db, Project, Project.owner_id == user.id),
         scan_count=await _count(db, Scan, Scan.created_by == user.id),
     )
+
+
+@router.post("/users/{user_id}/reset-link")
+async def create_reset_link(user_id: str, db: AsyncSession = Depends(get_db), admin: User = Depends(require_super_admin)):
+    """A single-use link for a user who is locked out. The admin passes it on; it is shown only once."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    if not user.is_active:
+        raise HTTPException(400, "This account is deactivated. Reactivate it before sending a reset link.")
+    token, expires = await password_reset.create_reset(db, user)
+    await log_admin_action(db, admin, "user.reset_link", user.email)
+    return {"url": password_reset.reset_url(token), "expires_at": expires, "email": user.email}
 
 
 @router.get("/scans", response_model=list[AdminScanOut])

@@ -21,3 +21,7 @@ export const updateAdminOrg = (
 ) => api.patch<AdminOrg>(`/admin/organizations/${id}`, changes);
 
 export const getAuditLog = () => api.get<AuditLogEntry[]>("/admin/audit-log");
+
+/** A single-use password reset link for a locked-out user. Shown once; pass it to them yourself. */
+export const createResetLink = (userId: string) =>
+  api.post<{ url: string; expires_at: string; email: string }>(`/admin/users/${userId}/reset-link`);

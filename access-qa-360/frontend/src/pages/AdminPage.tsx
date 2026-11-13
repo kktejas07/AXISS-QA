@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { getAdminOverview, getAdminScans, getAdminUsers, updateAdminUser } from "../api/admin";
+import { createResetLink, getAdminOverview, getAdminScans, getAdminUsers, updateAdminUser } from "../api/admin";
 import { useMe } from "../hooks/useMe";
 import type { AdminOverview, AdminScan, AdminUser, UserRole } from "../types";
 import { StatusPill } from "../components/StatusPill";
@@ -24,6 +24,8 @@ export function AdminPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<{ url: string; email: string; expires_at: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const loadOverview = () => getAdminOverview().then((r) => setOverview(r.data));
 
@@ -45,6 +47,31 @@ export function AdminPage() {
       setError(detail ?? `Could not update ${user.email}. Try again.`);
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const makeResetLink = async (user: AdminUser) => {
+    setError("");
+    setResetLink(null);
+    setCopied(false);
+    setSavingId(user.id);
+    try {
+      setResetLink((await createResetLink(user.id)).data);
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      setError(typeof detail === "string" ? detail : `Could not create a reset link for ${user.email}.`);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const copyResetLink = async () => {
+    if (!resetLink) return;
+    try {
+      await navigator.clipboard.writeText(resetLink.url);
+      setCopied(true);
+    } catch {
+      setCopied(false);
     }
   };
 
@@ -93,10 +120,31 @@ export function AdminPage() {
         </p>
       )}
 
+      {resetLink && (
+        <section role="status" className="mb-5 flex flex-col gap-3 rounded-2xl border-2 border-ink bg-white p-5 shadow-hard-ink">
+          <div>
+            <h2 className="text-lg font-bold">Password reset link for {resetLink.email}</h2>
+            <p className="text-body">
+              Send this to them yourself. It works once, expires at {new Date(resetLink.expires_at).toLocaleTimeString()} and is
+              not shown again.
+            </p>
+          </div>
+          <code className="break-all rounded-[10px] bg-soft px-3.5 py-3 font-mono text-[13.5px]">{resetLink.url}</code>
+          <div className="flex flex-wrap gap-2.5">
+            <button type="button" onClick={copyResetLink} className="h-11 rounded-[10px] bg-ink px-4 text-sm font-bold text-white">
+              {copied ? "Copied" : "Copy link"}
+            </button>
+            <button type="button" onClick={() => setResetLink(null)} className="h-11 rounded-[10px] border-[1.5px] border-ink bg-white px-4 text-sm font-semibold">
+              Done
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="mb-7 overflow-hidden rounded-2xl border border-gray-300 bg-white">
         <h2 className="px-5 py-4 text-lg font-bold">Users and roles</h2>
         <div className="relative overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-left">
+          <table className="w-full min-w-[1040px] border-collapse text-left">
             <thead>
               <tr className="bg-soft text-[13.5px] text-body">
                 <th scope="col" className="px-5 py-2.5 font-semibold">User</th>
@@ -160,6 +208,17 @@ export function AdminPage() {
                             className="h-11 rounded-[10px] border-[1.5px] border-ink bg-white px-3.5 text-sm font-semibold disabled:opacity-50"
                           >
                             {u.is_active ? "Deactivate" : "Reactivate"}
+                          </button>
+                        )}
+                        {u.is_active && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => makeResetLink(u)}
+                            aria-label={`Create a password reset link for ${u.email}`}
+                            className="h-11 whitespace-nowrap rounded-[10px] border-[1.5px] border-gray-400 bg-white px-3.5 text-sm font-semibold disabled:opacity-50"
+                          >
+                            Reset link
                           </button>
                         )}
                       </div>

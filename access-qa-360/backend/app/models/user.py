@@ -24,6 +24,8 @@ class User(Base):
     organization_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=True, index=True)
     org_role: Mapped[str] = mapped_column(String(16), default="owner", server_default="owner", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Sign-ins from before this moment stop working, so a reset signs out every other device.
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     projects: Mapped[list["Project"]] = relationship("Project", back_populates="owner", lazy="select")
 

@@ -16,6 +16,7 @@ import { ChooseTestsPage } from "./pages/ChooseTestsPage";
 import { ScanDetailPage } from "./pages/ScanDetailPage";
 import { ScansListPage } from "./pages/ScansListPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AdminAuditPage, AdminOrgDetailPage, AdminOrgsPage } from "./pages/AdminOrgsPage";
 import { AdminPage } from "./pages/AdminPage";
@@ -40,6 +41,8 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/projects/new" element={<RequireAuth><ProjectsPage /></RequireAuth>} />

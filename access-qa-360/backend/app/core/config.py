@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     # Where uploaded builds and generated reports are kept. Mount a volume here in production.
     STORAGE_DIR: str = "storage"
     MAX_UPLOAD_MB: int = 300
+    # Address of the web app, used in links inside emails and reset links.
+    APP_URL: str = "http://localhost:5173"
+    # Outgoing email. Leave SMTP_HOST empty to send no email; reset and invite links are then shared by hand.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    PASSWORD_RESET_MINUTES: int = 60
     # Largest amount of source code, once unpacked, that one code scan will read.
     CODE_SCAN_MAX_MB: int = 500
 

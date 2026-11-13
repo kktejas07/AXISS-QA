@@ -48,6 +48,8 @@ export interface Invite {
   role: OrgRole;
   token: string;
   created_at: string;
+  /** Only on the answer to creating an invite: true when the link was emailed. */
+  emailed?: boolean;
 }
 
 export interface AdminOrg {
