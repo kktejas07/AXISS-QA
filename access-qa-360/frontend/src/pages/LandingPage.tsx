@@ -1,3 +1,4 @@
+import { TechBackdrop } from "../components/TechBackdrop";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Bot, Braces, CalendarClock, Check, Code2, GitBranch, GitPullRequest, Globe, Inbox, ShieldCheck, Smartphone } from "lucide-react";
@@ -68,7 +69,9 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section className={`${wrap} grid items-center gap-10 pb-16 pt-8 lg:grid-cols-[0.9fr_1.1fr] lg:pt-14`}>
+        <div className="relative overflow-hidden">
+        <TechBackdrop />
+        <section className={`${wrap} relative grid items-center gap-10 pb-16 pt-8 lg:grid-cols-[0.9fr_1.1fr] lg:pt-14`}>
           <div className="wf-fade-up flex flex-col items-start gap-6">
             <h1 className="text-[44px] font-extrabold leading-[1.05] tracking-tight sm:text-[58px]" style={{ textWrap: "balance" }}>
               Find what is broken before your customers do.
@@ -84,6 +87,8 @@ export function LandingPage() {
           </div>
           <Shot src="/landing/results.webp" alt="A finished Wiseflow scan: a risk score, the number of findings, and the findings to fix first" className="wf-fade-up" />
         </section>
+
+        </div>
 
         <section className="border-y border-line bg-soft py-14">
           <div className={wrap}>
@@ -167,8 +172,9 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="bg-brand-700 py-14 text-white">
-          <div className={`${wrap} flex flex-wrap items-center justify-between gap-6`}>
+        <section className="relative overflow-hidden bg-brand-700 py-14 text-white">
+          <TechBackdrop variant="band" />
+          <div className={`${wrap} relative flex flex-wrap items-center justify-between gap-6`}>
             <div>
               <h2 className="text-3xl font-extrabold tracking-tight">Run your first scan in a few minutes.</h2>
               <p className="mt-1 text-brand-100">Start on the free plan. Move to a team plan when you need more scans and people.</p>
