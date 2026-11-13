@@ -1,0 +1,14 @@
+openapi: 3.0.0
+info: {title: Shop API, version: "2"}
+servers: [{url: "http://api.shop.example.com"}]
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+paths:
+  /orders:
+    get: {summary: List orders, security: [{bearer: []}], responses: {"200": {}, "401": {}}}
+  /orders/{id}:
+    get: {summary: Read an order, security: [{bearer: []}], responses: {"200": {}, "401": {}, "404": {}}}
+    delete: {summary: Delete an order, responses: {"204": {}}}
+  /login:
+    post: {summary: Sign in, requestBody: {}, responses: {"200": {}}}

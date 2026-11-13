@@ -37,3 +37,10 @@ Thumbs.db
 .vscode/
 .idea/
 access-qa-360/frontend/.vite/
+
+# browser tests
+dist-e2e/
+test-results/
+playwright-report/
+e2e.db
+e2e-storage/
