@@ -28,6 +28,20 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
     PASSWORD_RESET_MINUTES: int = 60
+    # ---- Plans and billing. The amounts are placeholders: change them before charging anyone. ----
+    # Team plan, per seat per month: whole US dollars (Stripe) and whole rupees (Razorpay).
+    TEAM_PRICE_USD: int = 29
+    TEAM_PRICE_INR: int = 2400
+    # Scans a free Individual account may start each month. 0 means no limit. Applies to new sign-ups.
+    FREE_SCANS_PER_MONTH: int = 10
+    # Where "Contact sales" on the pricing page sends people.
+    SALES_EMAIL: str = ""
+    # Leave a provider's keys empty to switch that provider off.
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+    RAZORPAY_WEBHOOK_SECRET: str = ""
     # Largest amount of source code, once unpacked, that one code scan will read.
     CODE_SCAN_MAX_MB: int = 500
 

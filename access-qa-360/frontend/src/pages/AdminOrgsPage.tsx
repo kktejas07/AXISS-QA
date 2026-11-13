@@ -100,7 +100,10 @@ export function AdminOrgsPage() {
                       <Link to={`/admin/organizations/${o.id}`} className="font-semibold text-brand-600 hover:text-brand-700">{o.name}</Link>
                       <div className="break-all text-[13.5px] text-body">{o.owner_email ?? "No owner"}</div>
                     </td>
-                    <td className="px-4 py-3">{accountName[o.account_type]}</td>
+                    <td className="px-4 py-3">
+                      {accountName[o.account_type]}
+                      {o.billing_status && <div className="text-[13.5px] capitalize text-body">{o.billing_provider}, {o.billing_status.replace("_", " ")}</div>}
+                    </td>
                     <td className="px-4 py-3">{of(o.member_count, o.seat_limit)}</td>
                     <td className="px-4 py-3">{of(o.scans_this_month, o.scan_limit)}</td>
                     <td className="px-4 py-3"><OrgStatus status={o.status} /></td>

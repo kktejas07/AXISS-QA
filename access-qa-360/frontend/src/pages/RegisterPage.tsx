@@ -60,7 +60,7 @@ export function RegisterPage() {
         <p className="mb-6 mt-1 text-body">
           {invite
             ? `You have been invited as ${roleName[invite.role] ?? invite.role}. You will see the organisation's scans as soon as you sign up.`
-            : "You get your own workspace. You can invite a team later."}
+            : "Free to start: your own workspace, no card needed. You can invite a team later."}
         </p>
 
         {inviteGone && (

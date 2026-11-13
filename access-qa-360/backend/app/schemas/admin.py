@@ -55,6 +55,10 @@ class AdminOrgOut(BaseModel):
     scans_this_month: int
     owner_email: str | None
     created_at: datetime
+    # Card subscription, if the organisation pays through a provider.
+    billing_provider: str | None = None
+    billing_status: str | None = None
+    billing_seats: int | None = None
 
 
 class AdminOrgMember(BaseModel):
