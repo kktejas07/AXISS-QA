@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Activity, Sparkles, Building2, FolderPlus, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Users } from "lucide-react";
+import { Activity, Building2, FolderKanban, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Permission } from "../types";
