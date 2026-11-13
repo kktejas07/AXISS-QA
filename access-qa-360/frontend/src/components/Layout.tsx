@@ -1,8 +1,9 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Building2, FolderPlus, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, ShieldCheck, Users } from "lucide-react";
+import { Building2, FolderPlus, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Permission } from "../types";
+import { Logo } from "./Logo";
 
 // `needs` hides an item from roles that cannot use it (viewers cannot start scans).
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; needs?: Permission };
@@ -42,28 +43,25 @@ export function Layout({ children, variant = "user" }: { children: React.ReactNo
       "flex items-center gap-3 min-h-[44px] px-3 rounded-[10px] text-[15px] no-underline",
       admin
         ? active
-          ? "bg-white text-ink font-bold"
-          : "text-gray-300 hover:text-white font-medium"
+          ? "bg-white text-brand-950 font-bold"
+          : "text-brand-100 hover:text-white font-medium"
         : active
           ? "bg-ink text-white font-semibold"
           : "text-body hover:text-ink font-medium",
     ].join(" ");
 
-  const quiet = admin ? "text-gray-300 hover:text-white" : "text-body hover:text-ink";
+  const quiet = admin ? "text-brand-100 hover:text-white" : "text-body hover:text-ink";
 
   return (
     <div className="min-h-screen bg-soft font-sans text-ink md:flex">
       <aside
         className={`shrink-0 md:w-60 md:min-h-screen flex flex-col gap-6 px-3.5 py-5 border-b md:border-b-0 md:border-r ${
-          admin ? "bg-ink text-white border-ink" : "bg-white border-line"
+          admin ? "bg-brand-950 text-white border-brand-950" : "bg-white border-line"
         }`}
       >
         <div className="flex flex-col gap-2.5 px-2">
-          <Link to="/" className="flex items-center gap-2.5 text-[19px] font-extrabold tracking-tight">
-            <span className="w-[30px] h-[30px] rounded-[9px] bg-brand-600 text-white flex items-center justify-center">
-              <ShieldCheck className="w-[17px] h-[17px]" strokeWidth={2.4} aria-hidden="true" />
-            </span>
-            Wiseflow
+          <Link to="/" aria-label="Wiseflow, home">
+            <Logo reversed={admin} />
           </Link>
           {admin && (
             <span className="self-start text-xs font-bold text-ink bg-amber-400 rounded-md px-2 py-0.5">Super admin</span>
@@ -92,7 +90,7 @@ export function Layout({ children, variant = "user" }: { children: React.ReactNo
             )
           )}
           {me && (
-            <p className={`px-3 pt-2 text-[13px] ${admin ? "text-gray-400" : "text-body"}`}>
+            <p className={`px-3 pt-2 text-[13px] ${admin ? "text-brand-300" : "text-body"}`}>
               <span className="block truncate font-semibold">{me.organization.name}</span>
               <span className="block truncate">{me.email}</span>
             </p>

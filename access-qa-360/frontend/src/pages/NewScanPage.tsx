@@ -120,7 +120,7 @@ export function NewScanPage() {
                   setError("");
                 }}
                 className={`flex flex-col gap-2.5 rounded-[14px] border-2 bg-white p-[18px] text-left disabled:cursor-not-allowed disabled:opacity-60 ${
-                  on ? "border-ink shadow-[5px_5px_0_#3b30e0]" : "border-gray-300"
+                  on ? "border-ink shadow-[5px_5px_0_#3730a3]" : "border-gray-300"
                 }`}
               >
                 <Icon className={`h-6 w-6 ${on ? "text-brand-600" : "text-body"}`} aria-hidden="true" />
