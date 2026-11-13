@@ -71,10 +71,21 @@ def ai_client(purpose: str) -> AsyncAnthropic:
 
     async def counted(*args, **kwargs):
         context = ai_context.get()
-        if "model" in kwargs:
-            kwargs["model"] = choose_model(kwargs["model"], context.get("quality"))
+        provider = context.get("provider") or "anthropic"
+        if provider != "anthropic" and context.get("api_key"):
+            # The organisation's own key with another provider: the same request, translated.
+            from app.core import providers
+
+            kwargs["model"] = providers.model_for(provider, kwargs.get("model", ""), context.get("quality"), context.get("model"))
+
+            async def call(*_args, **kw):
+                name = kw.pop("model")
+                return await providers.chat(provider, context.get("base_url"), context["api_key"], name, **kw)
+        else:
+            if "model" in kwargs:
+                kwargs["model"] = context.get("model") or choose_model(kwargs["model"], context.get("quality"))
+            call = AsyncAnthropic(api_key=context["api_key"]).messages.create if context.get("api_key") else create
         model = kwargs.get("model", "unknown")
-        call = AsyncAnthropic(api_key=context["api_key"]).messages.create if context.get("api_key") else create
         try:
             message = await call(*args, **kwargs)
         except Exception:
@@ -118,5 +129,10 @@ async def org_context(db, organization_id: str | None, audit_id: str | None = No
             context["quality"] = org.ai_quality or "balanced"
             key = decrypt(org.ai_key_encrypted) if org.ai_key_encrypted else None
             if key:
-                context["api_key"] = key
+                # The provider, model and address only apply together with the organisation's own key.
+                context.update(api_key=key, provider=org.ai_provider or "anthropic")
+                if org.ai_model:
+                    context["model"] = org.ai_model
+                if org.ai_base_url:
+                    context["base_url"] = org.ai_base_url
     return context

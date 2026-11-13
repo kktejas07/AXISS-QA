@@ -16,7 +16,8 @@ from app.core.secrets import decrypt, encrypt
 from app.models.audit_job import AuditJob
 from app.models.integration import Integration
 from app.models.organization import Organization
-from app.services import github, notify, scan_control, schedules, trackers
+from app.core import providers
+from app.services import chatbot_auditor, github, notify, scan_control, schedules, trackers
 
 router = APIRouter(tags=["connections"])
 KINDS = ("slack", "teams", "github", "linear", "azure")
@@ -143,13 +144,22 @@ async def save_azure(body: AzureSave, db: AsyncSession = Depends(get_db), ctx: O
 
 class AiSave(BaseModel):
     quality: Literal["fast", "balanced", "best"]
-    # The organisation's own Anthropic key. Left out: the saved key, if any, is kept. Empty string: it is removed.
+    provider: str = "anthropic"
+    # An exact model name, for organisations that want one. Empty: the provider's fast or best model is used.
+    model: str | None = Field(default=None, max_length=120)
+    # Only for the "custom" provider: where its OpenAI-compatible API lives.
+    base_url: str | None = Field(default=None, max_length=500)
+    # The organisation's own key. Left out: the saved key, if any, is kept. Empty string: it is removed.
     api_key: str | None = Field(default=None, max_length=400)
 
 
 def _ai_out(org: Organization) -> dict:
     key = decrypt(org.ai_key_encrypted) if org.ai_key_encrypted else None
-    return {"quality": org.ai_quality or "balanced", "own_key": bool(key), "key_ending": key[-4:] if key else None}
+    return {
+        "quality": org.ai_quality or "balanced", "own_key": bool(key), "key_ending": key[-4:] if key else None,
+        "provider": (org.ai_provider or "anthropic") if key else "anthropic", "model": org.ai_model if key else None, "base_url": org.ai_base_url if key else None,
+        "providers": [{"id": pid, "name": p["name"], "fast": p["fast"], "best": p["best"]} for pid, p in providers.PROVIDERS.items()],
+    }
 
 
 @router.get("/org/ai")
@@ -161,14 +171,47 @@ async def get_ai(ctx: OrgContext = Depends(get_org_context)):
 async def save_ai(body: AiSave, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     """Choose speed against quality for this organisation's AI work, and optionally use its own Anthropic key."""
     ctx.require("org.edit")
-    ctx.org.ai_quality = body.quality
-    if body.api_key is not None:
-        key = body.api_key.strip()
-        if key and not (key.startswith("sk-ant-") and len(key) >= 24):
+    org = ctx.org
+    if body.provider not in providers.PROVIDERS:
+        raise HTTPException(422, "That AI provider is not one Wiseflow can use")
+    removing = body.api_key is not None and not body.api_key.strip()
+    key = (body.api_key or "").strip() or (None if removing else decrypt(org.ai_key_encrypted or "") or None)
+    org.ai_quality = body.quality
+    if removing or not key:
+        if body.provider != "anthropic":
+            raise HTTPException(422, f"Enter your {providers.PROVIDERS[body.provider]['name']} key. Wiseflow's own key only works with Claude.")
+        org.ai_key_encrypted, org.ai_provider, org.ai_model, org.ai_base_url = None, "anthropic", None, None
+        await db.flush()
+        return _ai_out(org)
+
+    saved_provider = org.ai_provider or "anthropic"
+    if body.provider != saved_provider and not (body.api_key or "").strip():
+        raise HTTPException(422, "A key only works with the provider it came from. Enter the key for the provider you chose.")
+    model = (body.model or "").strip() or None
+    base = None
+    if body.provider == "anthropic":
+        if not (key.startswith("sk-ant-") and len(key) >= 24):
             raise HTTPException(422, "That does not look like an Anthropic API key. They start with sk-ant-")
-        ctx.org.ai_key_encrypted = encrypt(key) if key else None
+    else:
+        if len(key) < 16:
+            raise HTTPException(422, "That key is too short to be an API key")
+        if body.provider == "custom":
+            base = (body.base_url or "").strip().rstrip("/")
+            try:
+                chatbot_auditor.check_endpoint(base)      # https, and not an address on a private network
+            except chatbot_auditor.ChatbotError:
+                raise HTTPException(422, "Enter the API's address starting with https://. Addresses on a private network are not accepted.")
+            if not model:
+                raise HTTPException(422, "Enter the model name to use with that API")
+        # Try the key and the model with one tiny call, so a typo is found now and not in the middle of a scan.
+        try:
+            await providers.chat(body.provider, base, key, providers.model_for(body.provider, "", body.quality, model),
+                                 messages=[{"role": "user", "content": "Reply with the word OK."}], max_tokens=16, timeout=30)
+        except providers.ProviderError as e:
+            raise HTTPException(400, f"{e}. Check the key and the model name.")
+    org.ai_key_encrypted, org.ai_provider, org.ai_model, org.ai_base_url = encrypt(key), body.provider, model, base
     await db.flush()
-    return _ai_out(ctx.org)
+    return _ai_out(org)
 
 
 @router.delete("/org/connections/{kind}", status_code=204)

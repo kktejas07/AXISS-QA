@@ -67,6 +67,7 @@ export interface WebResult {
   /** "ok", or why signing in to the app did not work. Only when the scan was given sign-in details. */
   sign_in?: string;
   performance?: Performance;
+  smoke_run?: SmokeRun;
   /** Chatbot scans: each test message, the reply and the verdict. */
   chatbot?: ChatbotResult;
   /** API description scans. */
@@ -78,6 +79,17 @@ export interface WebResult {
   languages?: Record<string, number>;
   routes?: CodeRoute[];
   qa_gaps?: QaGaps;
+}
+
+export interface SmokeRun {
+  state: "running" | "done" | "failed";
+  total?: number;
+  error?: string;
+  finished_at?: string;
+  passed?: number;
+  warned?: number;
+  failed?: number;
+  pages: { url: string; path: string; status: number | null; ms: number | null; verdict: "pass" | "warn" | "fail"; problems: string[] }[];
 }
 
 export interface ChatbotProbe {

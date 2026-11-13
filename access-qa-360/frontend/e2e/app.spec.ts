@@ -151,17 +151,26 @@ test.describe("AI settings and chatbot scans", () => {
   test("the organisation picks its AI quality, and a bad key is refused", async ({ page, request }) => {
     await signedIn(page, request);
     await page.goto("/settings");
-    const ai = page.locator("section").filter({ has: page.getByRole("heading", { name: "AI model" }) });
+    const ai = page.locator("section").filter({ has: page.getByRole("heading", { name: "AI provider and model" }) });
     await expect(ai.getByRole("radio", { name: /Balanced/ })).toBeChecked();
     await ai.getByRole("radio", { name: /Fast/ }).check();
-    await ai.getByLabel(/Your own Anthropic API key/).fill("not-a-key");
+    await ai.getByLabel(/Your own API key/).fill("not-a-key");
     await ai.getByRole("button", { name: "Save AI settings" }).click();
     await expect(ai.getByRole("alert")).toContainText("does not look like an Anthropic API key");
-    await ai.getByLabel(/Your own Anthropic API key/).fill("");
+    await ai.getByLabel(/Your own API key/).fill("");
     await ai.getByRole("button", { name: "Save AI settings" }).click();
     await expect(ai.getByRole("status")).toHaveText("AI settings saved.");
     await page.reload();
     await expect(page.getByRole("radio", { name: /Fast/ })).toBeChecked();
+
+    // Another provider needs its own key, and a key that does not work is not saved.
+    await ai.getByLabel(/^Provider/).selectOption({ label: "Gemini (Google)" });
+    await expect(ai.getByText(/Leave empty to use gemini/)).toBeVisible();
+    await ai.getByLabel(/^Your API key/).fill("not-a-real-gemini-key-000000");
+    await ai.getByRole("button", { name: "Save AI settings" }).click();
+    await expect(ai.getByRole("alert")).toContainText("Check the key and the model name", { timeout: 40_000 });
+    await page.reload();
+    await expect(page.getByLabel(/^Provider/)).toHaveValue("anthropic");
   });
 
   test("a chatbot is tested end to end: one careless reply is caught, the rest pass", async ({ page, request }) => {

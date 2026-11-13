@@ -91,7 +91,7 @@ async def test_wise_uses_the_model_when_one_is_set_up_and_survives_it_failing(cl
                     raise RuntimeError("model is down")
                 return Reply()
 
-    monkeypatch.setattr(wise, "_ai_ready", lambda: True)
+    monkeypatch.setattr(wise, "_ai_ready", lambda *_: True)
     monkeypatch.setattr(wise, "ai_client", lambda purpose: Fake)
     ask = lambda: client.post(f"{API}/wise/chat", headers=auth_headers, json={"messages": [{"role": "user", "content": "What is the SQL injection finding?"}]})
     data = (await ask()).json()

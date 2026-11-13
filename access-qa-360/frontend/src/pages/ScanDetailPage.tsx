@@ -3,7 +3,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Check, Minus, X } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { ChangesTab, ConversationsTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab } from "../components/ScanInsights";
+import { ChangesTab, ConversationsTab, EndpointsTab, FlowsTab, SmokeTest, PerformanceTab, StandardsTab } from "../components/ScanInsights";
 import { ScanSteps } from "../components/ScanSteps";
 import { StatusPill } from "../components/StatusPill";
 import {
@@ -330,7 +330,12 @@ export function ScanDetailPage() {
       {tab === "accessibility" && <AccessibilityTab job={job} />}
       {tab === "gaps" && <QaGapsTab job={job} />}
       {tab === "cases" && <TestCasesTab job={job} />}
-      {tab === "code" && <AutomationTab job={job} />}
+      {tab === "code" && (
+        <div className="flex flex-col gap-5">
+          {job.source_type === "web" && <SmokeTest job={job} />}
+          <AutomationTab job={job} />
+        </div>
+      )}
       {tab === "conversations" && <ConversationsTab job={job} />}
       {tab === "flows" && <FlowsTab job={job} />}
       {tab === "performance" && <PerformanceTab job={job} />}

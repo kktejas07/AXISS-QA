@@ -199,16 +199,17 @@ def test_quality_picks_the_model():
 
 
 async def test_an_organisation_sets_its_ai_quality_and_key(client: AsyncClient, test_user, auth_headers, monkeypatch):
-    assert (await client.get(f"{API}/org/ai", headers=auth_headers)).json() == {"quality": "balanced", "own_key": False, "key_ending": None}
+    brief = lambda r: {k: r.json()[k] for k in ("quality", "own_key", "key_ending")}
+    assert brief(await client.get(f"{API}/org/ai", headers=auth_headers)) == {"quality": "balanced", "own_key": False, "key_ending": None}
     assert (await client.put(f"{API}/org/ai", headers=auth_headers, json={"quality": "fast", "api_key": "not-a-key"})).status_code == 422
     saved = await client.put(f"{API}/org/ai", headers=auth_headers, json={"quality": "fast", "api_key": "sk-ant-api03-abcdefghijklmnop-WXYZ"})
-    assert saved.json() == {"quality": "fast", "own_key": True, "key_ending": "WXYZ"}
+    assert brief(saved) == {"quality": "fast", "own_key": True, "key_ending": "WXYZ"}
     org_id = (await client.get(f"{API}/auth/me", headers=auth_headers)).json()["organization_id"]
     async with TestSessionLocal() as db:
         org = await db.get(Organization, org_id)
         assert "sk-ant" not in org.ai_key_encrypted
         context = await ai.org_context(db, org_id, "scan-1")
-    assert context == {"organization_id": org_id, "audit_id": "scan-1", "quality": "fast", "api_key": "sk-ant-api03-abcdefghijklmnop-WXYZ"}
+    assert context == {"organization_id": org_id, "audit_id": "scan-1", "quality": "fast", "api_key": "sk-ant-api03-abcdefghijklmnop-WXYZ", "provider": "anthropic"}
 
     # The key and the quality are applied where the call is made.
     seen = {}
@@ -232,7 +233,7 @@ async def test_an_organisation_sets_its_ai_quality_and_key(client: AsyncClient, 
     assert seen["model"] == "claude-haiku-4-5" and seen["keys"][-1] == "sk-ant-api03-abcdefghijklmnop-WXYZ"
 
     kept = await client.put(f"{API}/org/ai", headers=auth_headers, json={"quality": "best"})
-    assert kept.json() == {"quality": "best", "own_key": True, "key_ending": "WXYZ"}
+    assert brief(kept) == {"quality": "best", "own_key": True, "key_ending": "WXYZ"}
     assert (await client.put(f"{API}/org/ai", headers=auth_headers, json={"quality": "best", "api_key": ""})).json()["own_key"] is False
     async with TestSessionLocal() as db:
         (await db.get(User, test_user.id)).org_role = "member"

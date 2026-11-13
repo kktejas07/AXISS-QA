@@ -113,6 +113,62 @@ def rank(question: str, passages: list[dict], k: int = 8) -> list[dict]:
     return [p for _, p in scored[:k]]
 
 
+def embeddings_config(context: dict) -> dict | None:
+    """
+    Where to get embeddings for meaning-based search, or None to search by words only.
+    The organisation's own provider is used when it offers embeddings; otherwise the server's, if one is set up.
+    """
+    from app.core import providers
+
+    provider = context.get("provider")
+    model = providers.PROVIDERS.get(provider or "", {}).get("embeddings")
+    if context.get("api_key") and model:
+        return {"base": providers.base_url(provider, context.get("base_url")), "key": context["api_key"], "model": model}
+    if settings.EMBEDDINGS_API_KEY:
+        return {"base": settings.EMBEDDINGS_BASE_URL, "key": settings.EMBEDDINGS_API_KEY, "model": settings.EMBEDDINGS_MODEL}
+    return None
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    size = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
+    return dot / size if size else 0.0
+
+
+async def rank_by_meaning(db: AsyncSession, org_id: str, question: str, passages: list[dict], config: dict, k: int = 8) -> list[dict]:
+    """
+    Passages whose meaning is closest to the question, so "how do I stop people guessing passwords"
+    finds a finding titled "No rate limiting on login". Each passage is sent to the embeddings
+    provider once and remembered. The word-match order is blended in, so exact names still win.
+    """
+    import hashlib
+
+    from app.core import providers
+    from app.models.wise import WiseEmbedding
+
+    passages = passages[:500]
+    if not passages:
+        return []
+    texts = [(p["title"] + ". " + p["text"])[:2000] for p in passages]
+    keys = [hashlib.sha1((config["model"] + "\n" + t).encode()).hexdigest() for t in texts]
+    known = {row.hash: row.vector for row in (await db.execute(select(WiseEmbedding).where(WiseEmbedding.hash.in_(set(keys))))).scalars().all()}
+    missing = [(key, text) for key, text in dict(zip(keys, texts)).items() if key not in known]
+    for start in range(0, len(missing), 96):
+        batch = missing[start:start + 96]
+        vectors = await providers.embed(config["base"], config["key"], config["model"], [text for _, text in batch])
+        for (key, _), vector in zip(batch, vectors):
+            known[key] = vector
+            db.add(WiseEmbedding(hash=key, organization_id=org_id, vector=vector))
+    await db.flush()
+    asked = (await providers.embed(config["base"], config["key"], config["model"], [question[:2000]]))[0]
+    by_meaning = sorted(range(len(passages)), key=lambda i: -_cosine(asked, known[keys[i]]))
+    by_words = {id(p): place for place, p in enumerate(rank(question, passages, k=len(passages)))}
+    # Reciprocal rank fusion: a passage near the top of either list scores well; near the top of both, best.
+    score = {i: 1 / (60 + place) + (1 / (60 + by_words[id(passages[i])]) if id(passages[i]) in by_words else 0) for place, i in enumerate(by_meaning)}
+    # Keep only passages that are actually close in meaning, so an unrelated question still finds nothing.
+    return [passages[i] for i in sorted(score, key=lambda i: -score[i]) if _cosine(asked, known[keys[i]]) >= 0.25][:k]
+
+
 async def gather(db: AsyncSession, org_id: str, user_id: str, audit_id: str | None) -> list[dict]:
     visible = or_(AuditJob.organization_id == org_id, and_(AuditJob.organization_id.is_(None), AuditJob.created_by == user_id))
     q = select(AuditJob).where(visible, AuditJob.status.in_(DONE)).order_by(AuditJob.created_at.desc()).limit(MAX_SCANS)
@@ -163,9 +219,11 @@ def actions(question: str, audit_id: str | None = None) -> list[dict]:
     return out[:3]
 
 
-def _ai_ready() -> bool:
-    key = settings.ANTHROPIC_API_KEY or ""
-    return key.startswith("sk-") and settings.ENVIRONMENT != "test"
+def _ai_ready(context: dict | None = None) -> bool:
+    """A model can be called: the organisation brought its own key, or the server has one."""
+    if settings.ENVIRONMENT == "test":
+        return False
+    return bool((context or {}).get("api_key")) or (settings.ANTHROPIC_API_KEY or "").startswith("sk-")
 
 
 def plain_answer(question: str, found: list[dict]) -> str:
@@ -182,16 +240,26 @@ def plain_answer(question: str, found: list[dict]) -> str:
 
 async def answer(db: AsyncSession, org_id: str, user_id: str, messages: list[dict], audit_id: str | None = None) -> dict:
     question = messages[-1]["content"]
-    found = rank(question, await gather(db, org_id, user_id, audit_id))
+    everything = await gather(db, org_id, user_id, audit_id)
+    context = await org_context(db, org_id, audit_id)
+    config, search = embeddings_config(context), "words"
+    found = None
+    if config:
+        try:
+            found, search = await rank_by_meaning(db, org_id, question, everything, config), "meaning"
+        except Exception:
+            found = None      # the provider is down or the key is spent: search by words instead
+    if found is None:
+        found = rank(question, everything)
     sources, seen = [], set()
     for p in found:
         if (p["title"], p["link"]) not in seen:
             seen.add((p["title"], p["link"]))
             sources.append({"title": p["title"], "link": p["link"], "kind": p["kind"]})
-    out = {"sources": sources[:6], "actions": actions(question, audit_id), "used_ai": False}
-    if _ai_ready() and found:
+    out = {"sources": sources[:6], "actions": actions(question, audit_id), "used_ai": False, "search": search}
+    if _ai_ready(context) and found:
         passages = "\n\n".join(f"[{i + 1}] ({p['kind']}) {p['title']}\n{p['text'][:1200]}" for i, p in enumerate(found))
-        token = ai_context.set(await org_context(db, org_id, audit_id))
+        token = ai_context.set(context)
         try:
             reply = await ai_client("wise").messages.create(
                 model=MODEL, max_tokens=700, system=SYSTEM.format(passages=passages),
