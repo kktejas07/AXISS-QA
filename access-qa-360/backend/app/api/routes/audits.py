@@ -2,7 +2,7 @@
 A scan in the app is an "audit job". The flow is:
 
 POST /api/v1/audits                     — step 1: say what is being tested (draft, nothing runs)
-POST /api/v1/audits/{id}/upload         — step 1, mobile: attach the .apk or .ipa
+POST /api/v1/audits/{id}/upload         — step 1: attach the .apk or .ipa, or a .zip of source code
 POST /api/v1/audits/{id}/start          — step 2: choose outputs and depth, confirm permission, run
 GET  /api/v1/audits/{id}                — status, per-step progress and results
 GET  /api/v1/audits/{id}/stream         — the same progress as server-sent events
@@ -31,6 +31,7 @@ from app.core.storage import storage_path
 from app.models.audit_job import AuditJob, AuditStatus
 from app.models.user import User
 from app.api.deps import OrgContext, get_org_context
+from app.services.code_auditor import SourceError, parse_repo_url
 from app.services.orgs import scans_this_month
 
 router = APIRouter(prefix="/audits", tags=["audits"])
@@ -52,8 +53,9 @@ def _launch(job_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 class AuditCreate(BaseModel):
-    source_type: Literal["web", "android", "ios"] = "web"
+    source_type: Literal["web", "android", "ios", "code", "repo"] = "web"
     target_url: str | None = None
+    repo_url: str | None = None     # public GitHub, GitLab or Bitbucket link, for source_type "repo"
     app_name: str | None = None
     mobile_url: str | None = None   # Play Store / App Store URL
     # True keeps the original one-call behaviour: run everything straight away.
@@ -73,6 +75,7 @@ class AuditOut(BaseModel):
     target_url: str | None
     app_name: str | None
     mobile_url: str | None
+    repo_url: str | None
     source_filename: str | None
     outputs: list[str] | None
     allowed_outputs: list[str]
@@ -185,6 +188,12 @@ async def create_audit(
         target_url = None
     if body.mobile_url and not _is_web_address(body.mobile_url):
         raise HTTPException(422, "The app store link must start with http:// or https://")
+    repo_url = None
+    if body.source_type == "repo":
+        try:
+            repo_url, _ = parse_repo_url(body.repo_url or "")
+        except SourceError as e:
+            raise HTTPException(422, str(e))
 
     job = AuditJob(
         created_by=ctx.user.id,
@@ -193,6 +202,7 @@ async def create_audit(
         target_url=target_url,
         app_name=(body.app_name or "").strip() or None,
         mobile_url=body.mobile_url,
+        repo_url=repo_url,
     )
     # A mobile job needs its build uploaded first, so it always starts as a draft.
     autostart = body.autostart and (body.source_type == "web" or bool(body.mobile_url))
@@ -239,7 +249,7 @@ async def upload_build(
     db: AsyncSession = Depends(get_db),
     ctx: OrgContext = Depends(get_org_context),
 ):
-    """Attach an Android .apk or iOS .ipa to a scan that has not started yet."""
+    """Attach an Android .apk, an iOS .ipa or a .zip of source code to a scan that has not started yet."""
     ctx.require("scan.run")
     job = await _get_job(audit_id, db, ctx)
     if job.started_at:
@@ -247,6 +257,16 @@ async def upload_build(
 
     name = os.path.basename(file.filename or "")
     ext = os.path.splitext(name)[1].lower()
+    if job.source_type == "code":
+        if ext != ".zip":
+            raise HTTPException(415, "Upload the source code as a .zip file")
+        job.source_path = await _save_upload(file, audit_id, ext)
+        job.source_filename = name[:255]
+        await db.commit()
+        await db.refresh(job)
+        return job
+    if job.source_type == "repo":
+        raise HTTPException(415, "This scan reads a repository link, so there is nothing to upload")
     if ext not in (".apk", ".ipa"):
         raise HTTPException(415, "Upload an Android .apk or an iOS .ipa file")
     expected = {"android": ".apk", "ios": ".ipa"}.get(job.source_type)
@@ -299,6 +319,8 @@ async def start_audit(
         raise HTTPException(422, "Choose at least one output")
     if job.source_type in ("android", "ios") and not job.has_mobile_input:
         raise HTTPException(400, "Upload the app build before starting")
+    if job.source_type == "code" and not job.source_path:
+        raise HTTPException(400, "Upload the source code before starting")
     await _check_org_can_scan(db, ctx)
 
     now = datetime.now(timezone.utc)
@@ -396,6 +418,7 @@ async def export_audit(
         "app": job.label,
         "source_type": job.source_type,
         "target_url": job.target_url,
+        "repository": job.repo_url,
         "outputs": job.outputs,
         "depth": job.depth,
         "status": job.status.value if hasattr(job.status, "value") else str(job.status),
@@ -403,7 +426,8 @@ async def export_audit(
         "critical_count": job.critical_count,
         "high_count": job.high_count,
         "executive_summary": job.executive_summary,
-        "web": job.tier1_result,
+        "web": None if job.is_code else job.tier1_result,
+        "code": job.tier1_result if job.is_code else None,
         "mobile": job.tier2_result,
         "security": job.tier3_result,
         "manual_test_cases": (job.tier4_result or {}).get("test_cases"),

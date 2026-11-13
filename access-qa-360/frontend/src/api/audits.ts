@@ -1,6 +1,15 @@
 import api from "./client";
 
-export type SourceType = "web" | "android" | "ios";
+export type SourceType = "web" | "android" | "ios" | "code" | "repo";
+
+export const sourceName: Record<SourceType, string> = {
+  web: "Web app",
+  android: "Android build",
+  ios: "iOS build",
+  code: "Source code",
+  repo: "Repository",
+};
+export const isCode = (job: { source_type: SourceType }) => job.source_type === "code" || job.source_type === "repo";
 export type OutputKind = "security" | "manual" | "playwright" | "appium";
 export type Depth = "quick" | "standard" | "deep";
 export type ExportKind = "report" | "test-cases" | "playwright" | "appium" | "results";
@@ -9,6 +18,8 @@ export type StepStatus = "pending" | "running" | "completed" | "failed" | "skipp
 
 export interface Finding {
   id?: string;
+  /** Code scans: "secrets", "code", "config" or "dependency". */
+  check?: string;
   severity: string;
   title: string;
   description?: string;
@@ -50,6 +61,32 @@ export interface WebResult {
   routes_found?: string[];
   playwright_tests?: string;
   a11y_summary?: { total_violations: number; critical: number; serious: number; moderate: number; minor: number; violations: A11yViolation[] };
+  // Source code scans
+  files_scanned?: number;
+  truncated?: boolean;
+  languages?: Record<string, number>;
+  routes?: CodeRoute[];
+  qa_gaps?: QaGaps;
+}
+
+export interface CodeRoute {
+  method: string;
+  path: string;
+  file: string;
+  line: number;
+  tested?: boolean;
+}
+
+export interface QaGaps {
+  source_files: number;
+  test_files: number;
+  files_with_tests: number;
+  coverage_pct: number | null;
+  untested_files: { path: string; lines: number; language: string }[];
+  untested_file_count: number;
+  untested_routes: CodeRoute[];
+  untested_route_count: number;
+  route_count: number;
 }
 
 export interface MobileResult {
@@ -70,11 +107,14 @@ export interface SecurityResult {
   skipped?: string;
   findings?: Finding[];
   subdomains_found?: string[];
+  /** Code scans: what the dependency lookup covered. */
+  dependencies?: { packages_found: number; packages_checked: number; vulnerable: number; status: "none" | "checked" | "unavailable"; reason?: string };
 }
 
 export interface ManualResult {
   error?: string;
   skipped?: string;
+  note?: string;
   test_cases?: ManualCase[];
 }
 
@@ -85,6 +125,7 @@ export interface AuditJob {
   target_url: string | null;
   app_name: string | null;
   mobile_url: string | null;
+  repo_url: string | null;
   source_filename: string | null;
   outputs: OutputKind[] | null;
   allowed_outputs: OutputKind[];
@@ -115,7 +156,7 @@ export interface AuditJob {
 }
 
 /** Step 1: record what is being tested. Nothing runs until startAudit. */
-export const createDraft = (body: { source_type: SourceType; target_url?: string; app_name?: string }) =>
+export const createDraft = (body: { source_type: SourceType; target_url?: string; repo_url?: string; app_name?: string }) =>
   api.post<AuditJob>("/audits", { ...body, autostart: false });
 
 export const uploadBuild = (id: string, file: File, onProgress?: (percent: number) => void) => {

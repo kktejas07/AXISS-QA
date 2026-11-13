@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Copy, Download } from "lucide-react";
 import type { AuditJob, ExportKind, Finding, ManualCase } from "../api/audits";
-import { exportPath } from "../api/audits";
+import { exportPath, isCode } from "../api/audits";
 import { downloadFromApi } from "../utils/download";
 
 const severityOrder = ["critical", "high", "medium", "low", "info", "informational"];
@@ -124,10 +124,33 @@ export function SecurityTab({ job }: { job: AuditJob }) {
   if (job.tier3_result?.error && findings.length === 0) {
     return <p role="alert" className={`${empty} text-red-800`}>The security checks failed: {job.tier3_result.error}</p>;
   }
+  const code = isCode(job);
+  const deps = job.tier3_result?.dependencies;
+  // Say plainly what the dependency lookup did, so "no findings" is not read as "all clear" when it did not run.
+  const depNote =
+    code && deps
+      ? deps.status === "unavailable"
+        ? deps.reason
+        : deps.status === "none"
+          ? "No dependency lists with exact versions were found, so dependencies were not checked."
+          : `${deps.packages_checked} dependencies checked against the OSV vulnerability database, ${deps.vulnerable} with known vulnerabilities.${deps.reason ? ` ${deps.reason}` : ""}`
+      : null;
+  const note = depNote && (
+    <p role={deps?.status === "unavailable" ? "alert" : undefined} className={`rounded-xl border px-5 py-3 ${deps?.status === "unavailable" ? "border-orange-200 bg-orange-50 text-orange-900" : "border-gray-300 bg-white text-body"}`}>
+      {depNote}
+    </p>
+  );
   if (findings.length === 0) {
-    return <p className={empty}>{skipped ? "A security audit was not part of this scan." : "No security issues were found by the checks that ran."}</p>;
+    return (
+      <div className="flex flex-col gap-5">
+        {note}
+        <p className={empty}>{skipped ? "A security audit was not part of this scan." : "No security issues were found by the checks that ran."}</p>
+      </div>
+    );
   }
   return (
+    <div className="flex flex-col gap-5">
+    {note}
     <MasterDetail
       label="Findings"
       items={findings}
@@ -160,7 +183,7 @@ export function SecurityTab({ job }: { job: AuditJob }) {
             </Field>
           )}
           {(f.proof_request || f.proof_response) && (
-            <Field label="Proof">
+            <Field label={f.check === "dependency" ? "Advisories" : code ? "The line" : "Proof"}>
               <Proof text={[f.proof_request, f.proof_response].filter(Boolean).join("\n\n")} />
             </Field>
           )}
@@ -172,6 +195,100 @@ export function SecurityTab({ job }: { job: AuditJob }) {
         </div>
       )}
     />
+    </div>
+  );
+}
+
+/** Source code scans: routes and files that no test refers to. */
+export function QaGapsTab({ job }: { job: AuditJob }) {
+  const gaps = job.tier1_result?.qa_gaps;
+  if (!gaps) return <p className={empty}>Missing tests are measured on source code scans. This scan did not read any code.</p>;
+  const th = "px-5 py-2.5 font-semibold";
+  return (
+    <div className="flex flex-col gap-6">
+      <dl className="grid overflow-hidden rounded-2xl border border-gray-300 bg-white sm:grid-cols-3">
+        {[
+          ["Routes without tests", `${gaps.untested_route_count} of ${gaps.route_count}`],
+          ["Source files without tests", `${gaps.untested_file_count} of ${gaps.source_files}`],
+          ["Test files found", String(gaps.test_files)],
+        ].map(([label, value]) => (
+          <div key={label} className="border-b border-line px-6 py-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+            <dt className="text-sm font-semibold text-body">{label}</dt>
+            <dd className="text-[28px] font-extrabold leading-tight">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="max-w-[75ch] text-body">
+        A route or file counts as tested when a test file names it or refers to it. The tests were not run, so this
+        shows where tests are missing, not how thorough the existing ones are.
+        {job.tier1_result?.truncated ? " The file limit for this depth was reached, so part of the project was not read." : ""}
+      </p>
+
+      <section className={card}>
+        <h2 className="px-5 py-4 text-lg font-bold">Routes no test refers to</h2>
+        {gaps.untested_routes.length === 0 ? (
+          <p className="border-t border-line px-5 py-4 text-body">
+            {gaps.route_count === 0 ? "No HTTP routes were recognised in this code." : "Every route found is referred to by a test."}
+          </p>
+        ) : (
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse text-left">
+              <thead>
+                <tr className="bg-soft text-[13.5px] text-body">
+                  <th scope="col" className={th}>Route</th>
+                  <th scope="col" className={th}>Defined in</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gaps.untested_routes.map((r, i) => (
+                  <tr key={i} className="border-t border-line">
+                    <td className="break-all px-5 py-3 font-mono text-sm">
+                      {r.method !== "ANY" && <span className="mr-2 font-bold">{r.method}</span>}
+                      {r.path}
+                    </td>
+                    <td className="break-all px-5 py-3 font-mono text-[13px] text-body">{r.file}:{r.line}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {gaps.untested_route_count > gaps.untested_routes.length && (
+          <p className="border-t border-line px-5 py-3 text-[13.5px] text-body">Showing the first {gaps.untested_routes.length}. The full results download has them all.</p>
+        )}
+      </section>
+
+      <section className={card}>
+        <h2 className="px-5 py-4 text-lg font-bold">Largest files without tests</h2>
+        {gaps.untested_files.length === 0 ? (
+          <p className="border-t border-line px-5 py-4 text-body">Every source file is referred to by a test.</p>
+        ) : (
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse text-left">
+              <thead>
+                <tr className="bg-soft text-[13.5px] text-body">
+                  <th scope="col" className={th}>File</th>
+                  <th scope="col" className={th}>Language</th>
+                  <th scope="col" className={th}>Lines</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gaps.untested_files.slice(0, 50).map((u) => (
+                  <tr key={u.path} className="border-t border-line">
+                    <td className="break-all px-5 py-3 font-mono text-sm">{u.path}</td>
+                    <td className="px-5 py-3">{u.language}</td>
+                    <td className="px-5 py-3">{u.lines}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {gaps.untested_file_count > 50 && (
+          <p className="border-t border-line px-5 py-3 text-[13.5px] text-body">Showing the 50 largest of {gaps.untested_file_count}.</p>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -218,12 +335,15 @@ export function AccessibilityTab({ job }: { job: AuditJob }) {
 export function TestCasesTab({ job }: { job: AuditJob }) {
   const cases: ManualCase[] = job.tier4_result?.test_cases ?? [];
   if (cases.length === 0) {
-    return <p className={empty}>{job.tier4_result?.skipped ? "Manual test cases were not part of this scan." : "No test cases could be written for this app."}</p>;
+    return <p className={empty}>{job.tier4_result?.skipped ? "Manual test cases were not part of this scan." : job.tier4_result?.note ?? "No test cases could be written for this app."}</p>;
   }
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-body">{cases.length === 1 ? "1 test case" : `${cases.length} test cases`}</span>
+        <span className="text-body">
+          {cases.length === 1 ? "1 test case" : `${cases.length} test cases`}
+          {job.tier4_result?.note ? `. ${job.tier4_result.note}` : ""}
+        </span>
         {job.exports.includes("test-cases") && <DownloadButton id={job.id} kind="test-cases" label="Export CSV for Jira" />}
       </div>
       <MasterDetail
@@ -239,7 +359,7 @@ export function TestCasesTab({ job }: { job: AuditJob }) {
         detail={(c) => (
           <div className="flex flex-col gap-[18px]">
             <div className="flex flex-col gap-1.5">
-              <span className="font-mono text-[13px] text-body">{[c.id, c.category].filter(Boolean).join(", ")}</span>
+              <span className="font-mono text-[13px] text-body">{[c.id, c.category, isCode(job) ? c.page_url : undefined].filter(Boolean).join(", ")}</span>
               <h2 className="text-[22px] font-bold leading-tight">{c.title}</h2>
             </div>
             {c.preconditions && (

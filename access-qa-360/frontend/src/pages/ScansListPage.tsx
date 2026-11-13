@@ -4,10 +4,9 @@ import { Plus } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { StatusPill } from "../components/StatusPill";
-import { listAudits } from "../api/audits";
+import { listAudits, sourceName } from "../api/audits";
 import type { AuditJob } from "../api/audits";
 
-const sourceName = { web: "Web app", android: "Android build", ios: "iOS build" } as const;
 const outputName = { security: "Security", manual: "Test cases", playwright: "Playwright", appium: "Appium" } as const;
 
 /** Every scan the user has created, newest first. */

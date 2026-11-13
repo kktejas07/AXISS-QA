@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import tempfile
 import os
 from datetime import datetime, timezone
@@ -25,6 +26,7 @@ from app.services.web_auditor import (
 )
 from app.services.mobile_auditor import run_mobile_audit
 from app.services.api_auditor import run_api_audit
+from app.services import code_auditor
 
 from anthropic import AsyncAnthropic
 from app.core.config import settings
@@ -42,6 +44,16 @@ async def _set_progress(job_id: str, progress: int, **kwargs):
         job = res.scalar_one_or_none()
         if job:
             job.progress = progress
+            for k, v in kwargs.items():
+                setattr(job, k, v)
+            await db.commit()
+
+
+async def _set_progress_only(job_id: str, **kwargs):
+    """Update fields without touching progress."""
+    async with AsyncSessionLocal() as db:
+        job = (await db.execute(select(AuditJob).where(AuditJob.id == job_id))).scalar_one_or_none()
+        if job:
             for k, v in kwargs.items():
                 setattr(job, k, v)
             await db.commit()
@@ -82,7 +94,58 @@ Paragraph 4: immediate recommended actions.
 Return ONLY the paragraphs, no headers or bullets."""
 
 
+CODE_SUMMARY_PROMPT = """You are a senior security and QA consultant. Write a concise executive summary (3 paragraphs, max 250 words) of a static review of an application's source code. Nothing was run; the code was only read.
+
+Application: {app_name}
+Audit date: {date}
+Files read: {files} ({languages})
+HTTP routes found: {routes}
+
+Security findings: {total} ({critical} critical, {high} high, {medium} medium)
+  Leaked secrets: {secrets}
+  Risky code patterns: {code}
+  Vulnerable dependencies: {deps} ({dep_note})
+
+Test coverage by file name and reference (not measured by running tests):
+  Source files: {source_files}, test files: {test_files}
+  Source files no test refers to: {untested_files}
+  Routes no test refers to: {untested_routes} of {routes}
+
+Top issues:
+{top_issues}
+
+Write in business English. Paragraph 1: overall posture. Paragraph 2: the top risks and their business impact.
+Paragraph 3: where tests are missing and what to do first.
+Return ONLY the paragraphs, no headers or bullets."""
+
+
+async def _generate_code_summary(job: AuditJob) -> str:
+    t1, t3 = job.tier1_result or {}, job.tier3_result or {}
+    findings = t3.get("findings", [])
+    gaps = t1.get("qa_gaps", {})
+    deps = t3.get("dependencies", {})
+    by_check = lambda name: sum(1 for f in findings if f.get("check") == name)
+    prompt = CODE_SUMMARY_PROMPT.format(
+        app_name=job.label,
+        date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        files=t1.get("files_scanned", 0),
+        languages=", ".join(t1.get("languages", {})) or "unknown",
+        routes=len(t1.get("routes", [])),
+        total=len(findings),
+        critical=_count(findings, "critical"), high=_count(findings, "high"), medium=_count(findings, "medium"),
+        secrets=by_check("secrets"), code=by_check("code") + by_check("config"), deps=by_check("dependency"),
+        dep_note=deps.get("reason") or f"{deps.get('packages_checked', 0)} packages checked",
+        source_files=gaps.get("source_files", 0), test_files=gaps.get("test_files", 0),
+        untested_files=gaps.get("untested_file_count", 0), untested_routes=gaps.get("untested_route_count", 0),
+        top_issues="\n".join(f"- [{f.get('severity', '?').upper()}] {f.get('title', '?')} ({f.get('affected_url', '')})" for f in findings[:6]) or "No findings.",
+    )
+    msg = await ai.messages.create(model="claude-sonnet-4-5", max_tokens=700, messages=[{"role": "user", "content": prompt}])
+    return msg.content[0].text.strip()
+
+
 async def _generate_unified_summary(job: AuditJob) -> str:
+    if job.is_code:
+        return await _generate_code_summary(job)
     t1 = job.tier1_result or {}
     t2 = job.tier2_result or {}
     t3 = job.tier3_result or {}
@@ -164,6 +227,7 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
         from reportlab.lib.units import cm
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
         from reportlab.lib import colors
+        from xml.sax.saxutils import escape
 
         doc = SimpleDocTemplate(path, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
         styles = getSampleStyleSheet()
@@ -189,7 +253,7 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
         story.append(Paragraph(f"Overall Risk Score: {job.risk_score or '—'}/100", styles["Heading2"]))
         story.append(Paragraph(
             f"Critical: {job.critical_count} · High: {job.high_count} · "
-            f"Pages Audited: {job.total_pages_audited} · Test Cases: {job.total_test_cases}",
+            f"{'Files read' if job.is_code else 'Pages Audited'}: {job.total_pages_audited} · Test Cases: {job.total_test_cases}",
             styles["Normal"]
         ))
         story.append(Spacer(1, 0.5*cm))
@@ -201,9 +265,11 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
             for f in findings[:30]:
                 sev = f.get("severity","?").upper()
                 story.append(Paragraph(f"[{sev}] {f.get('title','?')}", styles["Heading3"]))
-                story.append(Paragraph(f.get("description","")[:400], styles["Normal"]))
+                if job.is_code and f.get("affected_url"):
+                    story.append(Paragraph(f"<b>Where:</b> {escape(str(f['affected_url']))}", styles["Normal"]))
+                story.append(Paragraph(escape(f.get("description","")[:600]), styles["Normal"]))
                 if f.get("remediation"):
-                    story.append(Paragraph(f"<b>Remediation:</b> {f['remediation']}", styles["Normal"]))
+                    story.append(Paragraph(f"<b>Remediation:</b> {escape(str(f['remediation']))}", styles["Normal"]))
                 story.append(Spacer(1, 0.3*cm))
 
         # Mobile build checks
@@ -214,6 +280,25 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
                 story.append(Paragraph(f"[{str(fl.get('severity','?')).upper()}] {fl.get('title','?')}", styles["Heading3"]))
                 story.append(Paragraph(str(fl.get("detail", ""))[:400], styles["Normal"]))
                 story.append(Spacer(1, 0.3*cm))
+
+        # Source code scans: where tests are missing
+        gaps = t1.get("qa_gaps") or {}
+        if gaps:
+            story.append(Paragraph("Where tests are missing", styles["Heading1"]))
+            story.append(Paragraph(
+                f"{gaps.get('source_files', 0)} source files and {gaps.get('test_files', 0)} test files were read. "
+                f"{gaps.get('untested_file_count', 0)} source files and {gaps.get('untested_route_count', 0)} of "
+                f"{gaps.get('route_count', 0)} routes are not referred to by any test. This compares names and text; "
+                "the tests were not run.", styles["Normal"]))
+            story.append(Spacer(1, 0.3*cm))
+            for r in gaps.get("untested_routes", [])[:25]:
+                story.append(Paragraph(escape(f"{r.get('method', '')} {r.get('path', '')}  ({r.get('file', '')})"), styles["Normal"]))
+            if gaps.get("untested_files"):
+                story.append(Spacer(1, 0.3*cm))
+                story.append(Paragraph("Largest files without tests", styles["Heading3"]))
+                for u in gaps["untested_files"][:25]:
+                    story.append(Paragraph(escape(f"{u.get('path', '')}  ({u.get('lines', 0)} lines)"), styles["Normal"]))
+            story.append(Spacer(1, 0.3*cm))
 
         # Accessibility
         a11y = t1.get("a11y_summary", {})
@@ -265,7 +350,7 @@ def _fallback_summary(job: AuditJob, findings: int) -> str:
     return (
         f"This scan of {job.label} found {findings} security "
         f"{'finding' if findings == 1 else 'findings'}: {job.critical_count or 0} critical and "
-        f"{job.high_count or 0} high. Pages mapped: {job.total_pages_audited or 0}. "
+        f"{job.high_count or 0} high. {'Files read' if job.is_code else 'Pages mapped'}: {job.total_pages_audited or 0}. "
         f"Manual test cases written: {job.total_test_cases or 0}.\n\n"
         "Fix the critical and high findings first; each one is listed in this report with its recommended fix."
     )
@@ -294,6 +379,11 @@ async def run_audit(audit_job_id: str):
         ipa_path = job.ipa_path
         outputs = set(job.outputs or ALL_OUTPUTS)
         depth = job.depth or "standard"
+        is_code = job.is_code
+
+    if is_code:
+        await _run_code_audit(audit_job_id)
+        return
 
     max_depth, max_pages = DEPTH_LIMITS.get(depth, DEPTH_LIMITS["standard"])
     critical = high = 0
@@ -428,7 +518,100 @@ async def run_audit(audit_job_id: str):
         tier4_data = {"skipped": "Manual test cases not selected"}
         await _set_progress(audit_job_id, 80, tier4_status="skipped", tier4_result=tier4_data)
 
-    # ---- Tier 5: summary and PDF report ---------------------------------------
+    await _finish(audit_job_id, tier_states, critical, high, tier1_data, tier2_data, tier3_data)
+
+
+async def _run_code_audit(audit_job_id: str) -> None:
+    """A scan of uploaded source code or a repository. The code is read, never run."""
+    async with AsyncSessionLocal() as db:
+        job = (await db.execute(select(AuditJob).where(AuditJob.id == audit_job_id))).scalar_one()
+        source_type, zip_path, repo_url, label = job.source_type, job.source_path, job.repo_url, job.label
+        outputs = set(job.outputs or ALL_OUTPUTS)
+        depth = job.depth or "standard"
+
+    await _set_progress(
+        audit_job_id, 5, status=AuditStatus.running, tier1_status="running",
+        tier2_status="skipped", tier2_result={"skipped": "No mobile build provided"},
+    )
+    tier1_data: dict = {}
+    tier3_data: dict = {"skipped": "Security audit not selected"}
+    tier_states: list[str] = []
+    critical = high = 0
+    work = None
+    try:
+        # ---- Tier 1: fetch the code, list files and routes, find missing tests ----
+        try:
+            work = await asyncio.to_thread(code_auditor.prepare_source, source_type, zip_path, repo_url)
+            scan = await asyncio.to_thread(code_auditor.scan_tree, os.path.join(work, "src"), depth, "security" in outputs)
+        except Exception as e:
+            tier1_data = {"error": str(e) if isinstance(e, code_auditor.SourceError) else _reason(e)}
+            await _set_progress(
+                audit_job_id, 100, status=AuditStatus.failed, tier1_status="failed", tier1_result=tier1_data,
+                tier3_status="skipped", tier3_result={"skipped": "The code could not be read"},
+                tier4_status="skipped", tier4_result={"skipped": "The code could not be read"},
+                tier5_status="skipped", tier5_result={"skipped": "The code could not be read"},
+                completed_at=datetime.now(timezone.utc),
+            )
+            return
+        tier1_data = {
+            "kind": "code",
+            "files_scanned": scan.files_scanned,
+            "truncated": scan.truncated,
+            "languages": scan.languages,
+            "routes": scan.routes[:500],
+            "routes_found": sorted({r["path"] for r in scan.routes})[:500],
+            "qa_gaps": scan.qa_gaps,
+        }
+        tier_states.append("completed")
+        await _set_progress(
+            audit_job_id, 40, tier1_status="completed", tier1_result=tier1_data,
+            total_pages_audited=scan.files_scanned, coverage_pct=scan.qa_gaps.get("coverage_pct"),
+        )
+
+        # ---- Tier 3: secrets, risky code, vulnerable dependencies ----
+        if "security" in outputs:
+            await _set_progress(audit_job_id, 45, tier3_status="running")
+            try:
+                dep_findings, dep_note = await code_auditor.check_dependencies(scan.packages, depth)
+                findings = sorted(scan.findings + dep_findings, key=lambda f: ["critical", "high", "medium", "low"].index(f["severity"]))
+                for number, finding in enumerate(findings, 1):
+                    finding["id"] = f"C-{number:03d}"
+                tier3_data = {"findings": findings, "dependencies": dep_note, "subdomains_found": [], "js_secrets": []}
+                critical, high = _count(findings, "critical"), _count(findings, "high")
+                tier_states.append("completed")
+                await _set_progress(
+                    audit_job_id, 70, tier3_status="completed", tier3_result=tier3_data,
+                    critical_count=critical, high_count=high,
+                )
+            except Exception as e:
+                tier3_data = {"error": _reason(e)}
+                tier_states.append("failed")
+                await _set_progress(audit_job_id, 70, tier3_status="failed", tier3_result=tier3_data)
+        else:
+            await _set_progress(audit_job_id, 70, tier3_status="skipped", tier3_result=tier3_data)
+
+        # ---- Tier 4: manual test cases for the routes found ----
+        if "manual" in outputs:
+            await _set_progress(audit_job_id, 75, tier4_status="running")
+            cases, note = await code_auditor.generate_code_test_cases(scan, label, depth)
+            tier4_data = {"test_cases": cases, "total": len(cases), "jira_csv": _to_jira_csv(cases), **({"note": note} if note else {})}
+            await _set_progress(audit_job_id, 80, tier4_status="completed", tier4_result=tier4_data, total_test_cases=len(cases))
+        else:
+            await _set_progress(audit_job_id, 80, tier4_status="skipped", tier4_result={"skipped": "Manual test cases not selected"})
+    finally:
+        # Customer source code is not kept: remove the working copy and the uploaded archive.
+        if work:
+            shutil.rmtree(work, ignore_errors=True)
+        if zip_path and os.path.exists(zip_path):
+            os.remove(zip_path)
+        await _set_progress_only(audit_job_id, source_path=None)
+
+    await _finish(audit_job_id, tier_states, critical, high, tier1_data, {}, tier3_data)
+
+
+async def _finish(audit_job_id: str, tier_states: list[str], critical: int, high: int,
+                  tier1_data: dict, tier2_data: dict, tier3_data: dict) -> None:
+    """Tier 5 for every kind of scan: risk score, summary and the PDF report."""
     # Nothing worked, so there is nothing to report on.
     if tier_states and all(s == "failed" for s in tier_states):
         await _set_progress(

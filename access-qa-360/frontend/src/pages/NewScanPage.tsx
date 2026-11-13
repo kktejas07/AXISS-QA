@@ -14,17 +14,24 @@ type Source = "web" | "mobile" | "code" | "repo";
 const sources: { id: Source; label: string; hint: string; icon: LucideIcon; ready: boolean }[] = [
   { id: "web", label: "Web app", hint: "Paste a URL", icon: Globe, ready: true },
   { id: "mobile", label: "Mobile build", hint: "Upload an .apk or .ipa", icon: Smartphone, ready: true },
-  { id: "code", label: "Source code", hint: "Upload a .zip", icon: Code2, ready: false },
-  { id: "repo", label: "Repository", hint: "GitHub, GitLab or Bitbucket", icon: GitBranch, ready: false },
+  { id: "code", label: "Source code", hint: "Upload a .zip", icon: Code2, ready: true },
+  { id: "repo", label: "Repository", hint: "GitHub, GitLab or Bitbucket", icon: GitBranch, ready: true },
 ];
 
 const field = "h-[52px] w-full rounded-[10px] border border-gray-400 bg-white px-3.5 text-[15px]";
+
+// What each upload type accepts, and how the drop area describes it.
+const uploads = {
+  mobile: { accept: ".apk,.ipa", test: /\.(apk|ipa)$/i, title: "Drop your build here", kinds: "Android .apk or iOS .ipa", wrong: "Choose an Android .apk or an iOS .ipa file.", missing: "Choose the app build to upload." },
+  code: { accept: ".zip", test: /\.zip$/i, title: "Drop your code here", kinds: "A .zip of the project folder", wrong: "Choose a .zip file of your source code.", missing: "Choose the .zip of your code to upload." },
+} as const;
 
 /** Step 1 of a scan: say what is being tested. Nothing runs until step 2. */
 export function NewScanPage() {
   const navigate = useNavigate();
   const [source, setSource] = useState<Source>("web");
   const [url, setUrl] = useState("");
+  const [repo, setRepo] = useState("");
   const [appName, setAppName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -46,12 +53,14 @@ export function NewScanPage() {
     );
   }
 
+  const upload = source === "mobile" || source === "code" ? uploads[source] : null;
+
   const pickFile = (f: File | undefined) => {
     setError("");
     if (!f) return;
-    if (!/\.(apk|ipa)$/i.test(f.name)) {
+    if (!upload || !upload.test.test(f.name)) {
       setFile(null);
-      setError("Choose an Android .apk or an iOS .ipa file.");
+      setError(upload?.wrong ?? "");
       return;
     }
     setFile(f);
@@ -60,8 +69,8 @@ export function NewScanPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (source === "mobile" && !file) {
-      setError("Choose the app build to upload.");
+    if (upload && !file) {
+      setError(upload.missing);
       return;
     }
     setBusy(true);
@@ -70,8 +79,11 @@ export function NewScanPage() {
       if (source === "web") {
         const { data } = await createDraft({ source_type: "web", target_url: url.trim(), app_name: name });
         navigate(`/audits/${data.id}/setup`);
+      } else if (source === "repo") {
+        const { data } = await createDraft({ source_type: "repo", repo_url: repo.trim(), app_name: name });
+        navigate(`/audits/${data.id}/setup`);
       } else if (file) {
-        const type: SourceType = /\.ipa$/i.test(file.name) ? "ios" : "android";
+        const type: SourceType = source === "code" ? "code" : /\.ipa$/i.test(file.name) ? "ios" : "android";
         const { data } = await createDraft({ source_type: type, app_name: name });
         setUploaded(0);
         await uploadBuild(data.id, file, setUploaded);
@@ -104,6 +116,7 @@ export function NewScanPage() {
                 aria-pressed={on}
                 onClick={() => {
                   setSource(id);
+                  setFile(null);
                   setError("");
                 }}
                 className={`flex flex-col gap-2.5 rounded-[14px] border-2 bg-white p-[18px] text-left disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -134,6 +147,22 @@ export function NewScanPage() {
                 Security checks send test requests to this address. Use a staging or test site when you can.
               </span>
             </label>
+          ) : source === "repo" ? (
+            <label className="flex flex-col gap-2 font-semibold">
+              Repository link
+              <input
+                type="url"
+                required
+                value={repo}
+                onChange={(e) => setRepo(e.target.value)}
+                placeholder="https://github.com/owner/repository"
+                className={`${field} font-mono font-normal`}
+              />
+              <span className="text-[13.5px] font-normal text-body">
+                Public repositories on GitHub, GitLab or Bitbucket. The default branch is read. For a private
+                repository, upload a .zip of the code instead.
+              </span>
+            </label>
           ) : (
             <div className="flex flex-col gap-2">
               <div
@@ -152,15 +181,16 @@ export function NewScanPage() {
                 }`}
               >
                 <Upload className="h-8 w-8 text-brand-600" aria-hidden="true" />
-                <span className="text-lg font-bold">{file ? file.name : "Drop your build here"}</span>
+                <span className="text-lg font-bold">{file ? file.name : upload?.title}</span>
                 <span className="text-body">
-                  {file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "Android .apk or iOS .ipa"}
+                  {file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : upload?.kinds}
                 </span>
                 <input
                   ref={fileInput}
                   id="build-file"
                   type="file"
-                  accept=".apk,.ipa"
+                  key={source}
+                  accept={upload?.accept}
                   className="sr-only"
                   onChange={(e) => pickFile(e.target.files?.[0])}
                 />
@@ -171,6 +201,11 @@ export function NewScanPage() {
                   {file ? "Choose a different file" : "Choose file"}
                 </label>
               </div>
+              {source === "code" && (
+                <span className="text-[13.5px] text-body">
+                  The code is read, never run. The upload is deleted as soon as the scan finishes.
+                </span>
+              )}
               {uploaded !== null && (
                 <div role="progressbar" aria-valuenow={uploaded} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress" className="h-2 overflow-hidden rounded-full bg-line">
                   <div className="h-full bg-brand-600" style={{ width: `${uploaded}%` }} />

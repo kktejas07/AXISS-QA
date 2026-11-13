@@ -10,20 +10,29 @@ import {
   AutomationTab,
   DownloadButton,
   DownloadsTab,
+  QaGapsTab,
   SecurityTab,
   SeverityTag,
   TestCasesTab,
   allFindings,
 } from "../components/ScanResults";
-import { getAudit } from "../api/audits";
+import { getAudit, isCode, sourceName } from "../api/audits";
 import type { AuditJob, StepStatus } from "../api/audits";
 
-const sourceName = { web: "Web app", android: "Android build", ios: "iOS build" } as const;
 
 type Step = { name: string; doing: string; status: StepStatus; problem?: string };
 
 function stepsOf(job: AuditJob): Step[] {
   const why = (r?: { error?: string; skipped?: string } | null) => r?.error ?? r?.skipped;
+  if (isCode(job)) {
+    // Source code scans have no mobile step, and the first step reads files instead of pages.
+    return [
+      { name: "Read the code", doing: job.source_type === "repo" ? "Cloning the repository, listing files and routes, finding missing tests" : "Unpacking the upload, listing files and routes, finding missing tests", status: job.tier1_status, problem: why(job.tier1_result) },
+      { name: "Run security checks", doing: "Looking for leaked secrets, risky code and vulnerable dependencies", status: job.tier3_status, problem: why(job.tier3_result) },
+      { name: "Write manual test cases", doing: "Writing cases for the routes found in the code", status: job.tier4_status, problem: why(job.tier4_result) },
+      { name: "Write the report", doing: "Summarising the results and building the PDF", status: job.tier5_status, problem: why(job.tier5_result) },
+    ];
+  }
   return [
     { name: "Map the web app", doing: "Opening pages, checking accessibility and writing web tests", status: job.tier1_status, problem: why(job.tier1_result) },
     { name: "Analyse the mobile build", doing: "Reading permissions and settings, writing mobile tests", status: job.tier2_status, problem: why(job.tier2_result) },
@@ -75,7 +84,7 @@ function Stat({ label, value, note, bad }: { label: string; value: string | numb
   );
 }
 
-type TabId = "summary" | "security" | "accessibility" | "cases" | "code" | "downloads";
+type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "downloads";
 
 /** One scan: progress while it runs, then tabbed results. */
 export function ScanDetailPage() {
@@ -120,6 +129,7 @@ export function ScanDetailPage() {
   }
   if (!job.started_at) return <Navigate to={`/audits/${job.id}/setup`} replace />;
 
+  const code = isCode(job);
   const title = <h1 className="break-all font-mono text-[28px] font-medium leading-tight">{job.target_url ?? job.label}</h1>;
 
   // ---- still running -------------------------------------------------------
@@ -127,7 +137,7 @@ export function ScanDetailPage() {
     return (
       <Layout>
         <div className="mb-7 flex flex-col gap-5">
-          <h1 className="text-4xl font-extrabold tracking-tight">Scanning your app</h1>
+          <h1 className="text-4xl font-extrabold tracking-tight">{code ? "Scanning your code" : "Scanning your app"}</h1>
           <ScanSteps current={3} />
         </div>
         <section className="mb-7 flex flex-col gap-4 rounded-2xl border-2 border-ink bg-white p-6 shadow-hard">
@@ -149,12 +159,18 @@ export function ScanDetailPage() {
   const findings = allFindings(job);
   const a11y = job.tier1_result?.a11y_summary?.violations.length ?? 0;
   const cases = job.tier4_result?.test_cases?.length ?? 0;
+  const gaps = job.tier1_result?.qa_gaps;
+  const gapCount = (gaps?.untested_route_count ?? 0) + (gaps?.untested_file_count ?? 0);
+  const languages = Object.keys(job.tier1_result?.languages ?? {});
+  // A code scan has no pages to check for accessibility and writes no automation; it reports missing tests instead.
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: "summary", label: "Summary" },
     { id: "security", label: "Security", count: findings.length },
-    { id: "accessibility", label: "Accessibility", count: a11y },
+    ...(code
+      ? [{ id: "gaps" as const, label: "QA gaps", count: gapCount }]
+      : [{ id: "accessibility" as const, label: "Accessibility", count: a11y }]),
     { id: "cases", label: "Test cases", count: cases },
-    { id: "code", label: "Automation" },
+    ...(code ? [] : [{ id: "code" as const, label: "Automation" }]),
     { id: "downloads", label: "Downloads", count: job.exports.length },
   ];
   const tab = tabs.find((t) => t.id === params.get("tab"))?.id ?? "summary";
@@ -168,7 +184,7 @@ export function ScanDetailPage() {
           <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2 text-sm text-body">
             <StatusPill status={job.status} />
             <span>{sourceName[job.source_type]}</span>
-            {job.source_type === "web" && <span>{job.depth[0].toUpperCase() + job.depth.slice(1)} depth</span>}
+            {(job.source_type === "web" || code) && <span>{job.depth[0].toUpperCase() + job.depth.slice(1)} depth</span>}
             {job.completed_at && <span>Finished {new Date(job.completed_at).toLocaleString()}</span>}
           </div>
         </div>
@@ -208,8 +224,22 @@ export function ScanDetailPage() {
           <dl className="grid overflow-hidden rounded-2xl border-2 border-ink bg-white shadow-hard sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Risk score" value={job.risk_score ?? "None"} note="0 is safest, 100 is worst" bad={(job.risk_score ?? 0) >= 60} />
             <Stat label="Security findings" value={findings.length} note={`${job.critical_count} critical, ${job.high_count} high`} bad={job.critical_count > 0} />
-            <Stat label="Pages mapped" value={job.total_pages_audited} note={`${a11y} accessibility ${a11y === 1 ? "problem" : "problems"}`} />
-            <Stat label="Manual test cases" value={cases} note={job.exports.includes("playwright") || job.exports.includes("appium") ? "plus automation scripts" : "no automation in this scan"} />
+            {code ? (
+              <>
+                <Stat label="Files read" value={job.total_pages_audited} note={languages.slice(0, 3).join(", ") || "No source files"} />
+                <Stat
+                  label="Routes without tests"
+                  value={gaps ? gaps.untested_route_count : "None"}
+                  note={gaps ? `of ${gaps.route_count} found, ${gaps.untested_file_count} files without tests` : "Not measured"}
+                  bad={!!gaps && gaps.route_count > 0 && gaps.untested_route_count / gaps.route_count > 0.5}
+                />
+              </>
+            ) : (
+              <>
+                <Stat label="Pages mapped" value={job.total_pages_audited} note={`${a11y} accessibility ${a11y === 1 ? "problem" : "problems"}`} />
+                <Stat label="Manual test cases" value={cases} note={job.exports.includes("playwright") || job.exports.includes("appium") ? "plus automation scripts" : "no automation in this scan"} />
+              </>
+            )}
           </dl>
 
           {job.executive_summary && (
@@ -246,6 +276,7 @@ export function ScanDetailPage() {
       )}
       {tab === "security" && <SecurityTab job={job} />}
       {tab === "accessibility" && <AccessibilityTab job={job} />}
+      {tab === "gaps" && <QaGapsTab job={job} />}
       {tab === "cases" && <TestCasesTab job={job} />}
       {tab === "code" && <AutomationTab job={job} />}
       {tab === "downloads" && <DownloadsTab job={job} />}
