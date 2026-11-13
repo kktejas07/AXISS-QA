@@ -21,19 +21,20 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_, select
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.secrets import encrypt
 from app.core.security import decode_token
 from app.core.storage import storage_path
 from app.models.audit_job import AuditJob, AuditStatus
 from app.models.user import User
 from app.api.deps import OrgContext, get_org_context
 from app.services.code_auditor import SourceError, parse_repo_url
-from app.services import scan_control
+from app.services import api_spec_auditor, scan_control
 from app.services.orgs import scans_this_month
 
 router = APIRouter(prefix="/audits", tags=["audits"])
@@ -47,7 +48,7 @@ def _launch(job_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 class AuditCreate(BaseModel):
-    source_type: Literal["web", "android", "ios", "code", "repo"] = "web"
+    source_type: Literal["web", "android", "ios", "code", "repo", "api"] = "web"
     target_url: str | None = None
     repo_url: str | None = None     # public GitHub, GitLab or Bitbucket link, for source_type "repo"
     app_name: str | None = None
@@ -56,10 +57,18 @@ class AuditCreate(BaseModel):
     autostart: bool = True
 
 
+class LoginDetails(BaseModel):
+    """The app's own sign-in page and a test account, so pages behind the login are scanned too."""
+    url: str = Field(max_length=2048)
+    username: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=1, max_length=255)
+
+
 class AuditStart(BaseModel):
     outputs: list[str]
     depth: Literal["quick", "standard", "deep"] = "standard"
     ownership_confirmed: bool = False
+    login: LoginDetails | None = None
 
 
 class AuditOut(BaseModel):
@@ -180,6 +189,10 @@ async def create_audit(
     if body.source_type == "web":
         if not _is_web_address(target_url):
             raise HTTPException(422, "Enter a full web address starting with http:// or https://")
+    elif body.source_type == "api":
+        # Optional: where the API runs, to probe it as well as reading its description.
+        if target_url and not _is_web_address(target_url):
+            raise HTTPException(422, "The API's address must start with http:// or https://")
     else:
         target_url = None
     if body.mobile_url and not _is_web_address(body.mobile_url):
@@ -261,6 +274,20 @@ async def upload_build(
         await db.commit()
         await db.refresh(job)
         return job
+    if job.source_type == "api":
+        if ext not in (".json", ".yaml", ".yml"):
+            raise HTTPException(415, "Upload the OpenAPI or Swagger file as .json, .yaml or .yml")
+        try:
+            about = api_spec_auditor.overview(api_spec_auditor.parse(await file.read(api_spec_auditor.MAX_BYTES + 1)))
+        except api_spec_auditor.SpecError as e:
+            raise HTTPException(422, str(e))
+        await file.seek(0)
+        job.source_path = await _save_upload(file, audit_id, ext)
+        job.source_filename = name[:255]
+        job.app_name = job.app_name or about["title"]
+        await db.commit()
+        await db.refresh(job)
+        return job
     if job.source_type == "repo":
         raise HTTPException(415, "This scan reads a repository link, so there is nothing to upload")
     if ext not in (".apk", ".ipa"):
@@ -317,6 +344,16 @@ async def start_audit(
         raise HTTPException(400, "Upload the app build before starting")
     if job.source_type == "code" and not job.source_path:
         raise HTTPException(400, "Upload the source code before starting")
+    if job.source_type == "api" and not job.source_path:
+        raise HTTPException(400, "Upload the API description before starting")
+    login = None
+    if body.login:
+        if job.source_type != "web":
+            raise HTTPException(422, "Sign-in details can only be used when scanning a website")
+        site, page = urlparse(job.target_url or ""), urlparse(body.login.url.strip())
+        if (page.scheme, page.netloc) != (site.scheme, site.netloc):
+            raise HTTPException(422, "The sign-in page must be on the site being scanned, so the password is not sent anywhere else")
+        login = encrypt(json.dumps({"url": body.login.url.strip(), "username": body.login.username, "password": body.login.password}))
     await _check_org_can_scan(db, ctx)
 
     now = datetime.now(timezone.utc)
@@ -324,6 +361,7 @@ async def start_audit(
     job.depth = body.depth
     job.ownership_confirmed_at = now
     job.started_at = now
+    job.login_encrypted = login
     await db.commit()
     await db.refresh(job)
 

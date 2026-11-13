@@ -66,6 +66,7 @@ export function ChooseTestsPage() {
   const [picked, setPicked] = useState<Set<OutputKind>>(new Set());
   const [depth, setDepth] = useState<Depth>("standard");
   const [confirmed, setConfirmed] = useState(false);
+  const [signIn, setSignIn] = useState({ on: false, url: "", username: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -104,14 +105,15 @@ export function ChooseTestsPage() {
       return next;
     });
 
-  const ready = picked.size > 0 && confirmed && !busy;
+  const ready = picked.size > 0 && confirmed && !busy && (!signIn.on || (signIn.url.trim() !== "" && signIn.username !== "" && signIn.password !== ""));
   const code = isCode(job);
 
   const start = async () => {
     setError("");
     setBusy(true);
     try {
-      await startAudit(job.id, { outputs: order.filter((o) => picked.has(o)), depth, ownership_confirmed: confirmed });
+      const login = signIn.on ? { url: signIn.url.trim(), username: signIn.username, password: signIn.password } : undefined;
+      await startAudit(job.id, { outputs: order.filter((o) => picked.has(o)), depth, ownership_confirmed: confirmed, login });
       navigate(`/audits/${job.id}`);
     } catch (err) {
       setError(apiError(err, "The scan could not start. Try again."));
@@ -227,6 +229,36 @@ export function ChooseTestsPage() {
                 ))}
               </div>
               <span className="text-[13.5px] text-body">{depths.find((d) => d.id === depth)?.[code ? "codeNote" : "note"]}</span>
+            </div>
+          )}
+
+          {job.source_type === "web" && (
+            <div className="flex flex-col gap-3 border-t border-line pt-4">
+              <label className="flex items-start gap-3 font-medium">
+                <input type="checkbox" checked={signIn.on} onChange={(e) => setSignIn({ ...signIn, on: e.target.checked })} className="mt-0.5 h-5 w-5 flex-none accent-brand-600" />
+                <span>
+                  Sign in first, to scan the pages behind the login
+                  <span className="block text-[13.5px] font-normal text-body">Use a test account, never a real customer's. The details are stored encrypted and deleted when the scan ends.</span>
+                </span>
+              </label>
+              {signIn.on && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1.5 text-sm font-semibold sm:col-span-2">
+                    Sign-in page
+                    <input type="url" value={signIn.url} onChange={(e) => setSignIn({ ...signIn, url: e.target.value })} placeholder={`${(job.target_url ?? "").replace(/\/$/, "")}/login`}
+                      className="h-12 rounded-[10px] border border-gray-400 bg-white px-3.5 font-mono text-[15px]" />
+                    <span className="text-[13.5px] font-normal text-body">Must be on the site being scanned.</span>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm font-semibold">
+                    Email or username
+                    <input value={signIn.username} onChange={(e) => setSignIn({ ...signIn, username: e.target.value })} autoComplete="off" className="h-12 rounded-[10px] border border-gray-400 bg-white px-3.5 text-[15px]" />
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm font-semibold">
+                    Password
+                    <input type="password" value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} autoComplete="new-password" className="h-12 rounded-[10px] border border-gray-400 bg-white px-3.5 text-[15px]" />
+                  </label>
+                </div>
+              )}
             </div>
           )}
 

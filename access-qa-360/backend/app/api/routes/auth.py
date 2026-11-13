@@ -16,7 +16,9 @@ from app.schemas.auth import (
     Token, LoginRequest, RegisterRequest, UserOut, MeOut, OrgBrief,
     ForgotPasswordRequest, ForgotPasswordOut, ResetPasswordRequest, ChangePasswordRequest,
 )
-from app.services import password_reset, sso
+from app.services import password_reset, sso, totp
+from app.core.secrets import decrypt, encrypt
+from pydantic import BaseModel
 from app.services.mailer import email_configured, send_email
 from app.api.deps import OrgContext, get_org_context
 from app.services.orgs import create_personal_org, member_count, permissions_for
@@ -77,9 +79,78 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This account has been deactivated")
+    if user.organization_id and not user.is_super_admin and user.org_role != "owner":
+        org = await db.get(Organization, user.organization_id)
+        if org and org.require_sso and sso.providers()["google"]:
+            raise HTTPException(status_code=403, detail="Your organisation requires signing in with Google. Use “Continue with Google”.")
+    if user.totp_enabled_at:
+        if not body.code:
+            # The sign-in page shows the code box when it sees this.
+            raise HTTPException(status_code=401, detail="two_step_required")
+        counter = totp.verify(decrypt(user.totp_secret_encrypted or "") or "", body.code, user.totp_last_counter)
+        if counter is None:
+            raise HTTPException(status_code=401, detail="That code is not right. Check your authenticator app and try again.")
+        user.totp_last_counter = counter
     if not user.is_super_admin and _is_bootstrap_admin(user.email):
         user.role = ROLE_SUPER_ADMIN
     return Token(access_token=create_access_token(user.id))
+
+
+# ---- two-step sign-in --------------------------------------------------------
+
+class TwoStepCode(BaseModel):
+    code: str
+
+
+class TwoStepOff(BaseModel):
+    password: str
+    code: str
+
+
+def _person(ctx: OrgContext) -> User:
+    if ctx.via_api_key:
+        raise HTTPException(status_code=403, detail="API keys cannot change sign-in settings")
+    return ctx.user
+
+
+@router.post("/2fa/setup")
+async def two_step_setup(db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Start setting up an authenticator app. Nothing changes until a code from it is confirmed."""
+    user = _person(ctx)
+    if user.totp_enabled_at:
+        raise HTTPException(status_code=409, detail="Two-step sign-in is already on")
+    secret = totp.new_secret()
+    user.totp_secret_encrypted, user.totp_last_counter = encrypt(secret), None
+    await db.flush()
+    return {"secret": secret, "uri": totp.uri(secret, user.email)}
+
+
+@router.post("/2fa/enable")
+async def two_step_enable(body: TwoStepCode, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    user = _person(ctx)
+    secret = decrypt(user.totp_secret_encrypted or "")
+    if user.totp_enabled_at or not secret:
+        raise HTTPException(status_code=400, detail="Start the setup again")
+    counter = totp.verify(secret, body.code, None)
+    if counter is None:
+        raise HTTPException(status_code=400, detail="That code is not right. Check your authenticator app and try again.")
+    user.totp_enabled_at, user.totp_last_counter = datetime.now(timezone.utc), counter
+    await db.flush()
+    return {"enabled": True}
+
+
+@router.post("/2fa/disable")
+async def two_step_disable(body: TwoStepOff, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    user = _person(ctx)
+    if not user.totp_enabled_at:
+        return {"enabled": False}
+    if not verify_password(body.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="The password is not correct")
+    if totp.verify(decrypt(user.totp_secret_encrypted or "") or "", body.code, user.totp_last_counter) is None:
+        raise HTTPException(status_code=400, detail="That code is not right. Check your authenticator app and try again.")
+    user.totp_secret_encrypted = user.totp_enabled_at = user.totp_last_counter = None
+    await db.flush()
+    return {"enabled": False}
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordOut)
@@ -221,4 +292,5 @@ async def me(ctx: OrgContext = Depends(get_org_context)):
         org_role=ctx.role,
         organization=OrgBrief(id=org.id, name=org.name, account_type=org.account_type, status=org.status),
         permissions=permissions_for(ctx.role),
+        two_step_enabled=bool(user.totp_enabled_at),
     )

@@ -17,6 +17,7 @@ export type Permission = "scan.run" | "members.manage" | "org.edit";
 export interface Me extends User {
   organization: { id: string; name: string; account_type: AccountType; status: "active" | "suspended" };
   permissions: Permission[];
+  two_step_enabled: boolean;
 }
 
 export interface Org {
@@ -31,6 +32,8 @@ export interface Org {
   scans_this_month: number;
   my_role: OrgRole;
   permissions: Permission[];
+  require_sso: boolean;
+  sso_available: boolean;
 }
 
 export interface Member {

@@ -23,6 +23,9 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
+  // Shown once the server says this account has two-step sign-in.
+  const [needsCode, setNeedsCode] = useState(false);
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -31,17 +34,26 @@ export function LoginPage() {
     setError("");
     setBusy(true);
     try {
-      const res = await login(email.trim(), password);
+      const res = await login(email.trim(), password, needsCode ? code : undefined);
       clearMe();
       localStorage.setItem("token", res.data.access_token);
       navigate("/");
     } catch (err) {
-      const status = (err as { response?: { status?: number } }).response?.status;
+      const { status, data } = (err as { response?: { status?: number; data?: { detail?: string } } }).response ?? {};
+      if (status === 401 && data?.detail === "two_step_required") {
+        setNeedsCode(true);
+        setBusy(false);
+        return;
+      }
       setError(
         status === 401
-          ? "That email and password do not match an account."
+          ? needsCode && typeof data?.detail === "string" && data.detail.startsWith("That code")
+            ? data.detail
+            : "That email and password do not match an account."
           : status === 403
-            ? "This account has been deactivated. Contact your administrator."
+            ? typeof data?.detail === "string" && data.detail.includes("Google")
+              ? data.detail
+              : "This account has been deactivated. Contact your administrator."
             : "Could not sign in. Check your connection and try again."
       );
       setBusy(false);
@@ -66,8 +78,15 @@ export function LoginPage() {
           </div>
           <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className={authField} />
         </div>
+        {needsCode && (
+          <label className="flex flex-col gap-1.5 text-sm font-semibold">
+            Code from your authenticator app
+            <input value={code} onChange={(e) => setCode(e.target.value)} required autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={7} placeholder="123456" className={`${authField} font-mono tracking-[0.3em]`} />
+            <span className="font-normal text-body">This account has two-step sign-in. Enter the six digits shown for Wiseflow.</span>
+          </label>
+        )}
         <button type="submit" disabled={busy} className={authButton}>
-          {busy ? "Signing in" : "Sign in"}
+          {busy ? "Signing in" : needsCode ? "Confirm and sign in" : "Sign in"}
         </button>
       </form>
       <p className="mt-5 text-center text-sm text-body">

@@ -5,7 +5,7 @@ import { getChanges, getStandards, standardsCsvPath } from "../api/insights";
 import type { Changes, FlatFinding, ScanBrief, Standards } from "../api/insights";
 import type { AuditJob } from "../api/audits";
 import { downloadFromApi } from "../utils/download";
-import { CompareSheets, EmptyPanel, ShieldList } from "./Illustrations";
+import { ApiBraces, CompareSheets, EmptyPanel, ShieldList, SpeedGauge } from "./Illustrations";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { SeverityTag } from "./ScanResults";
 import { card, errorBox } from "./ui";
@@ -178,6 +178,132 @@ export function StandardsTab({ job }: { job: AuditJob }) {
           <FindingList items={data.other} empty="" />
         </section>
       )}
+    </div>
+  );
+}
+
+const seconds = (ms: number | null | undefined) => (ms === null || ms === undefined ? "Not measured" : `${(ms / 1000).toFixed(1)} s`);
+const megabytes = (bytes: number | null | undefined) => (bytes === null || bytes === undefined ? "Not measured" : `${(bytes / 1_000_000).toFixed(1)} MB`);
+// [key, label, how to show it, "needs work" above this]. The limits match the server's.
+const perfColumns: [string, string, (v: number | null | undefined) => string, number][] = [
+  ["lcp_ms", "Largest paint", seconds, 2500],
+  ["fcp_ms", "First paint", seconds, 1800],
+  ["ttfb_ms", "First byte", seconds, 800],
+  ["bytes", "Page weight", megabytes, 1_500_000],
+];
+
+/** How fast each page loaded during the scan. */
+export function PerformanceTab({ job }: { job: AuditJob }) {
+  const perf = job.tier1_result?.performance;
+  if (!perf || perf.pages_measured === 0) {
+    return (
+      <EmptyPanel art={<SpeedGauge />} title="No pages were timed">
+        Load times are measured while the site is crawled. This scan has none, either because it ran before this was added or because no page could be loaded.
+      </EmptyPanel>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="max-w-[72ch] text-body">{perf.note}</p>
+      <dl className="grid gap-4 sm:grid-cols-4">
+        {perfColumns.map(([key, name, show, limit]) => {
+          const value = perf.averages[key];
+          const slow = value !== null && value !== undefined && value > limit;
+          return (
+            <div key={key} className={`${card} p-5`}>
+              <dt className="text-[13.5px] font-semibold text-body">{name}, average</dt>
+              <dd className={`text-2xl font-extrabold ${slow ? "text-red-800" : ""}`}>{show(value)}</dd>
+              <dd className="text-[13px] text-body">{slow ? `Over the recommended ${show(limit)}` : `Within the recommended ${show(limit)}`}</dd>
+            </div>
+          );
+        })}
+      </dl>
+      {perf.findings.length > 0 && (
+        <section className={`${card} overflow-hidden`}>
+          <h2 className="border-b border-line px-5 py-3.5 font-bold">What to fix</h2>
+          <ul className="divide-y divide-line">
+            {perf.findings.map((f, i) => (
+              <li key={i} className="flex flex-col gap-1 px-5 py-3">
+                <span className="flex flex-wrap items-center gap-2.5">
+                  <SeverityTag severity={f.severity} />
+                  <span className="font-semibold">{f.title}</span>
+                </span>
+                <span className="break-all font-mono text-[13px] text-body">{f.affected_url}</span>
+                <span>{f.description} {f.remediation}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section className={`${card} overflow-hidden`}>
+        <h2 className="border-b border-line px-5 py-3.5 font-bold">Every page that was timed</h2>
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-[15px]">
+            <thead className="text-[13.5px] text-body">
+              <tr>
+                <th scope="col" className="px-5 py-2.5 font-semibold">Page</th>
+                {perfColumns.map(([key, name]) => <th key={key} scope="col" className="px-4 py-2.5 font-semibold">{name}</th>)}
+                <th scope="col" className="px-4 py-2.5 font-semibold">Requests</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {perf.pages.map((p) => (
+                <tr key={p.url}>
+                  <td className="max-w-[320px] break-all px-5 py-2.5 font-mono text-[13px]">{p.url.replace(/^https?:\/\/[^/]+/, "") || "/"}</td>
+                  {perfColumns.map(([key, , show, limit]) => {
+                    const value = (p as unknown as Record<string, number | null>)[key];
+                    return <td key={key} className={`px-4 py-2.5 ${value !== null && value > limit ? "font-bold text-red-800" : ""}`}>{show(value)}</td>;
+                  })}
+                  <td className="px-4 py-2.5">{p.requests}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/** API description scans: every endpoint in the file and whether it needs sign-in. */
+export function EndpointsTab({ job }: { job: AuditJob }) {
+  const api = job.tier1_result?.api;
+  if (!api) {
+    return (
+      <EmptyPanel art={<ApiBraces />} title="No endpoints to show">
+        {job.tier1_result?.error ?? "The API description has not been read yet."}
+      </EmptyPanel>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-body">
+        {api.title}{api.version && `, version ${api.version}`} ({api.format}). {api.secured} of {api.operations} endpoints need sign-in. {job.tier3_result?.live}
+      </p>
+      <section className={`${card} overflow-hidden`}>
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-[15px]">
+            <thead className="text-[13.5px] text-body">
+              <tr>
+                <th scope="col" className="px-5 py-2.5 font-semibold">Method</th>
+                <th scope="col" className="px-4 py-2.5 font-semibold">Path</th>
+                <th scope="col" className="px-4 py-2.5 font-semibold">What it does</th>
+                <th scope="col" className="px-4 py-2.5 font-semibold">Sign-in</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {api.endpoints.map((e) => (
+                <tr key={`${e.method} ${e.path}`}>
+                  <td className="px-5 py-2.5 font-mono text-[13px] font-bold">{e.method}</td>
+                  <td className="break-all px-4 py-2.5 font-mono text-[13px]">{e.path}</td>
+                  <td className="px-4 py-2.5">{e.summary || "Not described"}</td>
+                  <td className={`px-4 py-2.5 font-semibold ${e.secured ? "" : "text-orange-800"}`}>{e.secured ? "Required" : "Not required"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

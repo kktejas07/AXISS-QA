@@ -3,7 +3,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Check, Minus, X } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { ChangesTab, StandardsTab } from "../components/ScanInsights";
+import { ChangesTab, EndpointsTab, PerformanceTab, StandardsTab } from "../components/ScanInsights";
 import { ScanSteps } from "../components/ScanSteps";
 import { StatusPill } from "../components/StatusPill";
 import {
@@ -87,7 +87,7 @@ function Stat({ label, value, note, bad }: { label: string; value: string | numb
   );
 }
 
-type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "changes" | "standards" | "performance" | "downloads";
+type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "changes" | "standards" | "performance" | "endpoints" | "downloads";
 
 /** One scan: progress while it runs, then tabbed results. */
 export function ScanDetailPage() {
@@ -184,6 +184,7 @@ export function ScanDetailPage() {
   }
 
   // ---- finished ------------------------------------------------------------
+  const api = job.source_type === "api";
   const findings = allFindings(job);
   const a11y = job.tier1_result?.a11y_summary?.violations.length ?? 0;
   const cases = job.tier4_result?.test_cases?.length ?? 0;
@@ -196,9 +197,12 @@ export function ScanDetailPage() {
     { id: "security", label: "Security", count: findings.length },
     ...(code
       ? [{ id: "gaps" as const, label: "QA gaps", count: gapCount }]
-      : [{ id: "accessibility" as const, label: "Accessibility", count: a11y }]),
+      : api
+        ? [{ id: "endpoints" as const, label: "Endpoints", count: job.tier1_result?.api?.operations ?? 0 }]
+        : [{ id: "accessibility" as const, label: "Accessibility", count: a11y }]),
+    ...(job.source_type === "web" ? [{ id: "performance" as const, label: "Performance", count: job.tier1_result?.performance?.findings.length ?? 0 }] : []),
     { id: "cases", label: "Test cases", count: cases },
-    ...(code ? [] : [{ id: "code" as const, label: "Automation" }]),
+    ...(code || api ? [] : [{ id: "code" as const, label: "Automation" }]),
     { id: "changes", label: "Changes" },
     { id: "standards", label: "Standards" },
     { id: "downloads", label: "Downloads", count: job.exports.length },
@@ -266,11 +270,23 @@ export function ScanDetailPage() {
               </>
             ) : (
               <>
-                <Stat label="Pages mapped" value={job.total_pages_audited} note={`${a11y} accessibility ${a11y === 1 ? "problem" : "problems"}`} />
+                {api ? (
+                  <Stat label="Endpoints read" value={job.total_pages_audited} note={`${job.tier1_result?.api?.secured ?? 0} need sign-in`} />
+                ) : (
+                  <Stat label="Pages mapped" value={job.total_pages_audited} note={`${a11y} accessibility ${a11y === 1 ? "problem" : "problems"}`} />
+                )}
                 <Stat label="Manual test cases" value={cases} note={job.exports.includes("playwright") || job.exports.includes("appium") ? "plus automation scripts" : "no automation in this scan"} />
               </>
             )}
           </dl>
+
+          {job.tier1_result?.sign_in && (
+            <p role="status" className={`rounded-xl border px-5 py-3 ${job.tier1_result.sign_in === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-orange-200 bg-orange-50 text-orange-900"}`}>
+              {job.tier1_result.sign_in === "ok"
+                ? "Wiseflow signed in with the details you gave, so pages behind the login are included."
+                : `Signing in did not work, so only public pages were scanned. ${job.tier1_result.sign_in}.`}
+            </p>
+          )}
 
           {job.executive_summary && (
             <section className="rounded-2xl border border-gray-300 bg-white p-6">
@@ -309,6 +325,8 @@ export function ScanDetailPage() {
       {tab === "gaps" && <QaGapsTab job={job} />}
       {tab === "cases" && <TestCasesTab job={job} />}
       {tab === "code" && <AutomationTab job={job} />}
+      {tab === "performance" && <PerformanceTab job={job} />}
+      {tab === "endpoints" && <EndpointsTab job={job} />}
       {tab === "changes" && <ChangesTab job={job} />}
       {tab === "standards" && <StandardsTab job={job} />}
       {tab === "downloads" && <DownloadsTab job={job} />}

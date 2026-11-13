@@ -1,8 +1,13 @@
 import api from "./client";
 import type { Me, User } from "../types";
 
-export const login = (email: string, password: string) =>
-  api.post<{ access_token: string }>("/auth/login", { email, password });
+/** `code` is the six-digit authenticator code, for accounts with two-step sign-in. */
+export const login = (email: string, password: string, code?: string) =>
+  api.post<{ access_token: string }>("/auth/login", { email, password, ...(code ? { code } : {}) });
+
+export const twoStepSetup = () => api.post<{ secret: string; uri: string }>("/auth/2fa/setup");
+export const twoStepEnable = (code: string) => api.post("/auth/2fa/enable", { code });
+export const twoStepDisable = (password: string, code: string) => api.post("/auth/2fa/disable", { password, code });
 
 /** With an invite token the new account joins that organisation; without one it gets its own. */
 export const register = (email: string, password: string, full_name: string, invite_token?: string) =>

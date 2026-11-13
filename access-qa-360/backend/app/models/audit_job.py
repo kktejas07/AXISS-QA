@@ -31,7 +31,7 @@ class AuditJob(Base):
     organization_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=True, index=True)
 
     # Input params
-    # "web" | "android" | "ios" | "code" (uploaded .zip) | "repo" (Git link). Only web jobs have a target_url.
+    # "web" | "android" | "ios" | "code" (uploaded .zip) | "repo" (Git link) | "api" (uploaded OpenAPI file).
     source_type: Mapped[str] = mapped_column(String(16), default="web", server_default="web", nullable=False)
     target_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     app_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -43,6 +43,8 @@ class AuditJob(Base):
     source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     repo_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)      # branch to scan; the default branch when empty
+    # Sign-in details for scanning behind a login. Encrypted, and wiped as soon as the scan ends.
+    login_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     # What started the scan when it was not a person: {"kind": "schedule", ...} or {"kind": "pull_request", ...}
     trigger: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
@@ -114,6 +116,8 @@ class AuditJob(Base):
     def allowed_outputs(self) -> list[str]:
         if self.source_type in ("android", "ios"):
             return ["security", "manual", "appium"]
+        if self.source_type == "api":
+            return ["security", "manual"]
         if self.is_code:
             # Automation scripts need a running app to be written against, so they are not offered here.
             return ["security", "manual"]

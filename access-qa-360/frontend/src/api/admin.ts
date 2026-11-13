@@ -23,6 +23,9 @@ export const updateAdminOrg = (
 export const getAuditLog = () => api.get<AuditLogEntry[]>("/admin/audit-log");
 
 /** A single-use password reset link for a locked-out user. Shown once; pass it to them yourself. */
+/** For a user who lost their authenticator app. */
+export const resetTwoStep = (userId: string) => api.post<{ email: string }>(`/admin/users/${userId}/reset-two-step`);
+
 export const createResetLink = (userId: string) =>
   api.post<{ url: string; expires_at: string; email: string }>(`/admin/users/${userId}/reset-link`);
 

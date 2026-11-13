@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Code2, GitBranch, Globe, Smartphone, Upload } from "lucide-react";
+import { ArrowRight, Code2, GitBranch, Globe, Smartphone, Upload, Braces } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { ScanSteps } from "../components/ScanSteps";
@@ -9,13 +9,14 @@ import type { SourceType } from "../api/audits";
 import { useCan } from "../hooks/useMe";
 import { apiError } from "../utils/errors";
 
-type Source = "web" | "mobile" | "code" | "repo";
+type Source = "web" | "mobile" | "code" | "repo" | "api";
 
 const sources: { id: Source; label: string; hint: string; icon: LucideIcon; ready: boolean }[] = [
   { id: "web", label: "Web app", hint: "Paste a URL", icon: Globe, ready: true },
   { id: "mobile", label: "Mobile build", hint: "Upload an .apk or .ipa", icon: Smartphone, ready: true },
   { id: "code", label: "Source code", hint: "Upload a .zip", icon: Code2, ready: true },
   { id: "repo", label: "Repository", hint: "GitHub, GitLab or Bitbucket", icon: GitBranch, ready: true },
+  { id: "api", label: "API", hint: "Upload an OpenAPI file", icon: Braces, ready: true },
 ];
 
 const field = "h-[52px] w-full rounded-[10px] border border-gray-400 bg-white px-3.5 text-[15px]";
@@ -23,6 +24,7 @@ const field = "h-[52px] w-full rounded-[10px] border border-gray-400 bg-white px
 // What each upload type accepts, and how the drop area describes it.
 const uploads = {
   mobile: { accept: ".apk,.ipa", test: /\.(apk|ipa)$/i, title: "Drop your build here", kinds: "Android .apk or iOS .ipa", wrong: "Choose an Android .apk or an iOS .ipa file.", missing: "Choose the app build to upload." },
+  api: { accept: ".json,.yaml,.yml", test: /\.(json|ya?ml)$/i, title: "Drop your API description here", kinds: "An OpenAPI or Swagger file: .json, .yaml or .yml", wrong: "Choose an OpenAPI or Swagger file ending in .json, .yaml or .yml.", missing: "Choose the API description to upload." },
   code: { accept: ".zip", test: /\.zip$/i, title: "Drop your code here", kinds: "A .zip of the project folder", wrong: "Choose a .zip file of your source code.", missing: "Choose the .zip of your code to upload." },
 } as const;
 
@@ -32,6 +34,7 @@ export function NewScanPage() {
   const [source, setSource] = useState<Source>("web");
   const [url, setUrl] = useState("");
   const [repo, setRepo] = useState("");
+  const [apiUrl, setApiUrl] = useState("");
   const [appName, setAppName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -53,7 +56,7 @@ export function NewScanPage() {
     );
   }
 
-  const upload = source === "mobile" || source === "code" ? uploads[source] : null;
+  const upload = source === "mobile" || source === "code" || source === "api" ? uploads[source] : null;
 
   const pickFile = (f: File | undefined) => {
     setError("");
@@ -83,8 +86,8 @@ export function NewScanPage() {
         const { data } = await createDraft({ source_type: "repo", repo_url: repo.trim(), app_name: name });
         navigate(`/audits/${data.id}/setup`);
       } else if (file) {
-        const type: SourceType = source === "code" ? "code" : /\.ipa$/i.test(file.name) ? "ios" : "android";
-        const { data } = await createDraft({ source_type: type, app_name: name });
+        const type: SourceType = source === "code" || source === "api" ? source : /\.ipa$/i.test(file.name) ? "ios" : "android";
+        const { data } = await createDraft({ source_type: type, app_name: name, ...(source === "api" && apiUrl.trim() ? { target_url: apiUrl.trim() } : {}) });
         setUploaded(0);
         await uploadBuild(data.id, file, setUploaded);
         navigate(`/audits/${data.id}/setup`);
@@ -105,7 +108,7 @@ export function NewScanPage() {
       </div>
 
       <form onSubmit={submit} className="flex max-w-3xl flex-col gap-6">
-        <div role="group" aria-label="Type of app" className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+        <div role="group" aria-label="Type of app" className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
           {sources.map(({ id, label, hint, icon: Icon, ready }) => {
             const on = source === id;
             return (
@@ -205,6 +208,15 @@ export function NewScanPage() {
                 <span className="text-[13.5px] text-body">
                   The code is read, never run. The upload is deleted as soon as the scan finishes.
                 </span>
+              )}
+              {source === "api" && (
+                <label className="flex flex-col gap-2 font-semibold">
+                  Where the API runs (optional)
+                  <input type="url" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="https://api.example.com" className={`${field} font-mono`} />
+                  <span className="text-[13.5px] font-normal text-body">
+                    Without an address, only the file is read. With one, the running API is also probed for common weaknesses.
+                  </span>
+                </label>
               )}
               {uploaded !== null && (
                 <div role="progressbar" aria-valuenow={uploaded} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress" className="h-2 overflow-hidden rounded-full bg-line">
