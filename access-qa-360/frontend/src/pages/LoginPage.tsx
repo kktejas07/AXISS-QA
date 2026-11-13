@@ -5,7 +5,7 @@ import { AuthAlert, AuthCard, authButton, authField } from "../components/AuthCa
 import { SsoButtons } from "../components/SsoButtons";
 import { clearMe } from "../hooks/useMe";
 
-// Why a Google or Microsoft sign-in did not finish, in plain words.
+// Why a Google sign-in did not finish, in plain words.
 const ssoErrors: Record<string, string> = {
   cancelled: "The sign-in was cancelled. Try again when you are ready.",
   expired: "That sign-in took too long or was started in another browser. Try again.",

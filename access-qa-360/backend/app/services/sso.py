@@ -1,12 +1,11 @@
 """
-Sign in with Google or Microsoft (OpenID Connect, authorization code flow).
+Sign in with Google (OpenID Connect, authorization code flow).
 
 The provider confirms who the person is; Wiseflow then signs in the account
 with that email address, creating it on first use.
 """
 from __future__ import annotations
 
-import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -25,33 +24,16 @@ class SsoError(Exception):
         self.code = code
 
 
-_TENANT = re.compile(r"^[0-9a-fA-F-]{36}$|^[a-z0-9-]+\.onmicrosoft\.com$")
-
-
-def _microsoft_ready() -> bool:
-    # A named tenant is required: with the shared "common" endpoint, the email a
-    # Microsoft account reports is not proof that the person owns that address.
-    return bool(settings.MICROSOFT_CLIENT_ID and settings.MICROSOFT_CLIENT_SECRET and _TENANT.match(settings.MICROSOFT_TENANT_ID or ""))
-
-
 def providers() -> dict[str, bool]:
-    return {"google": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET), "microsoft": _microsoft_ready()}
+    return {"google": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)}
 
 
 def _config(provider: str) -> dict:
-    if provider == "google":
-        return {
-            "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
-            "token": "https://oauth2.googleapis.com/token",
-            "userinfo": "https://openidconnect.googleapis.com/v1/userinfo",
-            "client_id": settings.GOOGLE_CLIENT_ID, "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        }
-    tenant = settings.MICROSOFT_TENANT_ID
     return {
-        "authorize": f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
-        "token": f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
-        "userinfo": "https://graph.microsoft.com/oidc/userinfo",
-        "client_id": settings.MICROSOFT_CLIENT_ID, "client_secret": settings.MICROSOFT_CLIENT_SECRET,
+        "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token": "https://oauth2.googleapis.com/token",
+        "userinfo": "https://openidconnect.googleapis.com/v1/userinfo",
+        "client_id": settings.GOOGLE_CLIENT_ID, "client_secret": settings.GOOGLE_CLIENT_SECRET,
     }
 
 
@@ -117,7 +99,7 @@ async def identity(provider: str, code: str) -> tuple[str, str]:
     email = str(data.get("email") or "").strip().lower()
     if not email or "@" not in email:
         raise SsoError("no_email")
-    if provider == "google" and data.get("email_verified") not in (True, "true"):
+    if data.get("email_verified") not in (True, "true"):
         raise SsoError("unverified")
     name = str(data.get("name") or "").strip() or email.split("@")[0]
     return email, name[:255]
