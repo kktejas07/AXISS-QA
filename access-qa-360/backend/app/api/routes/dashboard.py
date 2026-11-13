@@ -120,6 +120,10 @@ async def dashboard_summary(db: AsyncSession = Depends(get_db), ctx: OrgContext 
         test_cases["manual"] = test_cases.get("manual", 0) + int(audit_tests)
 
     audits = (await db.execute(select(AuditJob).where(*my_audits).order_by(AuditJob.created_at.desc()).limit(5))).scalars().all()
+    # Code scans report routes that no test refers to; count those as QA gaps.
+    gap_rows = await db.execute(select(AuditJob.tier1_result).where(*my_audits, AuditJob.source_type.in_(("code", "repo"))))
+    qa_gaps += sum(int(((t1 or {}).get("qa_gaps") or {}).get("untested_route_count", 0)) for (t1,) in gap_rows.all())
+
     for a in audits:
         found = list((a.tier3_result or {}).get("findings", [])) + [
             {**flag, "affected_url": a.label} for flag in (a.tier2_result or {}).get("security_flags", [])

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # Where uploaded builds and generated reports are kept. Mount a volume here in production.
     STORAGE_DIR: str = "storage"
     MAX_UPLOAD_MB: int = 300
+    # Largest amount of source code, once unpacked, that one code scan will read.
+    CODE_SCAN_MAX_MB: int = 500
 
     class Config:
         env_file = ".env"

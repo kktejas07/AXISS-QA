@@ -5,7 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ScanSteps } from "../components/ScanSteps";
-import { getAudit, startAudit } from "../api/audits";
+import { getAudit, isCode, sourceName, startAudit } from "../api/audits";
 import type { AuditJob, Depth, OutputKind } from "../api/audits";
 import { apiError } from "../utils/errors";
 
@@ -42,13 +42,20 @@ const outputInfo: Record<OutputKind, { label: string; desc: string; get: string;
 
 const order: OutputKind[] = ["security", "manual", "playwright", "appium"];
 
-const depths: { id: Depth; label: string; note: string }[] = [
-  { id: "quick", label: "Quick", note: "Up to 10 pages, one level of links. Fastest." },
-  { id: "standard", label: "Standard", note: "Up to 40 pages, three levels of links." },
-  { id: "deep", label: "Deep", note: "Up to 80 pages, four levels of links. Takes longest." },
+const depths: { id: Depth; label: string; note: string; codeNote: string }[] = [
+  { id: "quick", label: "Quick", note: "Up to 10 pages, one level of links. Fastest.", codeNote: "Up to 800 files and 150 dependencies. Fastest." },
+  { id: "standard", label: "Standard", note: "Up to 40 pages, three levels of links.", codeNote: "Up to 4,000 files and 600 dependencies." },
+  { id: "deep", label: "Deep", note: "Up to 80 pages, four levels of links. Takes longest.", codeNote: "Up to 12,000 files and 1,500 dependencies." },
 ];
 
-const sourceName = { web: "Web app", android: "Android build", ios: "iOS build" } as const;
+// Source code scans read the code instead of visiting the app, so two outputs mean something different.
+const codeInfo: Partial<Record<OutputKind, { desc: string; why?: string }>> = {
+  security: { desc: "Leaked secrets, risky code and dependencies with known vulnerabilities, each with its file and line." },
+  manual: { desc: "Test cases for the routes found in the code, untested routes first." },
+  playwright: { desc: "", why: "Needs a running web address" },
+  appium: { desc: "", why: "Needs an .apk or .ipa upload" },
+};
+
 
 /** Step 2 of a scan: choose the outputs, confirm permission and start. */
 export function ChooseTestsPage() {
@@ -98,6 +105,7 @@ export function ChooseTestsPage() {
     });
 
   const ready = picked.size > 0 && confirmed && !busy;
+  const code = isCode(job);
 
   const start = async () => {
     setError("");
@@ -121,7 +129,7 @@ export function ChooseTestsPage() {
       <section aria-label="App to test" className="mb-7 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 rounded-2xl border-2 border-ink bg-white px-6 py-5 shadow-hard">
         <div className="min-w-0">
           <div className="text-[13.5px] font-semibold text-body">You are testing</div>
-          <div className="break-all font-mono text-[17px] font-medium">{job.target_url ?? job.source_filename ?? job.label}</div>
+          <div className="break-all font-mono text-[17px] font-medium">{job.target_url ?? job.repo_url ?? job.source_filename ?? job.label}</div>
         </div>
         <dl className="flex flex-wrap gap-x-9 gap-y-2">
           <div>
@@ -142,7 +150,11 @@ export function ChooseTestsPage() {
           <h2 className="text-lg font-bold">Outputs</h2>
           <div role="group" aria-label="Outputs" className="grid gap-3.5 sm:grid-cols-2">
             {order.map((kind) => {
-              const { label, desc, get, icon: Icon, why } = outputInfo[kind];
+              const base = outputInfo[kind];
+              const over = code ? codeInfo[kind] : undefined;
+              const { label, get, icon: Icon } = base;
+              const desc = over?.desc || base.desc;
+              const why = over?.why ?? base.why;
               const allowed = job.allowed_outputs.includes(kind);
               const on = allowed && picked.has(kind);
               return (
@@ -198,7 +210,7 @@ export function ChooseTestsPage() {
             )}
           </div>
 
-          {job.source_type === "web" && (
+          {(job.source_type === "web" || code) && (
             <div className="flex flex-col gap-2.5 border-t border-line pt-4">
               <span className="text-[13.5px] font-semibold text-body">Depth</span>
               <div role="group" aria-label="Depth" className="flex gap-1.5 rounded-xl border border-line bg-soft p-1">
@@ -214,7 +226,7 @@ export function ChooseTestsPage() {
                   </button>
                 ))}
               </div>
-              <span className="text-[13.5px] text-body">{depths.find((d) => d.id === depth)?.note}</span>
+              <span className="text-[13.5px] text-body">{depths.find((d) => d.id === depth)?.[code ? "codeNote" : "note"]}</span>
             </div>
           )}
 
@@ -225,7 +237,7 @@ export function ChooseTestsPage() {
               onChange={(e) => setConfirmed(e.target.checked)}
               className="mt-0.5 h-5 w-5 flex-none accent-brand-600"
             />
-            I own this app or have written permission to test it.
+            {code ? "I own this code or have written permission to review it." : "I own this app or have written permission to test it."}
           </label>
 
           {error && (

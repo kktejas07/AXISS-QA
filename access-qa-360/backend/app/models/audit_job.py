@@ -31,7 +31,7 @@ class AuditJob(Base):
     organization_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=True, index=True)
 
     # Input params
-    # "web" | "android" | "ios". Mobile jobs have no target_url.
+    # "web" | "android" | "ios" | "code" (uploaded .zip) | "repo" (Git link). Only web jobs have a target_url.
     source_type: Mapped[str] = mapped_column(String(16), default="web", server_default="web", nullable=False)
     target_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     app_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -39,6 +39,9 @@ class AuditJob(Base):
     apk_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     ipa_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Source code scans: the uploaded archive (deleted once scanned) or the repository link.
+    source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     # What the user asked for: any of "security", "manual", "playwright", "appium"
     outputs: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -84,7 +87,12 @@ class AuditJob(Base):
 
     @property
     def label(self) -> str:
-        return self.app_name or self.source_filename or self.target_url or "Untitled app"
+        repo = "/".join(self.repo_url.removesuffix(".git").split("/")[3:]) if self.repo_url else None
+        return self.app_name or self.source_filename or repo or self.target_url or "Untitled app"
+
+    @property
+    def is_code(self) -> bool:
+        return self.source_type in ("code", "repo")
 
     @property
     def has_mobile_input(self) -> bool:
@@ -94,6 +102,9 @@ class AuditJob(Base):
     def allowed_outputs(self) -> list[str]:
         if self.source_type in ("android", "ios"):
             return ["security", "manual", "appium"]
+        if self.is_code:
+            # Automation scripts need a running app to be written against, so they are not offered here.
+            return ["security", "manual"]
         return ["security", "manual", "playwright"] + (["appium"] if self.has_mobile_input else [])
 
     @property
