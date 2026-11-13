@@ -1,3 +1,4 @@
+import { RadarWindow } from "../components/Illustrations";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
@@ -87,6 +88,7 @@ export function Dashboard() {
 
       {data.scans === 0 ? (
         <section className="rounded-2xl border border-gray-300 bg-white px-6 py-12 text-center">
+          <RadarWindow className="mx-auto mb-4 h-36 w-auto" />
           <h2 className="text-xl font-bold">No scans yet</h2>
           <p className="mx-auto mt-2 max-w-md text-body">
             Paste a web address or upload a mobile build to audit it and get test cases and scripts for it.

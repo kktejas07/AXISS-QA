@@ -1,3 +1,4 @@
+import { FolderStack } from "../components/Illustrations";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
@@ -39,7 +40,10 @@ export function ProjectsListPage() {
       ) : !projects ? (
         <LoadingSpinner />
       ) : projects.length === 0 ? (
-        <p className={emptyState}>No projects yet. Create one to start generating Playwright test suites from plain descriptions.</p>
+        <div className={emptyState}>
+          <FolderStack className="mx-auto mb-4 h-36 w-auto" />
+          <p>No projects yet. Create one to start generating Playwright test suites from plain descriptions.</p>
+        </div>
       ) : (
         <ul className={`${card} overflow-hidden`}>
           {projects.map((p, i) => (

@@ -187,6 +187,21 @@ export function ApiBraces({ className }: Props) {
   );
 }
 
+/** A stack of folders with a spark: projects. */
+export function FolderStack({ className }: Props) {
+  return (
+    <Frame className={className}>
+      <path d="M46 62h52l12 14h84a10 10 0 0 1 10 10v62a10 10 0 0 1-10 10H46a10 10 0 0 1-10-10V72a10 10 0 0 1 10-10z" fill={DEEP} transform="translate(8 8)" />
+      <path d="M46 46h52l12 14h84a10 10 0 0 1 10 10v8H36V56a10 10 0 0 1 10-10z" fill={LIGHT} {...line} />
+      <path d="M36 78h168v70a10 10 0 0 1-10 10H46a10 10 0 0 1-10-10z" fill="#fff" {...line} />
+      <rect x="54" y="98" width="72" height="9" rx="4.5" fill={MID} />
+      <rect x="54" y="116" width="104" height="9" rx="4.5" fill={PALE} />
+      <rect x="54" y="134" width="56" height="9" rx="4.5" fill={PALE} />
+      <path d="M178 20l5 13 13 5-13 5-5 13-5-13-13-5 13-5z" fill={MAIN} {...line} strokeWidth="2.5" />
+    </Frame>
+  );
+}
+
 /** A small panel that pairs an illustration with a heading, a sentence and an action: used for empty screens. */
 export function EmptyPanel({ art, title, children, action }: { art: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
