@@ -12,10 +12,20 @@ import { QAGapsPage } from "./pages/QAGapsPage";
 import { TestCasesPage } from "./pages/TestCasesPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { AuditPage } from "./pages/AuditPage";
+import { AdminPage } from "./pages/AdminPage";
+import { LoadingSpinner } from "./components/LoadingSpinner";
+import { useMe } from "./hooks/useMe";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("token");
   return token ? children : <Navigate to="/login" replace />;
+}
+
+/** Only super admins get in; everyone else goes back to their own overview. The API enforces this too. */
+function RequireSuperAdmin({ children }: { children: JSX.Element }) {
+  const me = useMe();
+  if (!me) return <LoadingSpinner />;
+  return me.role === "super_admin" ? children : <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -34,6 +44,7 @@ export default function App() {
         <Route path="/scans/:id/gaps" element={<RequireAuth><QAGapsPage /></RequireAuth>} />
         <Route path="/scans/:id/test-cases" element={<RequireAuth><TestCasesPage /></RequireAuth>} />
         <Route path="/scans/:id/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
+        <Route path="/admin" element={<RequireAuth><RequireSuperAdmin><AdminPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/audits" element={<RequireAuth><AuditPage /></RequireAuth>} />
         <Route path="/audits/new" element={<RequireAuth><AuditPage /></RequireAuth>} />
         <Route path="/audits/:auditId" element={<RequireAuth><AuditPage /></RequireAuth>} />

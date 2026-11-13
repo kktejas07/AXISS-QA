@@ -3,6 +3,56 @@ export interface User {
   email: string;
   full_name: string;
   is_active: boolean;
+  role: UserRole;
+}
+
+export type UserRole = "user" | "super_admin";
+
+export interface DashboardSummary {
+  projects: number;
+  scans: number;
+  open_vulnerabilities: Record<Severity, number>;
+  qa_gaps: number;
+  test_cases: Record<string, number>;
+  recent_scans: {
+    id: string;
+    url: string;
+    status: ScanStatus;
+    progress: number;
+    created_at: string;
+    critical: number;
+    high: number;
+    total: number;
+  }[];
+  top_findings: { id: string; scan_id: string; severity: Severity; title: string; affected_url: string }[];
+}
+
+export interface AdminOverview {
+  users_total: number;
+  users_active: number;
+  super_admins: number;
+  projects_total: number;
+  scans_total: number;
+  scans_today: number;
+  scans_running: number;
+  scans_queued: number;
+  scans_failed_today: number;
+  open_vulnerabilities: Record<Severity, number>;
+}
+
+export interface AdminUser extends User {
+  created_at: string;
+  project_count: number;
+  scan_count: number;
+}
+
+export interface AdminScan {
+  id: string;
+  url: string;
+  status: ScanStatus;
+  progress: number;
+  created_at: string;
+  owner_email: string;
 }
 
 export interface Project {

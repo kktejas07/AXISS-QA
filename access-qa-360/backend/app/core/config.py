@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET: str = "wiseflow-screenshots"
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    # Comma-separated emails that are made super admin when they register or sign in.
+    SUPER_ADMIN_EMAILS: str = ""
 
     class Config:
         env_file = ".env"

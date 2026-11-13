@@ -1,166 +1,194 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { Layout } from "../components/Layout";
-import { getProjects } from "../api/projects";
-import { getScans } from "../api/scans";
-import type { Project, Scan } from "../types";
-import { FolderOpen, Plus, Radar, Shield, BarChart3, TestTubeDiagonal } from "lucide-react";
+import { LoadingSpinner } from "../components/LoadingSpinner";
+import { SeverityBadge } from "../components/SeverityBadge";
+import { getDashboardSummary } from "../api/dashboard";
+import type { DashboardSummary, ScanStatus } from "../types";
+
+const statusLabel: Record<ScanStatus, string> = {
+  queued: "Queued",
+  crawling: "Crawling",
+  scanning: "Scanning",
+  analyzing: "Analysing",
+  completed: "Completed",
+  failed: "Failed",
+};
+
+export function scanStatusClass(status: ScanStatus): string {
+  if (status === "completed") return "bg-emerald-100 text-emerald-800";
+  if (status === "failed") return "bg-red-100 text-red-800";
+  if (status === "queued") return "bg-gray-100 text-gray-700";
+  return "bg-brand-50 text-brand-700";
+}
+
+export function ScanStatusPill({ status, progress }: { status: ScanStatus; progress: number }) {
+  const running = status === "crawling" || status === "scanning" || status === "analyzing";
+  return (
+    <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-bold ${scanStatusClass(status)}`}>
+      {statusLabel[status] ?? status}
+      {running ? `, ${progress}%` : ""}
+    </span>
+  );
+}
+
+function Stat({ label, value, note, tone }: { label: string; value: string | number; note: string; tone?: "bad" }) {
+  return (
+    <div className="flex flex-col gap-1 px-6 py-5 border-b border-line last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+      <dt className="text-sm font-semibold text-body">{label}</dt>
+      <dd className={`text-[40px] leading-tight font-extrabold ${tone === "bad" ? "text-red-700" : ""}`}>{value}</dd>
+      <span className="text-[13.5px] text-body">{note}</span>
+    </div>
+  );
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [scans, setScans] = useState<Scan[]>([]);
+  const [data, setData] = useState<DashboardSummary | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    getProjects().then((r) => setProjects(r.data)).catch(() => {});
-    getScans().then((r) => setScans(r.data)).catch(() => {});
+    getDashboardSummary()
+      .then((r) => setData(r.data))
+      .catch(() => setFailed(true));
   }, []);
 
-  const totalVulns = scans.reduce((sum, s) => {
-    const vc = s.vulnerability_count;
-    return sum + (vc ? vc.critical + vc.high + vc.medium + vc.low + vc.informational : 0);
-  }, 0);
-  const avgCoverage = scans.length > 0
-    ? Math.round(scans.reduce((sum, s) => sum + (s.coverage_percent || 0), 0) / scans.length)
-    : 0;
-  const recentScans = scans.slice(0, 5);
+  const header = (
+    <div className="flex flex-wrap items-center justify-between gap-4 mb-7">
+      <h1 className="text-4xl font-extrabold tracking-tight">Overview</h1>
+      <Link
+        to="/scans/new"
+        className="flex items-center gap-2 h-[52px] px-5 rounded-[10px] bg-brand-600 hover:bg-brand-700 text-white font-bold"
+      >
+        <Plus className="w-[18px] h-[18px]" strokeWidth={2.4} aria-hidden="true" /> New scan
+      </Link>
+    </div>
+  );
+
+  if (failed) {
+    return (
+      <Layout>
+        {header}
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-800">
+          Your overview could not be loaded. Check that the API is running, then reload the page.
+        </p>
+      </Layout>
+    );
+  }
+  if (!data) {
+    return (
+      <Layout>
+        {header}
+        <LoadingSpinner />
+      </Layout>
+    );
+  }
+
+  const v = data.open_vulnerabilities;
+  const testTotal = Object.values(data.test_cases).reduce((a, b) => a + b, 0);
+  const testTypes = Object.entries(data.test_cases).sort((a, b) => b[1] - a[1]);
 
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-brand-900">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Your QA & Security intelligence at a glance</p>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            to="/projects/new"
-            className="flex items-center gap-2 bg-white border border-gray-200 hover:border-indigo-300 text-brand-900 text-sm font-semibold px-4 py-2 rounded-lg transition"
-          >
-            <Plus className="w-4 h-4" /> New Project
+      {header}
+
+      <dl className="mb-7 grid overflow-hidden rounded-2xl border-2 border-ink bg-white shadow-hard sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          label="Critical findings open"
+          value={v.critical}
+          note={`${v.high} high, ${v.medium} medium`}
+          tone={v.critical > 0 ? "bad" : undefined}
+        />
+        <Stat label="QA gaps" value={data.qa_gaps} note="Routes and flows without enough tests" />
+        <Stat label="Tests generated" value={testTotal} note={`${data.test_cases.manual ?? 0} manual, ${testTotal - (data.test_cases.manual ?? 0)} automated`} />
+        <Stat label="Scans" value={data.scans} note={`across ${plural(data.projects, "project")}`} />
+      </dl>
+
+      {data.scans === 0 ? (
+        <section className="rounded-2xl border border-gray-300 bg-white px-6 py-12 text-center">
+          <h2 className="text-xl font-bold">No scans yet</h2>
+          <p className="mx-auto mt-2 max-w-md text-body">
+            Paste a URL to audit an app for vulnerabilities and get test cases and scripts for it.
+          </p>
+          <Link to="/scans/new" className="mt-5 inline-flex h-12 items-center rounded-[10px] bg-ink px-5 font-bold text-white">
+            Start your first scan
           </Link>
-          <Link
-            to="/scans/new"
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-          >
-            <Radar className="w-4 h-4" /> New Scan
-          </Link>
-        </div>
-      </div>
+        </section>
+      ) : (
+        <div className="flex flex-wrap items-start gap-7">
+          <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-7">
+            <section className="overflow-hidden rounded-2xl border border-gray-300 bg-white">
+              <h2 className="px-5 py-4 text-lg font-bold">Recent scans</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] border-collapse text-left">
+                  <thead>
+                    <tr className="bg-soft text-[13.5px] text-body">
+                      <th scope="col" className="px-5 py-2.5 font-semibold">App</th>
+                      <th scope="col" className="px-3 py-2.5 font-semibold">Status</th>
+                      <th scope="col" className="px-5 py-2.5 font-semibold">Open findings</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recent_scans.map((s) => (
+                      <tr key={s.id} className="border-t border-line">
+                        <td className="px-5 py-3.5">
+                          <Link to={`/scans/${s.id}`} className="font-mono text-sm text-brand-600 hover:text-brand-700 break-all">
+                            {s.url}
+                          </Link>
+                          <div className="text-[13.5px] text-body">{new Date(s.created_at).toLocaleString()}</div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <ScanStatusPill status={s.status} progress={s.progress} />
+                        </td>
+                        <td className="px-5 py-3.5 font-semibold whitespace-nowrap">
+                          {s.total === 0 ? "None" : `${s.critical} critical, ${s.high} high, ${s.total} in all`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <Radar className="w-5 h-5 text-indigo-500" />
-            <span className="text-xs text-gray-500 font-medium">Total Scans</span>
+            <section className="overflow-hidden rounded-2xl border border-gray-300 bg-white">
+              <h2 className="px-5 py-4 text-lg font-bold">Fix these first</h2>
+              {data.top_findings.length === 0 ? (
+                <p className="border-t border-line px-5 py-4 text-body">No open critical or high findings.</p>
+              ) : (
+                <ul>
+                  {data.top_findings.map((f) => (
+                    <li key={f.id} className="flex flex-wrap items-center gap-x-3.5 gap-y-2 border-t border-line px-5 py-3.5">
+                      <SeverityBadge severity={f.severity} />
+                      <Link to={`/scans/${f.scan_id}/vulnerabilities`} className="min-w-0 flex-[1_1_240px] font-semibold hover:text-brand-600">
+                        {f.title}
+                      </Link>
+                      <span className="font-mono text-[13px] text-body break-all">{f.affected_url}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
-          <p className="text-3xl font-bold text-brand-900">{scans.length}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <Shield className="w-5 h-5 text-red-500" />
-            <span className="text-xs text-gray-500 font-medium">Open Vulnerabilities</span>
-          </div>
-          <p className="text-3xl font-bold text-brand-900">{totalVulns}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <BarChart3 className="w-5 h-5 text-emerald-500" />
-            <span className="text-xs text-gray-500 font-medium">Avg QA Coverage</span>
-          </div>
-          <p className="text-3xl font-bold text-brand-900">{avgCoverage}%</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <FolderOpen className="w-5 h-5 text-yellow-500" />
-            <span className="text-xs text-gray-500 font-medium">Active Projects</span>
-          </div>
-          <p className="text-3xl font-bold text-brand-900">{projects.length}</p>
-        </div>
-      </div>
 
-      {/* Recent Scans */}
-      <div className="bg-white border border-gray-200 rounded-xl mb-8">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-brand-900">Recent Scans</h2>
-          <Link to="/scans/new" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</Link>
+          <section className="flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-2xl border border-gray-300 bg-white p-5">
+            <h2 className="text-lg font-bold">Tests by type</h2>
+            {testTypes.length === 0 ? (
+              <p className="text-body">No tests generated yet. Open a completed scan and choose Generate tests.</p>
+            ) : (
+              <dl>
+                {testTypes.map(([type, count]) => (
+                  <div key={type} className="flex justify-between gap-2 border-b border-line py-2 last:border-b-0">
+                    <dt className="text-body capitalize">{type.replace(/_/g, " ")}</dt>
+                    <dd className="font-bold">{count}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </section>
         </div>
-        {recentScans.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <Radar className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">No scans yet</p>
-            <p className="text-sm mt-1">Start your first scan to detect vulnerabilities and QA gaps</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {recentScans.map((s) => {
-              const vc = s.vulnerability_count;
-              const total = vc ? vc.critical + vc.high + vc.medium + vc.low + vc.informational : 0;
-              return (
-                <Link key={s.id} to={`/scans/${s.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
-                    s.risk_grade === "A" ? "bg-emerald-100 text-emerald-700" :
-                    s.risk_grade === "B" ? "bg-blue-100 text-blue-700" :
-                    s.risk_grade === "C" ? "bg-yellow-100 text-yellow-700" :
-                    s.risk_grade === "D" ? "bg-orange-100 text-orange-700" :
-                    "bg-red-100 text-red-700"
-                  }`}>
-                    {s.risk_grade || "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-brand-900 truncate font-mono">{s.url}</p>
-                    <p className="text-xs text-gray-500">{new Date(s.created_at).toLocaleString()}</p>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span>{total} vulns</span>
-                    <span>{s.coverage_percent}% covered</span>
-                    <span>{s.test_cases_generated} tests</span>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    s.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                    s.status === "failed" ? "bg-red-100 text-red-700" :
-                    "bg-indigo-100 text-indigo-700 animate-pulse"
-                  }`}>
-                    {s.status.toUpperCase()}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Projects Grid */}
-      <div className="mb-4">
-        <h2 className="font-semibold text-brand-900 mb-4">Projects</h2>
-        {projects.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 bg-white border border-gray-200 rounded-xl">
-            <FolderOpen className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">No projects yet</p>
-            <p className="text-sm mt-1">Create your first project to start generating tests</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((p) => (
-              <Link
-                key={p.id}
-                to={`/projects/${p.id}/suites`}
-                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-indigo-300 hover:shadow-sm transition group"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <TestTubeDiagonal className="w-5 h-5 text-indigo-500" />
-                  <span className="text-xs font-mono text-gray-400">
-                    {new Date(p.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-brand-900 group-hover:text-indigo-600 transition">{p.name}</h3>
-                <p className="text-xs text-gray-500 mt-1 truncate">{p.base_url}</p>
-                {p.description && <p className="text-sm text-gray-600 mt-2 line-clamp-2">{p.description}</p>}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </Layout>
   );
 }

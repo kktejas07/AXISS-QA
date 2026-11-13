@@ -5,6 +5,9 @@ from sqlalchemy.sql import func
 from app.core.database import Base
 import uuid
 
+ROLE_USER = "user"
+ROLE_SUPER_ADMIN = "super_admin"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -14,6 +17,12 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # "user" or "super_admin". Super admins see every organisation's data in /admin.
+    role: Mapped[str] = mapped_column(String(20), default="user", server_default="user", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     projects: Mapped[list["Project"]] = relationship("Project", back_populates="owner", lazy="select")
+
+    @property
+    def is_super_admin(self) -> bool:
+        return self.role == ROLE_SUPER_ADMIN
