@@ -95,4 +95,6 @@ use a different character. Without this step Wise shows a drawn owl and works th
 
 The web app's build writes the landing page's full HTML into `index.html`, with the structured data search engines read, and generates `sitemap.xml`, `robots.txt` and `llms.txt`. All of them carry the site's public address, which comes from the `SITE_URL` build argument of the `web` image (default `https://qa.vatax360.com`). Change it if the domain changes, then rebuild.
 
-After the first deploy on a domain, add the site to Google Search Console and Bing Webmaster Tools and submit `/sitemap.xml`. That step needs your own accounts.
+After the first deploy on a domain, add the site to Google Search Console and Bing Webmaster Tools. Each gives you a code to prove the site is yours ("HTML tag" method): set it as the `GOOGLE_SITE_VERIFICATION` or `BING_SITE_VERIFICATION` build argument of the `web` image and rebuild, then press Verify and submit `/sitemap.xml`.
+
+The public guides live in `frontend/src/content/guides.ts`. Adding an entry there adds the page, its place in the sitemap and in `llms.txt`.

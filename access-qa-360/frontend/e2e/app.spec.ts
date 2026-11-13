@@ -154,6 +154,39 @@ test.describe("platform keys, profile and help", () => {
   });
 });
 
+test.describe("guides", () => {
+  test("each guide is a real page that can be read without scripts, and is reachable from the home page", async ({ page }) => {
+    const source = await (await page.request.get("/guides/what-is-an-sbom/")).text();
+    expect(source).toContain("<title>What a software bill of materials (SBOM) is, and when you need one: Wiseflow</title>");
+    expect(source).toContain("It is the software equivalent of an ingredients label.");
+    const blocks = [...source.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map((m) => JSON.parse(m[1]));
+    expect(blocks.map((b) => b["@type"])).toEqual(["Article", "BreadcrumbList"]);
+    expect(blocks[0].mainEntityOfPage).toBe("http://localhost:5183/guides/what-is-an-sbom");
+    const map = await (await page.request.get("/sitemap.xml")).text();
+    expect(map).toContain("<loc>http://localhost:5183/guides/test-a-chatbot-for-prompt-injection</loc>");
+
+    await page.goto("/");
+    await page.getByRole("banner").getByRole("link", { name: "Guides" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Guides" })).toBeVisible();
+    await expect(page.getByRole("listitem").filter({ has: page.getByRole("heading", { level: 2 }) })).toHaveCount(5);
+    await page.getByRole("link", { name: /How to test a chatbot for prompt injection/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "How to test a chatbot for prompt injection" })).toBeVisible();
+    await expect(page).toHaveTitle("How to test a chatbot for prompt injection: Wiseflow");
+    expect(await page.locator('link[rel="canonical"]').getAttribute("href")).toBe("http://localhost:5183/guides/test-a-chatbot-for-prompt-injection");
+    expect(await page.locator('meta[name="robots"]').getAttribute("content")).toBe("index, follow");
+    await page.getByRole("link", { name: "Start free" }).last().click();
+    await expect(page).toHaveURL(/\/register$/);
+
+    // Opened directly, a guide shows its own content at once and nothing from the home page.
+    await page.goto("/guides/owasp-top-10-in-plain-words");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("The OWASP Top 10 in plain words");
+    await expect(page.getByText("A10 Server-side request forgery", { exact: false })).toBeVisible();
+    await page.goto("/guides/no-such-guide");
+    await expect(page.getByRole("heading", { name: "That guide does not exist" })).toBeVisible();
+    expect(await page.locator('meta[name="robots"]').getAttribute("content")).toBe("noindex, nofollow");
+  });
+});
+
 test.describe("signed out", () => {
   test("pricing shows the free plan's two scans, and sign-in offers no Microsoft button", async ({ page }) => {
     await page.goto("/pricing");
@@ -459,6 +492,14 @@ test.describe("on a phone", () => {
       expect(await scrollsSideways(page)).toBe(false);
     });
   }
+
+  test("the guides fit the screen without scrolling sideways", async ({ page }) => {
+    for (const path of ["/guides", "/guides/owasp-top-10-in-plain-words"]) {
+      await page.goto(path);
+      await page.waitForLoadState("networkidle");
+      expect(await scrollsSideways(page), path).toBe(false);
+    }
+  });
 
   test("the landing page fits the screen without scrolling sideways", async ({ page }) => {
     await page.goto("/");

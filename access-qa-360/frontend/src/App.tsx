@@ -1,4 +1,5 @@
 import { RouteMeta } from "./components/RouteMeta";
+import { GuidePage, GuidesPage } from "./pages/GuidesPage";
 import { AdminKeysPage } from "./pages/AdminKeysPage";
 import { HelpPage } from "./pages/HelpPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -66,6 +67,8 @@ export default function App() {
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         {/* Signed in: the overview. Signed out: the public page that says what Wiseflow is. */}
         <Route path="/" element={<Home />} />
+        <Route path="/guides" element={<GuidesPage />} />
+        <Route path="/guides/:slug" element={<GuidePage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />
         <Route path="/findings" element={<RequireAuth><FindingsPage /></RequireAuth>} />

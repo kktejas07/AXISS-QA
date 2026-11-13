@@ -24,7 +24,11 @@
     <script>
       // The built page carries the public home page's HTML so search engines can read it.
       // Anyone signed in, or opening another address, should not see it flash by before the app starts.
-      try { if (location.pathname !== "/" || localStorage.getItem("token")) document.getElementById("root").innerHTML = ""; } catch (e) {}
+      // Each built page says which address its HTML is for (the home page when it says nothing).
+      try {
+        var root = document.getElementById("root"), path = location.pathname.replace(/\/+$/, "") || "/";
+        if (path !== (root.getAttribute("data-path") || "/") || (path === "/" && localStorage.getItem("token"))) root.innerHTML = "";
+      } catch (e) {}
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
