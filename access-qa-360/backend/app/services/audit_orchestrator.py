@@ -14,6 +14,7 @@ import json
 import tempfile
 import os
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from sqlalchemy import select
 
@@ -27,6 +28,7 @@ from app.services.api_auditor import run_api_audit
 
 from anthropic import AsyncAnthropic
 from app.core.config import settings
+from app.core.storage import storage_path
 
 ai = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
@@ -89,7 +91,7 @@ async def _generate_unified_summary(job: AuditJob) -> str:
     # Web stats
     pages = t1.get("pages_audited", 0)
     a11y = t1.get("a11y_summary", {})
-    pw_test_count = len(t1.get("playwright_tests", "").split("\ndef test_"))
+    pw_test_count = (t1.get("playwright_tests") or "").count("def test_")
 
     # Mobile
     mobile_summary = "Not applicable" if not t2 else (
@@ -121,8 +123,8 @@ async def _generate_unified_summary(job: AuditJob) -> str:
     ) or "No critical findings."
 
     prompt = UNIFIED_SUMMARY_PROMPT.format(
-        app_name=job.app_name or job.target_url,
-        url=job.target_url,
+        app_name=job.label,
+        url=job.target_url or "not provided (mobile build)",
         date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         pages_crawled=pages,
         a11y_total=a11y.get("total_violations", 0),
@@ -150,10 +152,10 @@ async def _generate_unified_summary(job: AuditJob) -> str:
 
 async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
     """Write a unified PDF report. Returns file path."""
-    fd, path = tempfile.mkstemp(suffix=".pdf", prefix=f"audit_{job.id}_")
-    os.close(fd)
+    path = storage_path("reports", f"audit_{job.id}.pdf")
 
     t1 = job.tier1_result or {}
+    t2 = job.tier2_result or {}
     t3 = job.tier3_result or {}
 
     try:
@@ -169,8 +171,9 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
 
         # Cover
         story.append(Paragraph("Application Audit Report", styles["Title"]))
-        story.append(Paragraph(f"Target: {job.target_url}", styles["Normal"]))
-        story.append(Paragraph(f"App: {job.app_name or '—'}", styles["Normal"]))
+        story.append(Paragraph(f"App: {job.label}", styles["Normal"]))
+        if job.target_url:
+            story.append(Paragraph(f"Address: {job.target_url}", styles["Normal"]))
         story.append(Paragraph(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}", styles["Normal"]))
         story.append(Spacer(1, 0.5*cm))
 
@@ -203,6 +206,15 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
                     story.append(Paragraph(f"<b>Remediation:</b> {f['remediation']}", styles["Normal"]))
                 story.append(Spacer(1, 0.3*cm))
 
+        # Mobile build checks
+        flags = t2.get("security_flags", [])
+        if flags:
+            story.append(Paragraph("Mobile Build Findings", styles["Heading1"]))
+            for fl in flags[:30]:
+                story.append(Paragraph(f"[{str(fl.get('severity','?')).upper()}] {fl.get('title','?')}", styles["Heading3"]))
+                story.append(Paragraph(str(fl.get("detail", ""))[:400], styles["Normal"]))
+                story.append(Spacer(1, 0.3*cm))
+
         # Accessibility
         a11y = t1.get("a11y_summary", {})
         if a11y.get("violations"):
@@ -219,7 +231,7 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
         # Fallback plain text
         lines = [
             "APPLICATION AUDIT REPORT",
-            f"Target: {job.target_url}",
+            f"App: {job.label}",
             f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
             "",
             "EXECUTIVE SUMMARY",
@@ -238,10 +250,38 @@ async def _write_unified_pdf(job: AuditJob, summary: str) -> str:
 # Main audit runner
 # ---------------------------------------------------------------------------
 
+DEPTH_LIMITS = {"quick": (1, 10), "standard": (3, 40), "deep": (4, 80)}  # (crawl depth, max pages)
+ALL_OUTPUTS = ["security", "manual", "playwright", "appium"]
+
+
+def _reason(e: Exception) -> str:
+    """First line of an error, short enough to show a user."""
+    lines = str(e).strip().splitlines()
+    return (lines[0] if lines else type(e).__name__)[:300]
+
+
+def _fallback_summary(job: AuditJob, findings: int) -> str:
+    """Plain summary used when the AI-written one cannot be produced."""
+    return (
+        f"This scan of {job.label} found {findings} security "
+        f"{'finding' if findings == 1 else 'findings'}: {job.critical_count or 0} critical and "
+        f"{job.high_count or 0} high. Pages mapped: {job.total_pages_audited or 0}. "
+        f"Manual test cases written: {job.total_test_cases or 0}.\n\n"
+        "Fix the critical and high findings first; each one is listed in this report with its recommended fix."
+    )
+
+
+def _count(items: list[dict], severity: str) -> int:
+    return sum(1 for i in items if str(i.get("severity", "")).lower() == severity)
+
+
 async def run_audit(audit_job_id: str):
     """
-    Run all 5 audit tiers for the given AuditJob.
-    Updates the DB record throughout.
+    Run the tiers the user asked for and update the AuditJob throughout.
+
+    job.outputs decides what is produced ("security", "manual", "playwright",
+    "appium"); a tier with nothing to do is marked "skipped". Jobs created
+    before outputs existed (outputs is None) run everything.
     """
     async with AsyncSessionLocal() as db:
         res = await db.execute(select(AuditJob).where(AuditJob.id == audit_job_id))
@@ -252,146 +292,196 @@ async def run_audit(audit_job_id: str):
         mobile_url = job.mobile_url
         apk_path = job.apk_path
         ipa_path = job.ipa_path
-        auth_config = None  # TODO: pass through from job
+        outputs = set(job.outputs or ALL_OUTPUTS)
+        depth = job.depth or "standard"
 
-    await _set_progress(audit_job_id, 5, status=AuditStatus.running, tier1_status="running")
+    max_depth, max_pages = DEPTH_LIMITS.get(depth, DEPTH_LIMITS["standard"])
+    critical = high = 0
+    tier_states: list[str] = []
 
-    # ---- Tier 1: Web Audit ------------------------------------------------
-    tier1_data = {}
-    try:
-        pages = await crawl_and_audit(
-            target_url,
-            max_depth=3,
-            max_pages=40,
-            capture_screenshots=True,
-            run_a11y=True,
-        )
-        playwright_tests = await generate_playwright_tests(pages, target_url)
-        manual_cases = await generate_manual_test_cases(pages)
-        a11y_summary = summarise_a11y(pages)
-        tier1_data = {
-            "pages_audited": len(pages),
-            "pages": [p.to_dict() for p in pages[:20]],
-            "a11y_summary": a11y_summary,
-            "playwright_tests": playwright_tests,
-            "manual_test_cases": manual_cases,
-            "routes_found": list({p.path for p in pages}),
-        }
-        await _set_progress(
-            audit_job_id, 30,
-            tier1_status="completed",
-            tier1_result=tier1_data,
-            total_pages_audited=len(pages),
-            total_test_cases=len(manual_cases),
-        )
-    except Exception as e:
-        tier1_data = {"error": str(e)}
-        await _set_progress(audit_job_id, 30, tier1_status="failed", tier1_result=tier1_data)
+    await _set_progress(audit_job_id, 5, status=AuditStatus.running)
 
-    # ---- Tier 2: Mobile Audit ---------------------------------------------
-    await _set_progress(audit_job_id, 35, tier2_status="running")
-    tier2_data = {}
+    # ---- Tier 1: map the web app, write Playwright tests and manual cases ----
+    tier1_data: dict = {}
+    if target_url:
+        await _set_progress(audit_job_id, 8, tier1_status="running")
+        try:
+            pages = await crawl_and_audit(
+                target_url,
+                max_depth=max_depth,
+                max_pages=max_pages,
+                capture_screenshots=True,
+                run_a11y=True,
+            )
+            if not pages or all(p.error for p in pages):
+                raise RuntimeError("Could not load any page at that address")
+            playwright_tests = await generate_playwright_tests(pages, target_url) if "playwright" in outputs else ""
+            manual_cases = await generate_manual_test_cases(pages) if "manual" in outputs else []
+            tier1_data = {
+                "pages_audited": len(pages),
+                "pages": [p.to_dict() for p in pages[:20]],
+                "a11y_summary": summarise_a11y(pages),
+                "playwright_tests": playwright_tests,
+                "manual_test_cases": manual_cases,
+                "routes_found": sorted({p.path for p in pages}),
+            }
+            tier_states.append("completed")
+            await _set_progress(
+                audit_job_id, 30,
+                tier1_status="completed",
+                tier1_result=tier1_data,
+                total_pages_audited=len(pages),
+                total_test_cases=len(manual_cases),
+            )
+        except Exception as e:
+            tier1_data = {"error": _reason(e)}
+            tier_states.append("failed")
+            await _set_progress(audit_job_id, 30, tier1_status="failed", tier1_result=tier1_data)
+    else:
+        tier1_data = {"skipped": "No web address provided"}
+        await _set_progress(audit_job_id, 30, tier1_status="skipped", tier1_result=tier1_data)
+
+    # ---- Tier 2: mobile build ------------------------------------------------
+    tier2_data: dict = {}
     if mobile_url or apk_path or ipa_path:
+        await _set_progress(audit_job_id, 35, tier2_status="running")
         try:
             mobile_result = await run_mobile_audit(
                 apk_path=apk_path,
                 ipa_path=ipa_path,
                 store_url=mobile_url,
+                with_appium="appium" in outputs,
+                with_manual="manual" in outputs,
             )
+            if mobile_result.error and not (mobile_result.app_id or mobile_result.permissions or mobile_result.security_flags):
+                raise RuntimeError(mobile_result.error)
             tier2_data = mobile_result.to_dict()
             tier2_data["appium_tests"] = mobile_result.appium_test_code
+            if "security" not in outputs:
+                tier2_data["security_flags"] = []
+            critical += _count(tier2_data["security_flags"], "critical")
+            high += _count(tier2_data["security_flags"], "high")
+            tier_states.append("completed")
             await _set_progress(
                 audit_job_id, 50,
                 tier2_status="completed",
                 tier2_result=tier2_data,
+                critical_count=critical,
+                high_count=high,
             )
         except Exception as e:
-            tier2_data = {"error": str(e)}
+            tier2_data = {"error": _reason(e)}
+            tier_states.append("failed")
             await _set_progress(audit_job_id, 50, tier2_status="failed", tier2_result=tier2_data)
     else:
-        tier2_data = {"skipped": "No mobile input provided"}
+        tier2_data = {"skipped": "No mobile build provided"}
         await _set_progress(audit_job_id, 50, tier2_status="skipped", tier2_result=tier2_data)
 
-    # ---- Tier 3: API/Cyber Security ----------------------------------------
-    await _set_progress(audit_job_id, 55, tier3_status="running")
-    tier3_data = {}
-    try:
-        api_result = await run_api_audit(target_url, discover_subdomains=True, scan_js=True)
-        tier3_data = api_result.to_dict()
-        critical_count = sum(1 for f in api_result.findings if f.severity == "critical")
-        high_count = sum(1 for f in api_result.findings if f.severity == "high")
-        await _set_progress(
-            audit_job_id, 70,
-            tier3_status="completed",
-            tier3_result=tier3_data,
-            critical_count=critical_count,
-            high_count=high_count,
-        )
-    except Exception as e:
-        tier3_data = {"error": str(e)}
-        await _set_progress(audit_job_id, 70, tier3_status="failed", tier3_result=tier3_data)
+    # ---- Tier 3: API and security checks --------------------------------------
+    tier3_data: dict = {}
+    if target_url and "security" in outputs:
+        await _set_progress(audit_job_id, 55, tier3_status="running")
+        try:
+            # API paths hang off the site root, not off whichever page the user pasted.
+            parts = urlparse(target_url)
+            api_result = await run_api_audit(f"{parts.scheme}://{parts.netloc}", discover_subdomains=depth != "quick", scan_js=True)
+            tier3_data = api_result.to_dict()
+            critical += _count(tier3_data["findings"], "critical")
+            high += _count(tier3_data["findings"], "high")
+            tier_states.append("completed")
+            await _set_progress(
+                audit_job_id, 70,
+                tier3_status="completed",
+                tier3_result=tier3_data,
+                critical_count=critical,
+                high_count=high,
+            )
+        except Exception as e:
+            tier3_data = {"error": _reason(e)}
+            tier_states.append("failed")
+            await _set_progress(audit_job_id, 70, tier3_status="failed", tier3_result=tier3_data)
+    else:
+        reason = "Security audit not selected" if target_url else "No web address provided"
+        tier3_data = {"skipped": reason}
+        await _set_progress(audit_job_id, 70, tier3_status="skipped", tier3_result=tier3_data)
 
-    # ---- Tier 4: Manual QA Checklists (from Tier 1 results) ---------------
-    await _set_progress(audit_job_id, 75, tier4_status="running")
-    tier4_data = {}
-    try:
-        all_manual = tier1_data.get("manual_test_cases", [])
-        # Add mobile manual cases
-        all_manual += tier2_data.get("manual_test_cases", [])
-        tier4_data = {
-            "test_cases": all_manual,
-            "total": len(all_manual),
-            "jira_csv": _to_jira_csv(all_manual),
-        }
-        await _set_progress(
-            audit_job_id, 80,
-            tier4_status="completed",
-            tier4_result=tier4_data,
-            total_test_cases=len(all_manual),
-        )
-    except Exception as e:
-        tier4_data = {"error": str(e)}
-        await _set_progress(audit_job_id, 80, tier4_status="failed", tier4_result=tier4_data)
+    # ---- Tier 4: manual test cases, web and mobile together -------------------
+    tier4_data: dict = {}
+    if "manual" in outputs:
+        await _set_progress(audit_job_id, 75, tier4_status="running")
+        try:
+            all_manual = list(tier1_data.get("manual_test_cases", [])) + list(tier2_data.get("manual_test_cases", []))
+            tier4_data = {"test_cases": all_manual, "total": len(all_manual), "jira_csv": _to_jira_csv(all_manual)}
+            # Not counted in tier_states: this step only repackages the tiers above, so it
+            # "succeeds" even when they all failed and must not mask that.
+            await _set_progress(
+                audit_job_id, 80,
+                tier4_status="completed",
+                tier4_result=tier4_data,
+                total_test_cases=len(all_manual),
+            )
+        except Exception as e:
+            tier4_data = {"error": _reason(e)}
+            tier_states.append("failed")
+            await _set_progress(audit_job_id, 80, tier4_status="failed", tier4_result=tier4_data)
+    else:
+        tier4_data = {"skipped": "Manual test cases not selected"}
+        await _set_progress(audit_job_id, 80, tier4_status="skipped", tier4_result=tier4_data)
 
-    # ---- Tier 5: Unified Report -------------------------------------------
+    # ---- Tier 5: summary and PDF report ---------------------------------------
+    # Nothing worked, so there is nothing to report on.
+    if tier_states and all(s == "failed" for s in tier_states):
+        await _set_progress(
+            audit_job_id, 100,
+            status=AuditStatus.failed,
+            tier5_status="skipped",
+            tier5_result={"skipped": "Every step failed"},
+            completed_at=datetime.now(timezone.utc),
+        )
+        return
+
     await _set_progress(audit_job_id, 85, tier5_status="running")
     try:
-        # Re-read job for final state
         async with AsyncSessionLocal() as db:
             res = await db.execute(select(AuditJob).where(AuditJob.id == audit_job_id))
             job = res.scalar_one_or_none()
 
-        summary = await _generate_unified_summary(job)
-        pdf_path = await _write_unified_pdf(job, summary)
-
-        # Compute risk score (0-100, higher = worse)
-        total_findings = len(tier3_data.get("findings", []))
+        total_findings = len(tier3_data.get("findings", [])) + len(tier2_data.get("security_flags", []))
         a11y_critical = tier1_data.get("a11y_summary", {}).get("critical", 0)
-        risk_score = min(100, (job.critical_count or 0) * 20 + (job.high_count or 0) * 8 + a11y_critical * 5 + min(total_findings * 2, 20))
+        risk_score = min(100, critical * 20 + high * 8 + a11y_critical * 5 + min(total_findings * 2, 20))
+        job.risk_score = risk_score
 
-        tier5_data = {
-            "executive_summary": summary,
-            "risk_score": risk_score,
-            "pdf_path": pdf_path,
-        }
+        # The report must not depend on the AI summary: fall back to a plain one if it fails.
+        summary_error = None
+        try:
+            summary = await _generate_unified_summary(job)
+        except Exception as e:
+            summary_error = _reason(e)
+            summary = _fallback_summary(job, total_findings)
+        pdf_path = await _write_unified_pdf(job, summary)
 
         await _set_progress(
             audit_job_id, 100,
-            status=AuditStatus.completed,
+            status=AuditStatus.partial if "failed" in tier_states else AuditStatus.completed,
             tier5_status="completed",
-            tier5_result=tier5_data,
+            tier5_result={
+                "executive_summary": summary,
+                "risk_score": risk_score,
+                "pdf_path": pdf_path,
+                **({"summary_error": summary_error} if summary_error else {}),
+            },
             executive_summary=summary,
             report_pdf_path=pdf_path,
             risk_score=risk_score,
             completed_at=datetime.now(timezone.utc),
         )
-
     except Exception as e:
         await _set_progress(
-            audit_job_id, 95,
+            audit_job_id, 100,
             status=AuditStatus.partial,
             tier5_status="failed",
-            tier5_result={"error": str(e)},
+            tier5_result={"error": _reason(e)},
+            completed_at=datetime.now(timezone.utc),
         )
 
 

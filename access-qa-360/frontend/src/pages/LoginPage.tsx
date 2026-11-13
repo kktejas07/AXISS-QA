@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../api/auth";
+import { clearMe } from "../hooks/useMe";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ export function LoginPage() {
     setError("");
     try {
       const res = await login(email, password);
+      clearMe();
       localStorage.setItem("token", res.data.access_token);
       navigate("/");
     } catch {

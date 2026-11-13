@@ -1,62 +1,137 @@
 import api from "./client";
 
-export interface AuditCreate {
-  target_url: string;
+export type SourceType = "web" | "android" | "ios";
+export type OutputKind = "security" | "manual" | "playwright" | "appium";
+export type Depth = "quick" | "standard" | "deep";
+export type ExportKind = "report" | "test-cases" | "playwright" | "appium" | "results";
+export type AuditStatus = "queued" | "running" | "completed" | "failed" | "partial";
+export type StepStatus = "pending" | "running" | "completed" | "failed" | "skipped";
+
+export interface Finding {
+  id?: string;
+  severity: string;
+  title: string;
+  description?: string;
+  detail?: string;
+  affected_url?: string;
+  method?: string;
+  proof_request?: string;
+  proof_response?: string;
+  cwe_id?: string;
+  owasp_category?: string;
+  remediation?: string;
+}
+
+export interface ManualCase {
+  id?: string;
+  title: string;
+  category?: string;
+  priority?: string;
+  preconditions?: string;
+  steps?: string[];
+  expected_result?: string;
+  page_url?: string;
+}
+
+export interface A11yViolation {
+  id: string;
+  impact: string;
+  description: string;
+  help: string;
+  helpUrl: string;
+  occurrences: number;
+  affected_pages: string[];
+}
+
+export interface WebResult {
+  error?: string;
+  skipped?: string;
+  pages_audited?: number;
+  routes_found?: string[];
+  playwright_tests?: string;
+  a11y_summary?: { total_violations: number; critical: number; serious: number; moderate: number; minor: number; violations: A11yViolation[] };
+}
+
+export interface MobileResult {
+  error?: string;
+  skipped?: string;
+  platform?: string;
   app_name?: string;
-  mobile_url?: string;
+  app_id?: string;
+  version?: string;
+  permissions?: string[];
+  dangerous_permissions?: string[];
+  security_flags?: Finding[];
+  appium_tests?: string;
+}
+
+export interface SecurityResult {
+  error?: string;
+  skipped?: string;
+  findings?: Finding[];
+  subdomains_found?: string[];
+}
+
+export interface ManualResult {
+  error?: string;
+  skipped?: string;
+  test_cases?: ManualCase[];
 }
 
 export interface AuditJob {
   id: string;
-  target_url: string;
+  label: string;
+  source_type: SourceType;
+  target_url: string | null;
   app_name: string | null;
   mobile_url: string | null;
-  status: "queued" | "running" | "completed" | "failed" | "partial";
+  source_filename: string | null;
+  outputs: OutputKind[] | null;
+  allowed_outputs: OutputKind[];
+  depth: Depth;
+  status: AuditStatus;
   progress: number;
-  tier1_status: string;
-  tier2_status: string;
-  tier3_status: string;
-  tier4_status: string;
-  tier5_status: string;
+  tier1_status: StepStatus;
+  tier2_status: StepStatus;
+  tier3_status: StepStatus;
+  tier4_status: StepStatus;
+  tier5_status: StepStatus;
   risk_score: number | null;
-  coverage_pct: number | null;
   critical_count: number;
   high_count: number;
   total_test_cases: number;
   total_pages_audited: number;
   executive_summary: string | null;
-  report_pdf_path: string | null;
+  exports: ExportKind[];
   created_at: string;
+  started_at: string | null;
   completed_at: string | null;
-  // tier results only on detail endpoint
-  tier1_result?: Record<string, unknown> | null;
-  tier2_result?: Record<string, unknown> | null;
-  tier3_result?: Record<string, unknown> | null;
-  tier4_result?: Record<string, unknown> | null;
-  tier5_result?: Record<string, unknown> | null;
+  // Results come with the single-scan request only.
+  tier1_result?: WebResult | null;
+  tier2_result?: MobileResult | null;
+  tier3_result?: SecurityResult | null;
+  tier4_result?: ManualResult | null;
+  tier5_result?: { error?: string; skipped?: string } | null;
 }
 
-export const createAudit = (body: AuditCreate) =>
-  api.post<AuditJob>("/audits", body);
+/** Step 1: record what is being tested. Nothing runs until startAudit. */
+export const createDraft = (body: { source_type: SourceType; target_url?: string; app_name?: string }) =>
+  api.post<AuditJob>("/audits", { ...body, autostart: false });
 
-export const listAudits = () =>
-  api.get<AuditJob[]>("/audits");
-
-export const getAudit = (id: string) =>
-  api.get<AuditJob>(`/audits/${id}`);
-
-export const uploadApk = (id: string, file: File) => {
+export const uploadBuild = (id: string, file: File, onProgress?: (percent: number) => void) => {
   const form = new FormData();
   form.append("file", file);
-  return api.post<AuditJob>(`/audits/${id}/upload-apk`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
+  return api.post<AuditJob>(`/audits/${id}/upload`, form, {
+    onUploadProgress: (e) => e.total && onProgress?.(Math.round((e.loaded / e.total) * 100)),
   });
 };
 
-export const uploadIpa = (id: string, file: File) => {
-  const form = new FormData();
-  form.append("file", file);
-  return api.post<AuditJob>(`/audits/${id}/upload-ipa`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-};
+/** Step 2: choose outputs and depth, confirm permission, and run. */
+export const startAudit = (id: string, body: { outputs: OutputKind[]; depth: Depth; ownership_confirmed: boolean }) =>
+  api.post<AuditJob>(`/audits/${id}/start`, body);
+
+export const listAudits = () => api.get<AuditJob[]>("/audits");
+
+export const getAudit = (id: string) => api.get<AuditJob>(`/audits/${id}`);
+
+export const exportPath = (id: string, kind: ExportKind) => `/audits/${id}/export/${kind}`;

@@ -4,46 +4,60 @@ import { Layout } from "../components/Layout";
 import { getReports, generateReport } from "../api/scans";
 import type { Report, ReportType, ReportFormat } from "../types";
 import { ArrowLeft, FileText, Download, Loader2, Plus } from "lucide-react";
+import { downloadFromApi } from "../utils/download";
+import { apiError } from "../utils/errors";
 
+// Only what the server can actually build.
 const reportTypeLabels: Record<ReportType, string> = {
-  executive: "Executive Summary",
+  executive_summary: "Executive Summary",
   vulnerability: "Vulnerability Report",
-  "qa-gap": "QA Gap Report",
-  "test-bundle": "Test Case Bundle",
+  qa_gap: "QA Gap Report",
   compliance: "Compliance Report",
-  diff: "Diff Report",
 };
 
 const formatLabels: Record<ReportFormat, string> = {
   pdf: "PDF",
   json: "JSON",
-  docx: "Word (.docx)",
   csv: "CSV",
-  feature: "Gherkin (.feature)",
-  py: "Python (.py)",
-  ts: "TypeScript (.ts)",
 };
 
 const reportFormatOptions: Record<ReportType, ReportFormat[]> = {
-  executive: ["pdf"],
-  vulnerability: ["pdf", "json", "docx"],
-  "qa-gap": ["pdf", "docx"],
-  "test-bundle": ["feature", "py", "ts", "docx"],
-  compliance: ["pdf", "csv"],
-  diff: ["pdf", "json"],
+  executive_summary: ["pdf"],
+  vulnerability: ["pdf", "json", "csv"],
+  qa_gap: ["pdf", "json"],
+  compliance: ["pdf", "json"],
 };
 
 export function ReportsPage() {
   const { id } = useParams<{ id: string }>();
   const [reports, setReports] = useState<Report[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [reportType, setReportType] = useState<ReportType>("executive");
+  const [reportType, setReportType] = useState<ReportType>("executive_summary");
   const [format, setFormat] = useState<ReportFormat>("pdf");
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (id) getReports(id).then((r) => setReports(r.data));
+    if (id) getReports(id).then((r) => setReports(r.data)).catch(() => setError("Reports could not be loaded."));
   }, [id]);
+
+  // A report is built in the background, so keep checking until none is still "generating".
+  const waiting = reports.some((r) => r.status === "generating");
+  useEffect(() => {
+    if (!id || !waiting) return;
+    const timer = setInterval(() => getReports(id).then((r) => setReports(r.data)).catch(() => {}), 3000);
+    return () => clearInterval(timer);
+  }, [id, waiting]);
+
+  const download = async (r: Report) => {
+    if (!r.download_url) return;
+    setError("");
+    try {
+      await downloadFromApi(r.download_url, `report.${r.format}`);
+    } catch {
+      setError("The download failed. Try again.");
+    }
+  };
 
   useEffect(() => {
     const available = reportFormatOptions[reportType];
@@ -53,12 +67,13 @@ export function ReportsPage() {
   const handleGenerate = async () => {
     if (!id) return;
     setGenerating(true);
+    setError("");
     try {
       const { data } = await generateReport(id, reportType, format);
       setReports([data, ...reports]);
       setShowForm(false);
-    } catch {
-      // error handled silently for MVP
+    } catch (e) {
+      setError(apiError(e, "The report could not be started. Try again."));
     } finally {
       setGenerating(false);
     }
@@ -84,6 +99,10 @@ export function ReportsPage() {
           <Plus className="w-4 h-4" /> Generate Report
         </button>
       </div>
+
+      {error && (
+        <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
+      )}
 
       {/* Generate Form */}
       {showForm && (
@@ -140,7 +159,7 @@ export function ReportsPage() {
               <div key={r.id} className="flex items-center gap-4 px-5 py-4">
                 <FileText className="w-8 h-8 text-indigo-400 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-brand-900 text-sm">{reportTypeLabels[r.report_type]}</p>
+                  <p className="font-medium text-brand-900 text-sm">{reportTypeLabels[r.report_type] ?? r.report_type}</p>
                   <p className="text-xs text-gray-500">
                     {formatLabels[r.format]} &middot; {new Date(r.created_at).toLocaleString()}
                   </p>
@@ -153,13 +172,13 @@ export function ReportsPage() {
                   {r.status}
                 </span>
                 {r.status === "ready" && r.download_url && (
-                  <a
-                    href={r.download_url}
+                  <button
+                    type="button"
+                    onClick={() => download(r)}
                     className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                    download
                   >
                     <Download className="w-4 h-4" /> Download
-                  </a>
+                  </button>
                 )}
               </div>
             ))}

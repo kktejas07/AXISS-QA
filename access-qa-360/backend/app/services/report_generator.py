@@ -226,10 +226,8 @@ async def generate_report(report_id: str) -> str:
         exec_summary = await _generate_executive_summary(data)
         data["executive_summary"] = exec_summary
 
-    # Write to temp file
-    suffix = f".{fmt}"
-    fd, out_path = tempfile.mkstemp(suffix=suffix, prefix=f"report_{report_id}_")
-    os.close(fd)
+    from app.core.storage import storage_path
+    out_path = storage_path("reports", f"report_{report_id}.{fmt}")
 
     if fmt == "json":
         with open(out_path, "w") as f:

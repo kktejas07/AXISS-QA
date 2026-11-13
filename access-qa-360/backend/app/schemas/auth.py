@@ -22,5 +22,6 @@ class UserOut(BaseModel):
     email: str
     full_name: str
     is_active: bool
+    role: str = "user"
 
     model_config = {"from_attributes": True}

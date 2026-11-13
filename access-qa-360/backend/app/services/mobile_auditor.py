@@ -485,6 +485,8 @@ async def run_mobile_audit(
     apk_path: str | None = None,
     ipa_path: str | None = None,
     store_url: str | None = None,
+    with_appium: bool = True,
+    with_manual: bool = True,
 ) -> MobileAuditResult:
     """
     Run a full mobile audit.
@@ -501,10 +503,9 @@ async def run_mobile_audit(
         result.error = "No mobile input provided"
         return result
 
-    # Generate Appium test suite
-    result.appium_test_code = await generate_appium_tests(result)
-
-    # Generate manual test cases
-    result.manual_test_cases = await generate_mobile_manual_cases(result)
+    if with_appium:
+        result.appium_test_code = await generate_appium_tests(result)
+    if with_manual:
+        result.manual_test_cases = await generate_mobile_manual_cases(result)
 
     return result

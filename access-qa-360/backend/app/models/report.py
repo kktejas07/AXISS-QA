@@ -34,3 +34,17 @@ class Report(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     scan: Mapped["Scan"] = relationship("Scan", back_populates="reports")
+
+    @property
+    def created_at(self) -> datetime:
+        return self.generated_at
+
+    @property
+    def status(self) -> str:
+        import os
+
+        return "ready" if self.file_path and os.path.exists(self.file_path) else "generating"
+
+    @property
+    def download_url(self) -> str | None:
+        return f"/reports/{self.id}/download" if self.status == "ready" else None
