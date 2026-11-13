@@ -99,6 +99,15 @@ def _make_jwt_none(claims: dict) -> str:
     return f"{header}.{payload}."
 
 
+def _is_api_success(resp: httpx.Response) -> bool:
+    """True only for a 200 that is real API data.
+
+    Single-page apps answer every unknown path with 200 and their HTML shell, which
+    is not evidence that an API endpoint answered.
+    """
+    return resp.status_code == 200 and "json" in resp.headers.get("content-type", "").lower()
+
+
 async def probe_jwt(base_url: str, existing_token: str | None, client: httpx.AsyncClient) -> list[ApiAuditFinding]:
     findings = []
 
@@ -116,7 +125,7 @@ async def probe_jwt(base_url: str, existing_token: str | None, client: httpx.Asy
                 headers={"Authorization": f"Bearer {none_token}"},
                 timeout=5,
             )
-            if resp.status_code == 200:
+            if _is_api_success(resp):
                 f = ApiAuditFinding()
                 f.check = "jwt_alg_none"
                 f.severity = "critical"
@@ -136,7 +145,7 @@ async def probe_jwt(base_url: str, existing_token: str | None, client: httpx.Asy
     # 2. No auth header → check for 401
     try:
         resp = await client.get(f"{base_url.rstrip('/')}/api/v1/users/me", timeout=5)
-        if resp.status_code == 200:
+        if _is_api_success(resp):
             f = ApiAuditFinding()
             f.check = "missing_auth"
             f.severity = "critical"

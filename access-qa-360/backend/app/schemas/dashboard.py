@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 class RecentScan(BaseModel):
     id: str
+    # "audit" is a scan from the main flow (/audits/{id}); "scan" is a quick security scan (/scans/{id}).
+    kind: str = "scan"
     url: str
     status: str
     progress: int
@@ -20,6 +22,7 @@ class TopFinding(BaseModel):
     severity: str
     title: str
     affected_url: str
+    kind: str = "scan"
 
 
 class DashboardSummary(BaseModel):

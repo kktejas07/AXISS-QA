@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.models.audit_job import AuditJob
 from app.models.project import Project
 from app.models.qa_gap import QAGap
 from app.models.scan import Scan
@@ -94,6 +95,47 @@ async def dashboard_summary(db: AsyncSession = Depends(get_db), user: User = Dep
         TopFinding(id=v.id, scan_id=v.scan_id, severity=_value(v.severity), title=v.title, affected_url=v.affected_url)
         for v in worst_first[:5]
     ]
+
+    # ---- scans from the main flow (audit jobs). Drafts that never started are left out.
+    my_audits = (AuditJob.created_by == user.id, AuditJob.started_at.is_not(None))
+    audit_count, audit_critical, audit_high, audit_tests = (
+        await db.execute(
+            select(
+                func.count(),
+                func.coalesce(func.sum(AuditJob.critical_count), 0),
+                func.coalesce(func.sum(AuditJob.high_count), 0),
+                func.coalesce(func.sum(AuditJob.total_test_cases), 0),
+            ).where(*my_audits)
+        )
+    ).one()
+    scans += audit_count
+    open_vulns["critical"] += int(audit_critical)
+    open_vulns["high"] += int(audit_high)
+    if audit_tests:
+        test_cases["manual"] = test_cases.get("manual", 0) + int(audit_tests)
+
+    audits = (await db.execute(select(AuditJob).where(*my_audits).order_by(AuditJob.created_at.desc()).limit(5))).scalars().all()
+    for a in audits:
+        found = list((a.tier3_result or {}).get("findings", [])) + [
+            {**flag, "affected_url": a.label} for flag in (a.tier2_result or {}).get("security_flags", [])
+        ]
+        recent_scans.append(
+            RecentScan(
+                id=a.id, kind="audit", url=a.label, status=_value(a.status), progress=a.progress,
+                created_at=a.created_at, critical=a.critical_count, high=a.high_count, total=len(found),
+            )
+        )
+        for i, item in enumerate(found):
+            severity = str(item.get("severity", "")).lower()
+            if severity in ("critical", "high"):
+                top_findings.append(
+                    TopFinding(
+                        id=f"{a.id}:{item.get('id', i)}", scan_id=a.id, kind="audit", severity=severity,
+                        title=item.get("title", "Finding"), affected_url=item.get("affected_url") or a.label,
+                    )
+                )
+    recent_scans = sorted(recent_scans, key=lambda r: str(r.created_at), reverse=True)[:6]
+    top_findings = sorted(top_findings, key=lambda t: SEVERITY_ORDER[t.severity])[:5]
 
     return DashboardSummary(
         projects=projects,

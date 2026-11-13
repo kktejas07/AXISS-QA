@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     # Comma-separated emails that are made super admin when they register or sign in.
     SUPER_ADMIN_EMAILS: str = ""
+    # Where uploaded builds and generated reports are kept. Mount a volume here in production.
+    STORAGE_DIR: str = "storage"
+    MAX_UPLOAD_MB: int = 300
 
     class Config:
         env_file = ".env"

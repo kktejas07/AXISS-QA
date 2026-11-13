@@ -29,11 +29,21 @@ class AuditJob(Base):
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
 
     # Input params
-    target_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    # "web" | "android" | "ios". Mobile jobs have no target_url.
+    source_type: Mapped[str] = mapped_column(String(16), default="web", server_default="web", nullable=False)
+    target_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     app_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     mobile_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     apk_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     ipa_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # What the user asked for: any of "security", "manual", "playwright", "appium"
+    outputs: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    depth: Mapped[str] = mapped_column(String(16), default="standard", server_default="standard", nullable=False)
+    # Set when the user confirms they may test this app; nothing runs before that.
+    ownership_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Overall status
     status: Mapped[AuditStatus] = mapped_column(Enum(AuditStatus), default=AuditStatus.queued)
@@ -69,3 +79,36 @@ class AuditJob(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     creator: Mapped["User"] = relationship("User", lazy="select")
+
+    @property
+    def label(self) -> str:
+        return self.app_name or self.source_filename or self.target_url or "Untitled app"
+
+    @property
+    def has_mobile_input(self) -> bool:
+        return bool(self.apk_path or self.ipa_path or self.mobile_url)
+
+    @property
+    def allowed_outputs(self) -> list[str]:
+        if self.source_type in ("android", "ios"):
+            return ["security", "manual", "appium"]
+        return ["security", "manual", "playwright"] + (["appium"] if self.has_mobile_input else [])
+
+    @property
+    def exports(self) -> list[str]:
+        """Which downloads exist for this job right now."""
+        import os
+
+        t1, t2, t4 = self.tier1_result or {}, self.tier2_result or {}, self.tier4_result or {}
+        found = []
+        if self.report_pdf_path and os.path.exists(self.report_pdf_path):
+            found.append("report")
+        if t4.get("test_cases"):
+            found.append("test-cases")
+        if (t1.get("playwright_tests") or "").strip():
+            found.append("playwright")
+        if (t2.get("appium_tests") or "").strip():
+            found.append("appium")
+        if self.started_at:
+            found.append("results")
+        return found

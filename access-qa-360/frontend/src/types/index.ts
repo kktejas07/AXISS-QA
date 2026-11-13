@@ -16,15 +16,17 @@ export interface DashboardSummary {
   test_cases: Record<string, number>;
   recent_scans: {
     id: string;
+    /** "audit" opens /audits/:id (main flow); "scan" opens /scans/:id (quick security scan). */
+    kind: "audit" | "scan";
     url: string;
-    status: ScanStatus;
+    status: string;
     progress: number;
     created_at: string;
     critical: number;
     high: number;
     total: number;
   }[];
-  top_findings: { id: string; scan_id: string; severity: Severity; title: string; affected_url: string }[];
+  top_findings: { id: string; scan_id: string; kind: "audit" | "scan"; severity: Severity; title: string; affected_url: string }[];
 }
 
 export interface AdminOverview {
@@ -49,7 +51,7 @@ export interface AdminUser extends User {
 export interface AdminScan {
   id: string;
   url: string;
-  status: ScanStatus;
+  status: string;
   progress: number;
   created_at: string;
   owner_email: string;
@@ -102,8 +104,8 @@ export type ScanStatus = "queued" | "crawling" | "scanning" | "analyzing" | "com
 export type Severity = "critical" | "high" | "medium" | "low" | "informational";
 export type CoverageStatus = "covered" | "partial" | "uncovered";
 export type TestCaseType = "manual" | "unit" | "smoke" | "regression" | "integration" | "performance" | "accessibility" | "security";
-export type ReportType = "executive" | "vulnerability" | "qa-gap" | "test-bundle" | "compliance" | "diff";
-export type ReportFormat = "pdf" | "json" | "docx" | "csv" | "feature" | "py" | "ts";
+export type ReportType = "executive_summary" | "vulnerability" | "qa_gap" | "compliance";
+export type ReportFormat = "pdf" | "json" | "csv";
 
 export interface AuthConfig {
   type: "none" | "cookie" | "bearer" | "oauth" | "basic";

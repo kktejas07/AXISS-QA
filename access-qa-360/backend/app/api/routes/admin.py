@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_super_admin
 from app.core.database import get_db
+from app.models.audit_job import AuditJob, AuditStatus
 from app.models.project import Project
 from app.models.scan import Scan, ScanStatus
 from app.models.user import ROLE_SUPER_ADMIN, User
@@ -42,16 +43,21 @@ async def overview(db: AsyncSession = Depends(get_db)):
     for severity, count in rows.all():
         open_vulns[_value(severity)] = count
 
+    started = AuditJob.started_at.is_not(None)  # drafts that never ran are not scans yet
+
     return AdminOverview(
         users_total=await _count(db, User),
         users_active=await _count(db, User, User.is_active.is_(True)),
         super_admins=await _count(db, User, User.role == ROLE_SUPER_ADMIN),
         projects_total=await _count(db, Project),
-        scans_total=await _count(db, Scan),
-        scans_today=await _count(db, Scan, Scan.created_at >= today),
-        scans_running=await _count(db, Scan, Scan.status.in_(RUNNING)),
-        scans_queued=await _count(db, Scan, Scan.status == ScanStatus.queued),
-        scans_failed_today=await _count(db, Scan, Scan.status == ScanStatus.failed, Scan.created_at >= today),
+        scans_total=await _count(db, Scan) + await _count(db, AuditJob, started),
+        scans_today=await _count(db, Scan, Scan.created_at >= today) + await _count(db, AuditJob, AuditJob.started_at >= today),
+        scans_running=await _count(db, Scan, Scan.status.in_(RUNNING))
+        + await _count(db, AuditJob, AuditJob.status == AuditStatus.running),
+        scans_queued=await _count(db, Scan, Scan.status == ScanStatus.queued)
+        + await _count(db, AuditJob, started, AuditJob.status == AuditStatus.queued),
+        scans_failed_today=await _count(db, Scan, Scan.status == ScanStatus.failed, Scan.created_at >= today)
+        + await _count(db, AuditJob, AuditJob.status == AuditStatus.failed, AuditJob.started_at >= today),
         open_vulnerabilities=open_vulns,
     )
 
@@ -119,14 +125,19 @@ async def list_all_scans(limit: int = 20, db: AsyncSession = Depends(get_db)):
     rows = await db.execute(
         select(Scan, User.email).join(User, User.id == Scan.created_by).order_by(Scan.created_at.desc()).limit(limit)
     )
-    return [
-        AdminScanOut(
-            id=s.id,
-            url=s.url,
-            status=_value(s.status),
-            progress=s.progress,
-            created_at=s.created_at,
-            owner_email=email,
-        )
+    items = [
+        AdminScanOut(id=s.id, url=s.url, status=_value(s.status), progress=s.progress, created_at=s.created_at, owner_email=email)
         for s, email in rows.all()
     ]
+    audit_rows = await db.execute(
+        select(AuditJob, User.email)
+        .join(User, User.id == AuditJob.created_by)
+        .where(AuditJob.started_at.is_not(None))
+        .order_by(AuditJob.created_at.desc())
+        .limit(limit)
+    )
+    items += [
+        AdminScanOut(id=a.id, url=a.label, status=_value(a.status), progress=a.progress, created_at=a.created_at, owner_email=email)
+        for a, email in audit_rows.all()
+    ]
+    return sorted(items, key=lambda i: str(i.created_at), reverse=True)[:limit]

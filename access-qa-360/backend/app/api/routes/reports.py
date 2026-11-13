@@ -12,6 +12,9 @@ import os
 
 router = APIRouter(tags=["reports"])
 
+# Hold references so background report tasks are not dropped before they finish.
+_pending: set = set()
+
 
 @router.post("/scans/{scan_id}/reports", response_model=ReportOut, status_code=201)
 async def create_report(
@@ -34,10 +37,12 @@ async def create_report(
     await db.commit()
     await db.refresh(report)
 
-    # Generate report async (fire and forget — polling /reports for file_path)
+    # Build the file in the background; the list endpoint reports "ready" once it exists.
     import asyncio
     from app.services.report_generator import generate_report
-    asyncio.create_task(generate_report(report.id))
+    task = asyncio.create_task(generate_report(report.id))
+    _pending.add(task)
+    task.add_done_callback(_pending.discard)
 
     return report
 
@@ -66,4 +71,10 @@ async def download_report(report_id: str, db: AsyncSession = Depends(get_db), us
         raise HTTPException(404, "Report file not yet generated")
 
     media_types = {"pdf": "application/pdf", "json": "application/json", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "csv": "text/csv"}
-    return FileResponse(report.file_path, media_type=media_types.get(report.format, "application/octet-stream"))
+    fmt = report.format.value if hasattr(report.format, "value") else str(report.format)
+    rtype = report.report_type.value if hasattr(report.report_type, "value") else str(report.report_type)
+    return FileResponse(
+        report.file_path,
+        media_type=media_types.get(fmt, "application/octet-stream"),
+        filename=f"wiseflow-{rtype.replace('_', '-')}-{report.id[:8]}.{fmt}",
+    )

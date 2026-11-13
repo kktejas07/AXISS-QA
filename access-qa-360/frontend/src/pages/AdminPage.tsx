@@ -4,7 +4,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { getAdminOverview, getAdminScans, getAdminUsers, updateAdminUser } from "../api/admin";
 import { useMe } from "../hooks/useMe";
 import type { AdminOverview, AdminScan, AdminUser, UserRole } from "../types";
-import { ScanStatusPill } from "./Dashboard";
+import { StatusPill } from "../components/StatusPill";
 
 function Stat({ label, value, note, tone }: { label: string; value: number; note: string; tone?: "bad" }) {
   return (
@@ -188,7 +188,7 @@ export function AdminPage() {
                     <td className="px-5 py-3 font-mono text-sm break-all">{s.url}</td>
                     <td className="px-3 py-3 text-body break-all">{s.owner_email}</td>
                     <td className="px-3 py-3">
-                      <ScanStatusPill status={s.status} progress={s.progress} />
+                      <StatusPill status={s.status} progress={s.progress} />
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap text-body">{new Date(s.created_at).toLocaleString()}</td>
                   </tr>

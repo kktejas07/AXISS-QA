@@ -5,33 +5,8 @@ import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { SeverityBadge } from "../components/SeverityBadge";
 import { getDashboardSummary } from "../api/dashboard";
-import type { DashboardSummary, ScanStatus } from "../types";
-
-const statusLabel: Record<ScanStatus, string> = {
-  queued: "Queued",
-  crawling: "Crawling",
-  scanning: "Scanning",
-  analyzing: "Analysing",
-  completed: "Completed",
-  failed: "Failed",
-};
-
-export function scanStatusClass(status: ScanStatus): string {
-  if (status === "completed") return "bg-emerald-100 text-emerald-800";
-  if (status === "failed") return "bg-red-100 text-red-800";
-  if (status === "queued") return "bg-gray-100 text-gray-700";
-  return "bg-brand-50 text-brand-700";
-}
-
-export function ScanStatusPill({ status, progress }: { status: ScanStatus; progress: number }) {
-  const running = status === "crawling" || status === "scanning" || status === "analyzing";
-  return (
-    <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-bold ${scanStatusClass(status)}`}>
-      {statusLabel[status] ?? status}
-      {running ? `, ${progress}%` : ""}
-    </span>
-  );
-}
+import { StatusPill } from "../components/StatusPill";
+import type { DashboardSummary } from "../types";
 
 function Stat({ label, value, note, tone }: { label: string; value: string | number; note: string; tone?: "bad" }) {
   return (
@@ -110,7 +85,7 @@ export function Dashboard() {
         <section className="rounded-2xl border border-gray-300 bg-white px-6 py-12 text-center">
           <h2 className="text-xl font-bold">No scans yet</h2>
           <p className="mx-auto mt-2 max-w-md text-body">
-            Paste a URL to audit an app for vulnerabilities and get test cases and scripts for it.
+            Paste a web address or upload a mobile build to audit it and get test cases and scripts for it.
           </p>
           <Link to="/scans/new" className="mt-5 inline-flex h-12 items-center rounded-[10px] bg-ink px-5 font-bold text-white">
             Start your first scan
@@ -132,15 +107,15 @@ export function Dashboard() {
                   </thead>
                   <tbody>
                     {data.recent_scans.map((s) => (
-                      <tr key={s.id} className="border-t border-line">
+                      <tr key={`${s.kind}-${s.id}`} className="border-t border-line">
                         <td className="px-5 py-3.5">
-                          <Link to={`/scans/${s.id}`} className="font-mono text-sm text-brand-600 hover:text-brand-700 break-all">
+                          <Link to={s.kind === "audit" ? `/audits/${s.id}` : `/scans/${s.id}`} className="font-mono text-sm text-brand-600 hover:text-brand-700 break-all">
                             {s.url}
                           </Link>
                           <div className="text-[13.5px] text-body">{new Date(s.created_at).toLocaleString()}</div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <ScanStatusPill status={s.status} progress={s.progress} />
+                          <StatusPill status={s.status} progress={s.progress} />
                         </td>
                         <td className="px-5 py-3.5 font-semibold whitespace-nowrap">
                           {s.total === 0 ? "None" : `${s.critical} critical, ${s.high} high, ${s.total} in all`}
@@ -161,7 +136,7 @@ export function Dashboard() {
                   {data.top_findings.map((f) => (
                     <li key={f.id} className="flex flex-wrap items-center gap-x-3.5 gap-y-2 border-t border-line px-5 py-3.5">
                       <SeverityBadge severity={f.severity} />
-                      <Link to={`/scans/${f.scan_id}/vulnerabilities`} className="min-w-0 flex-[1_1_240px] font-semibold hover:text-brand-600">
+                      <Link to={f.kind === "audit" ? `/audits/${f.scan_id}?tab=security` : `/scans/${f.scan_id}/vulnerabilities`} className="min-w-0 flex-[1_1_240px] font-semibold hover:text-brand-600">
                         {f.title}
                       </Link>
                       <span className="font-mono text-[13px] text-body break-all">{f.affected_url}</span>
@@ -175,7 +150,7 @@ export function Dashboard() {
           <section className="flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-2xl border border-gray-300 bg-white p-5">
             <h2 className="text-lg font-bold">Tests by type</h2>
             {testTypes.length === 0 ? (
-              <p className="text-body">No tests generated yet. Open a completed scan and choose Generate tests.</p>
+              <p className="text-body">No tests generated yet. Choose manual test cases when you start a scan.</p>
             ) : (
               <dl>
                 {testTypes.map(([type, count]) => (

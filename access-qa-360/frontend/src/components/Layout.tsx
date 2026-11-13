@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { FolderPlus, Layers, LayoutDashboard, LogOut, Plus, ShieldCheck, Users } from "lucide-react";
+import { FolderPlus, LayoutDashboard, ListChecks, LogOut, Plus, ShieldCheck, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
 
@@ -8,7 +8,7 @@ type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 const userNav: NavItem[] = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/scans/new", label: "New scan", icon: Plus },
-  { to: "/audits", label: "Full audit", icon: Layers },
+  { to: "/audits", label: "Scans", icon: ListChecks },
   { to: "/projects/new", label: "New project", icon: FolderPlus },
 ];
 
