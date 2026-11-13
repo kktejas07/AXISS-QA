@@ -223,7 +223,9 @@ def _ai_ready(context: dict | None = None) -> bool:
     """A model can be called: the organisation brought its own key, or the server has one."""
     if settings.ENVIRONMENT == "test":
         return False
-    return bool((context or {}).get("api_key")) or (settings.ANTHROPIC_API_KEY or "").startswith("sk-")
+    from app.core import platform
+
+    return bool((context or {}).get("api_key")) or bool(platform.ai_key())
 
 
 def plain_answer(question: str, found: list[dict]) -> str:

@@ -209,7 +209,7 @@ async def test_an_organisation_sets_its_ai_quality_and_key(client: AsyncClient, 
         org = await db.get(Organization, org_id)
         assert "sk-ant" not in org.ai_key_encrypted
         context = await ai.org_context(db, org_id, "scan-1")
-    assert context == {"organization_id": org_id, "audit_id": "scan-1", "quality": "fast", "api_key": "sk-ant-api03-abcdefghijklmnop-WXYZ", "provider": "anthropic"}
+    assert context == {"organization_id": org_id, "audit_id": "scan-1", "quality": "fast", "cap": None, "api_key": "sk-ant-api03-abcdefghijklmnop-WXYZ", "provider": "anthropic"}
 
     # The key and the quality are applied where the call is made.
     seen = {}

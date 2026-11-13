@@ -37,3 +37,5 @@ export const ssoStartUrl = (provider: "google", invite?: string) => {
   const base = (api.defaults.baseURL ?? "").replace(/\/$/, "");
   return `${base}/auth/sso/${provider}/start${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`;
 };
+
+export const updateMyName = (full_name: string) => api.patch<{ full_name: string }>("/auth/me", { full_name });

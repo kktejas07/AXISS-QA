@@ -5,7 +5,7 @@ import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ChangesTab, ConversationsTab, EndpointsTab, FlowsTab, SmokeTest, PerformanceTab, StandardsTab } from "../components/ScanInsights";
 import { ScanSteps } from "../components/ScanSteps";
-import { SbomCard } from "../components/Workspace";
+import { LicenceCard, SbomCard } from "../components/Workspace";
 import { StatusPill } from "../components/StatusPill";
 import {
   AccessibilityTab,
@@ -347,6 +347,7 @@ export function ScanDetailPage() {
         <div className="flex flex-col gap-5">
           <DownloadsTab job={job} />
           {(job.tier1_result?.packages?.length ?? 0) > 0 && <SbomCard auditId={job.id} count={job.tier1_result!.packages!.length} />}
+          {(job.tier1_result?.packages?.length ?? 0) > 0 && <LicenceCard auditId={job.id} canCheck={canStop === true} />}
         </div>
       )}
     </Layout>

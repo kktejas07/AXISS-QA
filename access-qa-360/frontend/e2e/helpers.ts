@@ -21,6 +21,15 @@ export async function signedIn(page: Page, request: APIRequestContext): Promise<
   return email;
 }
 
+/** Opens the app signed in as the super admin (see SUPER_ADMIN_EMAILS in serve-backend.sh). */
+export async function signedInAsAdmin(page: Page, request: APIRequestContext): Promise<void> {
+  const email = "admin@wiseflow-e2e.io";
+  // Already registered by an earlier test in the same run: that answer is fine.
+  await request.post(`${API}/auth/register`, { data: { email, password: PASSWORD, full_name: "Ada Admin" } });
+  const token = (await (await request.post(`${API}/auth/login`, { data: { email, password: PASSWORD } })).json()).access_token;
+  await page.addInitScript((t) => localStorage.setItem("token", t), token);
+}
+
 /** The six-digit code an authenticator app would show for this key right now (RFC 6238). */
 export function totp(secret: string, at = Date.now()): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";

@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import asyncio
+
 from app.api.deps import require_super_admin
+from app.core import platform
+from app.core.config import settings
+from app.core.providers import PROVIDERS
 from app.core.database import get_db
 from app.models.audit_job import AuditJob, AuditStatus
 from app.models.organization import AdminAuditLog, Organization
@@ -210,6 +215,12 @@ async def _org_detail(db: AsyncSession, org: Organization) -> AdminOrgDetail:
             AdminOrgMember(id=m.id, full_name=m.full_name, email=m.email, org_role=m.org_role, is_active=m.is_active)
             for m in members
         ],
+        ai_own_key=bool(org.ai_key_encrypted),
+        ai_provider=PROVIDERS.get(org.ai_provider, {}).get("name") if org.ai_key_encrypted else None,
+        ai_model=org.ai_model if org.ai_key_encrypted else None,
+        ai_monthly_cap_usd=org.ai_monthly_cap_usd,
+        ai_platform_cap_usd=settings.AI_MONTHLY_CAP_USD,
+        ai_spend_this_month=round(await asyncio.to_thread(platform.month_spend, org.id), 2),
     )
 
 
@@ -260,11 +271,32 @@ async def update_organization(
                 await log_admin_action(db, admin, f"org.{field}", org.name, f"{getattr(org, field) or 'no limit'} to {value or 'no limit'}")
                 setattr(org, field, value)
 
+    if "ai_monthly_cap_usd" in sent and body.ai_monthly_cap_usd != org.ai_monthly_cap_usd:
+        cap = body.ai_monthly_cap_usd
+        if cap is not None and not 0 <= cap <= 1_000_000:
+            raise HTTPException(422, "The AI allowance must be 0 or more whole dollars, or empty to use the platform's figure")
+        say = lambda v: "the platform's figure" if v is None else ("no limit" if v == 0 else f"${v}")
+        await log_admin_action(db, admin, "org.ai_allowance", org.name, f"{say(org.ai_monthly_cap_usd)} to {say(cap)}")
+        org.ai_monthly_cap_usd = cap
+
     if "status" in sent and body.status and body.status != org.status:
         await log_admin_action(db, admin, "org.suspend" if body.status == "suspended" else "org.reactivate", org.name)
         org.status = body.status
 
     await db.flush()
+    return await _org_detail(db, org)
+
+
+@router.delete("/organizations/{org_id}/ai-key", response_model=AdminOrgDetail)
+async def remove_ai_key(org_id: str, db: AsyncSession = Depends(get_db), admin: User = Depends(require_super_admin)):
+    """Take away an organisation's own AI key, for example one that leaked. It goes back to the platform's key."""
+    org = await db.get(Organization, org_id)
+    if not org:
+        raise HTTPException(404, "Organisation not found")
+    if org.ai_key_encrypted:
+        org.ai_key_encrypted, org.ai_provider, org.ai_model, org.ai_base_url = None, "anthropic", None, None
+        await log_admin_action(db, admin, "org.ai_key_removed", org.name)
+        await db.flush()
     return await _org_detail(db, org)
 
 

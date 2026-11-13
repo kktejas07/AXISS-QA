@@ -1,3 +1,6 @@
+import { AdminKeysPage } from "./pages/AdminKeysPage";
+import { HelpPage } from "./pages/HelpPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { Dashboard } from "./pages/Dashboard";
@@ -81,6 +84,9 @@ export default function App() {
         <Route path="/admin/organizations/:id" element={<RequireAuth><RequireSuperAdmin><AdminOrgDetailPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/queue" element={<RequireAuth><RequireSuperAdmin><AdminQueuePage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/ai-usage" element={<RequireAuth><RequireSuperAdmin><AdminAiUsagePage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+        <Route path="/help" element={<RequireAuth><HelpPage /></RequireAuth>} />
+        <Route path="/admin/keys" element={<RequireAuth><RequireSuperAdmin><AdminKeysPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/health" element={<RequireAuth><RequireSuperAdmin><AdminHealthPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/audit-log" element={<RequireAuth><RequireSuperAdmin><AdminAuditPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/library" element={<RequireAuth><LibraryPage /></RequireAuth>} />

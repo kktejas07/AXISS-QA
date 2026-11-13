@@ -6,6 +6,8 @@ export PYTHONPATH=. ENVIRONMENT=test SECRET_KEY=e2e-only-not-a-real-secret ANTHR
 export DATABASE_URL=sqlite+aiosqlite:///./e2e.db SYNC_DATABASE_URL=sqlite:///./e2e.db REDIS_URL=redis://localhost:6379/0
 # The chatbot test talks to a stand-in bot on this machine, which the scanner refuses unless told otherwise.
 export ALLOW_PRIVATE_TARGETS=true
+# The one account the browser tests sign in with to reach the admin console.
+export SUPER_ADMIN_EMAILS=admin@wiseflow-e2e.io
 export APP_URL=http://localhost:5183 CORS_ORIGINS=http://localhost:5183 STORAGE_DIR=e2e-storage
 rm -rf e2e.db e2e-storage
 python - <<'PY'

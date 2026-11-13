@@ -28,3 +28,15 @@ export const getNotifications = () => api.get<Notice[]>("/notifications");
 
 export interface FirstSteps { steps: { id: string; label: string; about: string; path: string; done: boolean }[]; done: number; total: number }
 export const getFirstSteps = () => api.get<FirstSteps>("/onboarding");
+
+export interface LicenceReport {
+  counts: { strong: number; unknown: number; weak: number; permissive: number };
+  about: Record<string, string>;
+  packages: { ecosystem: string; name: string; version: string; manifest: string; licence: string; group: "strong" | "unknown" | "weak" | "permissive" }[];
+  checked: number;
+  not_looked_up: number;
+  over_limit: number;
+}
+
+/** The first call for a scan looks the licences up from the package registries, which can take a little while. */
+export const getLicences = (auditId: string) => api.get<LicenceReport>(`/audits/${auditId}/licences`, { timeout: 120000 });

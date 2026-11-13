@@ -74,4 +74,6 @@ class AiUsage(Base):
     input_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     ok: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # True when the organisation's own key paid for the call, so it does not count towards its allowance.
+    own_key: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

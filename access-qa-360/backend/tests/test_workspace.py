@@ -101,3 +101,66 @@ async def test_notifications_and_first_steps(client: AsyncClient, test_user, aut
     await client.post(f"{API}/schedules", headers=auth_headers, json={"source_type": "web", "target": "https://shop.example.com", "frequency": "weekly", "ownership_confirmed": True})
     now = (await client.get(f"{API}/onboarding", headers=auth_headers)).json()
     assert now["done"] == 2 and [s["id"] for s in now["steps"] if s["done"]] == ["scan", "schedule"]
+
+
+def test_licences_are_sorted_by_what_they_ask_of_you():
+    from app.services.licences import classify
+
+    for licence, group in [("MIT", "permissive"), ("Apache-2.0", "permissive"), ("BSD-3-Clause", "permissive"), ("ISC", "permissive"),
+                           ("GPL-3.0-or-later", "strong"), ("GNU General Public License v2 (GPLv2)", "strong"), ("AGPL-3.0", "strong"),
+                           ("LGPL-2.1", "weak"), ("GNU Lesser General Public License v3", "weak"), ("MPL-2.0", "weak"),
+                           ("MIT OR GPL-3.0", "permissive"),                 # you may pick the easier one
+                           ("MIT AND GPL-3.0", "strong"),                    # both apply
+                           ("(MIT OR Apache-2.0)", "permissive"), ("", "unknown"), (None, "unknown"), ("UNLICENSED", "unknown"), ("Custom EULA", "unknown")]:
+        assert classify(licence) == group, licence
+
+
+async def test_a_code_scan_lists_its_licences_once_and_keeps_them(client: AsyncClient, test_user, auth_headers, monkeypatch):
+    import httpx
+
+    from app.services import licences
+
+    org = await org_of(client, auth_headers)
+    packages = [{"ecosystem": "PyPI", "name": "requests", "version": "2.31.0", "manifest": "requirements.txt"},
+                {"ecosystem": "PyPI", "name": "mystery", "version": "0.1.0", "manifest": "requirements.txt"},
+                {"ecosystem": "npm", "name": "@scope/copyleft", "version": "1.0.0", "manifest": "package-lock.json"},
+                {"ecosystem": "npm", "name": "left-pad", "version": "1.3.0", "manifest": "package-lock.json"},
+                {"ecosystem": "Maven", "name": "org.example:lib", "version": "1.0", "manifest": "pom.xml"}]
+    job = await scan(org, test_user, [], source_type="code", target_url=None, app_name="shop-api", tier1_result={"packages": packages})
+    plain = await scan(org, test_user, [], target_url="https://blog.example.com")
+    assert (await client.get(f"{API}/audits/{plain}/licences", headers=auth_headers)).status_code == 404
+
+    asked = []
+    answers = {"https://pypi.org/pypi/requests/2.31.0/json": {"info": {"classifiers": ["License :: OSI Approved :: Apache Software License"]}},
+               "https://registry.npmjs.org/@scope%2Fcopyleft/1.0.0": {"license": "GPL-3.0"},
+               "https://registry.npmjs.org/left-pad/1.3.0": {"license": {"type": "WTFPL"}}}
+
+    class Registry:
+        def __init__(self, **kwargs):
+            assert kwargs["follow_redirects"] is False
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url):
+            asked.append(url)
+            return httpx.Response(200, json=answers[url]) if url in answers else httpx.Response(404)
+
+    monkeypatch.setattr(licences.httpx, "AsyncClient", Registry)
+    got = (await client.get(f"{API}/audits/{job}/licences", headers=auth_headers)).json()
+    assert got["counts"] == {"strong": 1, "unknown": 1, "weak": 0, "permissive": 2} and got["checked"] == 4 and got["not_looked_up"] == 1
+    assert [(p["name"], p["licence"], p["group"]) for p in got["packages"]] == [
+        ("@scope/copyleft", "GPL-3.0", "strong"), ("mystery", "Not found", "unknown"), ("left-pad", "WTFPL", "permissive"), ("requests", "Apache Software License", "permissive")]
+    assert len(asked) == 4
+    again = (await client.get(f"{API}/audits/{job}/licences", headers=auth_headers)).json()
+    assert again == got and len(asked) == 4                                   # kept with the scan, not looked up twice
+
+
+async def test_you_can_change_your_own_name(client: AsyncClient, test_user, auth_headers):
+    assert (await client.patch(f"{API}/auth/me", headers=auth_headers, json={"full_name": "   "})).status_code == 422
+    assert (await client.patch(f"{API}/auth/me", headers=auth_headers, json={"full_name": "  Erin   Q. Tester "})).json() == {"full_name": "Erin Q. Tester"}
+    assert (await client.get(f"{API}/auth/me", headers=auth_headers)).json()["full_name"] == "Erin Q. Tester"
+    assert (await client.patch(f"{API}/auth/me", json={"full_name": "Nobody"})).status_code in (401, 403)

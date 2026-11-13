@@ -112,7 +112,8 @@ async def test_health_reports_each_part(client: AsyncClient, admin_headers, auth
     assert checks["Database"]["status"] == "ok" and checks["File storage"]["status"] == "ok"
     assert checks["Queue (Redis)"]["status"] == "down"          # no Redis in the test environment
     assert checks["Email"]["status"] == "off" and checks["Email"]["required"] is False
-    assert checks["AI service key"]["status"] == "off"          # the test key is a placeholder
+    assert checks["AI model"]["status"] == "off"                # the test key is a placeholder
+    assert {"Stripe", "Razorpay", "Sign in with Google", "Meaning-based search"} <= set(checks)
     assert data["healthy"] is False                              # a required part is down
 
 

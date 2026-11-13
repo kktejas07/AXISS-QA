@@ -126,6 +126,27 @@ async def sbom(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgContex
                     headers={"Content-Disposition": f'attachment; filename="wiseflow-sbom-{job.id[:8]}.cdx.json"'})
 
 
+@router.get("/audits/{audit_id}/licences")
+async def licences(audit_id: str, refresh: bool = False, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """The licence of each package a code scan found. Looked up once from the package registries, then kept with the scan."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app.services import licences as L
+
+    job = (await db.execute(select(AuditJob).where(AuditJob.id == audit_id, AuditJob.organization_id == ctx.org.id))).scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, "Scan not found")
+    data = job.tier1_result or {}
+    if not data.get("packages"):
+        raise HTTPException(404, "This scan has no package list. Scan the code again to get one.")
+    if refresh or "licences" not in data:
+        ctx.require("scan.run")          # the lookup calls outside services, so viewers and read-only keys only see a finished one
+        job.tier1_result = {**data, "licences": await L.report(data["packages"])}
+        flag_modified(job, "tier1_result")
+        await db.flush()
+    return job.tier1_result["licences"]
+
+
 @router.get("/notifications")
 async def notifications(db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     """What happened lately: scans that finished and scheduled runs that were skipped. Newest first."""
