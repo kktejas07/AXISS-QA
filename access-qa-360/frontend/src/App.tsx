@@ -1,3 +1,4 @@
+import { RouteMeta } from "./components/RouteMeta";
 import { AdminKeysPage } from "./pages/AdminKeysPage";
 import { HelpPage } from "./pages/HelpPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -54,6 +55,7 @@ function RequireSuperAdmin({ children }: { children: JSX.Element }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <RouteMeta />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

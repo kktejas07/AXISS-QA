@@ -21,6 +21,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // The built page carries the public home page's HTML so search engines can read it.
+      // Anyone signed in, or opening another address, should not see it flash by before the app starts.
+      try { if (location.pathname !== "/" || localStorage.getItem("token")) document.getElementById("root").innerHTML = ""; } catch (e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
