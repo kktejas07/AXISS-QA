@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
     PASSWORD_RESET_MINUTES: int = 60
+    # ---- Sign in with Google or Microsoft. Leave a provider's client id empty to switch it off. ----
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    MICROSOFT_CLIENT_ID: str = ""
+    MICROSOFT_CLIENT_SECRET: str = ""
+    # Your Microsoft Entra tenant id. Required for Microsoft sign-in: only accounts in this tenant may sign in.
+    MICROSOFT_TENANT_ID: str = ""
+    # Public address of this API, used as the address providers send people back to.
+    # Empty means APP_URL + "/api/v1", which is right when the web app proxies /api (the production setup).
+    SSO_REDIRECT_BASE: str = ""
     # ---- Plans and billing. The amounts are placeholders: change them before charging anyone. ----
     # Team plan, per seat per month: whole US dollars (Stripe) and whole rupees (Razorpay).
     TEAM_PRICE_USD: int = 29

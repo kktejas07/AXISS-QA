@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import secrets
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -12,7 +16,7 @@ from app.schemas.auth import (
     Token, LoginRequest, RegisterRequest, UserOut, MeOut, OrgBrief,
     ForgotPasswordRequest, ForgotPasswordOut, ResetPasswordRequest, ChangePasswordRequest,
 )
-from app.services import password_reset
+from app.services import password_reset, sso
 from app.services.mailer import email_configured, send_email
 from app.api.deps import OrgContext, get_org_context
 from app.services.orgs import create_personal_org, member_count, permissions_for
@@ -130,6 +134,78 @@ async def change_password(body: ChangePasswordRequest, db: AsyncSession = Depend
         raise HTTPException(status_code=400, detail="Choose a password that is different from the current one")
     await password_reset.set_password(db, user, body.new_password)
     return Token(access_token=create_access_token(user.id))
+
+
+# ---- sign in with Google or Microsoft ------------------------------------------
+
+SSO_COOKIE = "wf_sso"
+
+
+def _back_to_login(code: str) -> RedirectResponse:
+    return RedirectResponse(f"{settings.APP_URL.rstrip('/')}/login?sso_error={code}", status_code=302)
+
+
+@router.get("/sso/providers")
+async def sso_providers():
+    return sso.providers()
+
+
+@router.get("/sso/{provider}/start")
+async def sso_start(provider: Literal["google", "microsoft"], invite: str | None = None):
+    """Send the browser to the provider's sign-in page."""
+    try:
+        url, nonce = sso.authorize_url(provider, invite)
+    except sso.SsoError as e:
+        return _back_to_login(e.code)
+    response = RedirectResponse(url, status_code=302)
+    response.set_cookie(SSO_COOKIE, nonce, max_age=600, httponly=True, samesite="lax", secure=settings.APP_URL.startswith("https://"), path="/")
+    return response
+
+
+@router.get("/sso/{provider}/callback")
+async def sso_callback(
+    request: Request, provider: Literal["google", "microsoft"], code: str | None = None, state: str | None = None, error: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """The provider sends the person back here. Sign them in, creating the account on first use."""
+    if error or not code:
+        return _back_to_login("cancelled")
+    try:
+        claims = sso.read_state(state or "", provider, request.cookies.get(SSO_COOKIE))
+        if not sso.providers().get(provider):
+            raise sso.SsoError("unavailable")
+        email, name = await sso.identity(provider, code)
+    except sso.SsoError as e:
+        return _back_to_login(e.code)
+
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if user and not user.is_active:
+        return _back_to_login("deactivated")
+    if not user:
+        invite = None
+        if claims.get("i"):
+            invite = (await db.execute(select(Invite).where(Invite.token == claims["i"], Invite.accepted_at.is_(None)))).scalar_one_or_none()
+            if not invite or invite.email != email:
+                return _back_to_login("invite_mismatch")
+            org = await db.get(Organization, invite.organization_id)
+            if org.seat_limit is not None and await member_count(db, org.id) >= org.seat_limit:
+                return _back_to_login("no_seats")
+        # No password is set; the person can add one later with "Forgot password".
+        user = User(email=email, full_name=name, hashed_password=get_password_hash(secrets.token_urlsafe(32)),
+                    role=ROLE_SUPER_ADMIN if _is_bootstrap_admin(email) else ROLE_USER)
+        db.add(user)
+        await db.flush()
+        if invite:
+            user.organization_id, user.org_role = invite.organization_id, invite.role
+            invite.accepted_at = datetime.now(timezone.utc)
+            await db.flush()
+        else:
+            await create_personal_org(db, user)
+    elif not user.is_super_admin and _is_bootstrap_admin(user.email):
+        user.role = ROLE_SUPER_ADMIN
+    await db.commit()
+    # In the address fragment, which browsers never send to a server or write to its logs.
+    return RedirectResponse(f"{settings.APP_URL.rstrip('/')}/sso#token={create_access_token(user.id)}", status_code=302)
 
 
 @router.get("/me", response_model=MeOut)

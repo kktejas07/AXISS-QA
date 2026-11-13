@@ -2,7 +2,21 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../api/auth";
 import { AuthAlert, AuthCard, authButton, authField } from "../components/AuthCard";
+import { SsoButtons } from "../components/SsoButtons";
 import { clearMe } from "../hooks/useMe";
+
+// Why a Google or Microsoft sign-in did not finish, in plain words.
+const ssoErrors: Record<string, string> = {
+  cancelled: "The sign-in was cancelled. Try again when you are ready.",
+  expired: "That sign-in took too long or was started in another browser. Try again.",
+  failed: "The sign-in could not be completed. Try again, or use your email and password.",
+  unavailable: "That way of signing in is not switched on for this Wiseflow server.",
+  unverified: "Your Google account's email address is not verified, so it cannot be used to sign in.",
+  no_email: "That account did not share an email address, so it cannot be used to sign in.",
+  deactivated: "This account has been deactivated. Contact your administrator.",
+  invite_mismatch: "That invitation is for a different email address. Sign in with the address it was sent to.",
+  no_seats: "That organisation has no free seats. Ask its owner to make room.",
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -38,6 +52,8 @@ export function LoginPage() {
     <AuthCard title="Sign in" intro="Welcome back to your workspace.">
       {params.get("reset") && !error && <AuthAlert tone="ok">Your password was changed. Sign in with the new one.</AuthAlert>}
       {error && <AuthAlert>{error}</AuthAlert>}
+      {!error && params.get("sso_error") && <AuthAlert>{ssoErrors[params.get("sso_error") ?? ""] ?? ssoErrors.failed}</AuthAlert>}
+      <SsoButtons />
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5 text-sm font-semibold">
           Email

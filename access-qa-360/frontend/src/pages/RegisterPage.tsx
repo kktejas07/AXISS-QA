@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Logo } from "../components/Logo";
+import { SsoButtons } from "../components/SsoButtons";
 import { login, previewInvite, register } from "../api/auth";
 import { clearMe } from "../hooks/useMe";
 import { apiError } from "../utils/errors";
@@ -74,6 +75,7 @@ export function RegisterPage() {
           </p>
         )}
 
+        <SsoButtons invite={invite ? token : undefined} />
         <form onSubmit={submit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5 text-sm font-semibold">
             Full name
