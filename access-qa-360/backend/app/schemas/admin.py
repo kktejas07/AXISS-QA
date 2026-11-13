@@ -26,6 +26,8 @@ class AdminUserOut(BaseModel):
     created_at: datetime
     project_count: int = 0
     scan_count: int = 0
+    organization_name: str | None = None
+    org_role: str | None = None
 
 
 class AdminUserUpdate(BaseModel):
@@ -40,3 +42,46 @@ class AdminScanOut(BaseModel):
     progress: int
     created_at: datetime
     owner_email: str
+
+
+class AdminOrgOut(BaseModel):
+    id: str
+    name: str
+    account_type: str
+    status: str
+    seat_limit: int | None
+    scan_limit: int | None
+    member_count: int
+    scans_this_month: int
+    owner_email: str | None
+    created_at: datetime
+
+
+class AdminOrgMember(BaseModel):
+    id: str
+    full_name: str
+    email: str
+    org_role: str
+    is_active: bool
+
+
+class AdminOrgDetail(AdminOrgOut):
+    members: list[AdminOrgMember]
+
+
+class AdminOrgUpdate(BaseModel):
+    """Send only the fields to change. A limit of null means "no limit"."""
+
+    account_type: Literal["individual", "team", "enterprise"] | None = None
+    seat_limit: int | None = None
+    scan_limit: int | None = None
+    status: Literal["active", "suspended"] | None = None
+
+
+class AuditLogOut(BaseModel):
+    id: str
+    actor_email: str
+    action: str
+    target: str
+    detail: str
+    created_at: datetime

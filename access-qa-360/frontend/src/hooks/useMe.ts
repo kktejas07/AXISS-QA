@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { getMe } from "../api/auth";
-import type { User } from "../types";
+import type { Me, Permission } from "../types";
 
 // One /auth/me request per sign-in, shared by every component that needs the user.
-let cached: User | null = null;
-let pending: Promise<User> | null = null;
+let cached: Me | null = null;
+let pending: Promise<Me> | null = null;
 
-export function fetchMe(): Promise<User> {
+export function fetchMe(): Promise<Me> {
   if (cached) return Promise.resolve(cached);
   if (!pending) {
     pending = getMe()
@@ -28,8 +28,8 @@ export function clearMe() {
 }
 
 /** The signed-in user, or null while it is loading. */
-export function useMe(): User | null {
-  const [me, setMe] = useState<User | null>(cached);
+export function useMe(): Me | null {
+  const [me, setMe] = useState<Me | null>(cached);
   useEffect(() => {
     let alive = true;
     fetchMe()
@@ -40,4 +40,10 @@ export function useMe(): User | null {
     };
   }, []);
   return me;
+}
+
+/** Whether the signed-in user's role allows an action. Undefined while the user is loading. */
+export function useCan(permission: Permission): boolean | undefined {
+  const me = useMe();
+  return me ? me.permissions.includes(permission) : undefined;
 }

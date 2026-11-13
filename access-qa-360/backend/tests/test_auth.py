@@ -18,7 +18,7 @@ async def test_register(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_duplicate(client: AsyncClient):
-    payload = {"email": "dup@example.com", "password": "pass123", "full_name": "Dup"}
+    payload = {"email": "dup@example.com", "password": "pass12345", "full_name": "Dup"}
     await client.post("/api/v1/auth/register", json=payload)
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 400
@@ -53,3 +53,11 @@ async def test_me(client: AsyncClient, auth_headers):
     response = await client.get("/api/v1/auth/me", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["email"] == "test@example.com"
+
+
+@pytest.mark.asyncio
+async def test_register_rejects_short_passwords(client: AsyncClient):
+    response = await client.post("/api/v1/auth/register", json={
+        "email": "short@example.com", "password": "1234567", "full_name": "Short",
+    })
+    assert response.status_code == 422

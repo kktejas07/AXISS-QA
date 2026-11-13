@@ -95,12 +95,13 @@ export function AdminPage() {
 
       <section className="mb-7 overflow-hidden rounded-2xl border border-gray-300 bg-white">
         <h2 className="px-5 py-4 text-lg font-bold">Users and roles</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-left">
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-left">
             <thead>
               <tr className="bg-soft text-[13.5px] text-body">
                 <th scope="col" className="px-5 py-2.5 font-semibold">User</th>
-                <th scope="col" className="px-3 py-2.5 font-semibold">Role</th>
+                <th scope="col" className="px-3 py-2.5 font-semibold">Organisation</th>
+                <th scope="col" className="px-3 py-2.5 font-semibold">Platform role</th>
                 <th scope="col" className="px-3 py-2.5 font-semibold">Projects</th>
                 <th scope="col" className="px-3 py-2.5 font-semibold">Scans</th>
                 <th scope="col" className="px-3 py-2.5 font-semibold">Joined</th>
@@ -119,6 +120,10 @@ export function AdminPage() {
                         {self && <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-xs font-bold text-brand-700">You</span>}
                       </div>
                       <div className="text-[13.5px] text-body break-all">{u.email}</div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div>{u.organization_name ?? "None yet"}</div>
+                      {u.org_role && <div className="text-[13.5px] capitalize text-body">{u.org_role}</div>}
                     </td>
                     <td className="px-3 py-3">
                       <label className="sr-only" htmlFor={`role-${u.id}`}>
@@ -172,7 +177,7 @@ export function AdminPage() {
         {scans.length === 0 ? (
           <p className="border-t border-line px-5 py-4 text-body">No scans have been run yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-left">
               <thead>
                 <tr className="bg-soft text-[13.5px] text-body">

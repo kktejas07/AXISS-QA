@@ -27,6 +27,8 @@ class AuditJob(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    # Scans belong to the organisation, so every member can see them.
+    organization_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=True, index=True)
 
     # Input params
     # "web" | "android" | "ios". Mobile jobs have no target_url.

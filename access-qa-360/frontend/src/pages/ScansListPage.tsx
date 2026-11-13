@@ -46,7 +46,7 @@ export function ScansListPage() {
         </section>
       ) : (
         <section className="overflow-hidden rounded-2xl border border-gray-300 bg-white">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-left">
               <thead>
                 <tr className="bg-soft text-[13.5px] text-body">

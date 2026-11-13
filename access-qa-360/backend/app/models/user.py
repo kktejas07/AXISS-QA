@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime
+from sqlalchemy import String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -19,6 +19,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # "user" or "super_admin". Super admins see every organisation's data in /admin.
     role: Mapped[str] = mapped_column(String(20), default="user", server_default="user", nullable=False)
+    # The one organisation this user belongs to, and their role in it:
+    # "owner" | "admin" | "member" | "viewer". Filled in on sign-up or on first request.
+    organization_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=True, index=True)
+    org_role: Mapped[str] = mapped_column(String(16), default="owner", server_default="owner", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     projects: Mapped[list["Project"]] = relationship("Project", back_populates="owner", lazy="select")

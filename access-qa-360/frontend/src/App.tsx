@@ -15,6 +15,9 @@ import { NewScanPage } from "./pages/NewScanPage";
 import { ChooseTestsPage } from "./pages/ChooseTestsPage";
 import { ScanDetailPage } from "./pages/ScanDetailPage";
 import { ScansListPage } from "./pages/ScansListPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { AdminAuditPage, AdminOrgDetailPage, AdminOrgsPage } from "./pages/AdminOrgsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { useMe } from "./hooks/useMe";
@@ -36,6 +39,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/projects/new" element={<RequireAuth><ProjectsPage /></RequireAuth>} />
         <Route path="/projects/:projectId/suites" element={<RequireAuth><TestSuitesPage /></RequireAuth>} />
@@ -49,6 +54,9 @@ export default function App() {
         <Route path="/scans/:id/test-cases" element={<RequireAuth><TestCasesPage /></RequireAuth>} />
         <Route path="/scans/:id/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><RequireSuperAdmin><AdminPage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/admin/organizations" element={<RequireAuth><RequireSuperAdmin><AdminOrgsPage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/admin/organizations/:id" element={<RequireAuth><RequireSuperAdmin><AdminOrgDetailPage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/admin/audit-log" element={<RequireAuth><RequireSuperAdmin><AdminAuditPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/audits" element={<RequireAuth><ScansListPage /></RequireAuth>} />
         <Route path="/audits/new" element={<Navigate to="/scans/new" replace />} />
         <Route path="/audits/:id/setup" element={<RequireAuth><ChooseTestsPage /></RequireAuth>} />
