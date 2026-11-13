@@ -4,7 +4,8 @@ import { ArrowRight, FileText, Send, Trash2, X } from "lucide-react";
 import { addWiseDocument, askWise, getWiseDocuments, getWisePrompts, removeWiseDocument } from "../api/wise";
 import type { WiseDocument, WiseMessage, WisePrompt } from "../api/wise";
 import { apiError } from "../utils/errors";
-import { WiseChat, WiseOwl } from "./Illustrations";
+import { WiseBot } from "./WiseBot";
+import type { BotState } from "./WiseBot";
 import { Dots } from "./LoadingSpinner";
 import { errorBox } from "./ui";
 
@@ -30,6 +31,9 @@ export function Wise() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // What the character shows: searching while it works, a moment of "done" after an answer, "error" when it failed.
+  const [justAnswered, setJustAnswered] = useState(false);
+  const mood: BotState = busy ? "searching" : error ? "error" : justAnswered ? "done" : open ? "listening" : "idle";
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   // On a scan's page, that scan is always among the things Wise searches.
@@ -64,6 +68,8 @@ export function Wise() {
     try {
       const { data } = await askWise(next, auditId);
       setMessages([...next, { role: "assistant", content: data.answer, sources: data.sources, actions: data.actions }]);
+      setJustAnswered(true);
+      setTimeout(() => setJustAnswered(false), 2600);
     } catch (e) {
       setError(apiError(e, "Wise could not answer just now. Try again."));
     } finally {
@@ -80,7 +86,9 @@ export function Wise() {
           className="wf-slide-in fixed bottom-24 right-4 z-40 flex h-[min(620px,calc(100vh-7.5rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border-2 border-ink bg-white shadow-hard md:right-6"
         >
           <header className="flex items-center gap-3 border-b-2 border-ink bg-brand-600 px-4 py-3 text-white">
-            <WiseOwl className="h-10 w-10 flex-none" />
+            <span className="flex h-12 w-12 flex-none items-center justify-center overflow-hidden rounded-full bg-white">
+              <WiseBot state={mood} className="h-11 w-11" />
+            </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-bold leading-tight">Wise</h2>
               <p className="text-[13px] text-brand-100">Answers from your scans and documents</p>
@@ -98,7 +106,7 @@ export function Wise() {
           <div className="flex-1 overflow-y-auto px-4 py-4" aria-live="polite">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center gap-3 text-center">
-                <WiseChat className="h-28 w-auto" />
+                <WiseBot state="listening" className="h-28 w-28" />
                 <p className="font-semibold">Ask about your scans, or pick a question to start.</p>
                 <ul className="flex w-full flex-col gap-2">
                   {prompts.map((p, i) => (
@@ -175,7 +183,9 @@ export function Wise() {
         className="group fixed bottom-5 right-4 z-40 flex h-16 w-16 items-center justify-center rounded-full border-2 border-ink bg-white shadow-hard md:right-6"
       >
         {!open && <span aria-hidden="true" className="wf-ring absolute inset-0 rounded-full border-2 border-brand-600" />}
-        <WiseOwl className={`h-12 w-12 ${open ? "" : "wf-bob"}`} still={open} />
+        <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
+          <WiseBot state={busy ? "working" : "idle"} className="h-14 w-14" />
+        </span>
       </button>
     </>
   );
@@ -215,7 +225,7 @@ export function WiseDocuments({ canEdit }: { canEdit: boolean }) {
             Add requirements, user stories or release notes as text files. Wise then answers from them as well as from your scans. Up to 50 files of 1 MB each.
           </p>
         </div>
-        <WiseOwl className="hidden h-16 w-16 sm:block" still />
+        <WiseBot state="reading" className="hidden h-20 w-20 sm:block" />
       </div>
       {error && <p role="alert" className={`${errorBox} mb-4`}>{error}</p>}
       {notice && <p role="status" className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">{notice}</p>}

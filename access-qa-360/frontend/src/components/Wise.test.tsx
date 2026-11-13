@@ -6,6 +6,8 @@ import * as api from "../api/wise";
 import { Wise, WiseDocuments } from "./Wise";
 
 vi.mock("../api/wise");
+// The character is tested on its own in WiseBot.test.tsx.
+vi.mock("./WiseBot", () => ({ WiseBot: () => null }));
 
 const reply = (answer: string, more = {}) => ({ data: { answer, sources: [], actions: [], used_ai: false, ...more } }) as never;
 const open = async (path = "/") => {

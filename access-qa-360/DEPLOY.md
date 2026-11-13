@@ -75,3 +75,18 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs -f api
 
 - Scans run inside the API process. Restarting the API while a scan is running stops that scan; start it again from the app.
 - Run one API container. Several would each work, but a scan belongs to the container that started it.
+
+## The animated Wise character (optional)
+
+Wise can show an animated character from the "Agent Pals" Lottie pack. The pack is licensed
+artwork, so its files are not in this repository. On each machine that builds the web app,
+before building:
+
+```bash
+cd frontend
+node scripts/install-wise-bot.mjs "/path/to/Agent Pals/Lottie Pack/Circle"
+```
+
+That copies the 13 animations into `frontend/public/wise-bot/` (git-ignored) in Wiseflow's
+indigo. Add `--original` to keep the pack's own colours, or point at another bot's folder to
+use a different character. Without this step Wise shows a drawn owl and works the same.
