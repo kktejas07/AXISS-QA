@@ -16,10 +16,11 @@ from app.core.secrets import decrypt, encrypt
 from app.models.audit_job import AuditJob
 from app.models.integration import Integration
 from app.models.organization import Organization
-from app.services import github, notify, scan_control, schedules, trackers
+from app.core import providers
+from app.services import chatbot_auditor, github, notify, scan_control, schedules, trackers
 
 router = APIRouter(tags=["connections"])
-KINDS = ("slack", "teams", "github", "linear")
+KINDS = ("slack", "teams", "github", "linear", "azure")
 
 
 async def _row(db: AsyncSession, org_id: str, kind: str) -> Integration | None:
@@ -49,6 +50,8 @@ def _describe(kind: str, row: Integration | None, org_id: str, can_edit: bool) -
         return {"connected": True, "events": cfg.get("events", "automatic")}
     if kind == "linear":
         return {"connected": True, "team_key": cfg.get("team_key"), "team_name": cfg.get("team_name")}
+    if kind == "azure":
+        return {"connected": True, **{k: cfg.get(k) for k in ("organization", "project", "work_item_type")}}
     out = {"connected": True, "login": cfg.get("login"), "repo": cfg.get("repo"), "fail_on": cfg.get("fail_on", "high"), "webhook_url": webhook_url(org_id)}
     if can_edit:   # needed to set the webhook up on GitHub; not shown to members and viewers
         out["webhook_secret"] = decrypt(cfg.get("webhook_secret", ""))
@@ -118,8 +121,101 @@ async def save_linear(body: LinearSave, db: AsyncSession = Depends(get_db), ctx:
     return _describe("linear", row, ctx.org.id, True)
 
 
+class AzureSave(BaseModel):
+    organization: str = Field(pattern=f"^{trackers.AZURE_NAME}$")
+    project: str = Field(pattern=f"^{trackers.AZURE_NAME}$")
+    token: str = Field(min_length=10, max_length=400)
+    work_item_type: Literal["Bug", "Issue", "Task"] = "Bug"
+
+
+@router.put("/org/azure")
+async def save_azure(body: AzureSave, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Connect Azure Boards with a personal access token, to turn findings into work items."""
+    ctx.require("org.edit")
+    try:
+        project = await trackers.azure_check(body.organization, body.project, body.token.strip())
+    except trackers.TrackerError as e:
+        raise HTTPException(400, str(e))
+    row = await _save(db, ctx, "azure", {"organization": body.organization, "project": project, "work_item_type": body.work_item_type}, body.token.strip())
+    return _describe("azure", row, ctx.org.id, True)
+
+
+# ---- AI settings ---------------------------------------------------------------
+
+class AiSave(BaseModel):
+    quality: Literal["fast", "balanced", "best"]
+    provider: str = "anthropic"
+    # An exact model name, for organisations that want one. Empty: the provider's fast or best model is used.
+    model: str | None = Field(default=None, max_length=120)
+    # Only for the "custom" provider: where its OpenAI-compatible API lives.
+    base_url: str | None = Field(default=None, max_length=500)
+    # The organisation's own key. Left out: the saved key, if any, is kept. Empty string: it is removed.
+    api_key: str | None = Field(default=None, max_length=400)
+
+
+def _ai_out(org: Organization) -> dict:
+    key = decrypt(org.ai_key_encrypted) if org.ai_key_encrypted else None
+    return {
+        "quality": org.ai_quality or "balanced", "own_key": bool(key), "key_ending": key[-4:] if key else None,
+        "provider": (org.ai_provider or "anthropic") if key else "anthropic", "model": org.ai_model if key else None, "base_url": org.ai_base_url if key else None,
+        "providers": [{"id": pid, "name": p["name"], "fast": p["fast"], "best": p["best"]} for pid, p in providers.PROVIDERS.items()],
+    }
+
+
+@router.get("/org/ai")
+async def get_ai(ctx: OrgContext = Depends(get_org_context)):
+    return _ai_out(ctx.org)
+
+
+@router.put("/org/ai")
+async def save_ai(body: AiSave, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Choose speed against quality for this organisation's AI work, and optionally use its own Anthropic key."""
+    ctx.require("org.edit")
+    org = ctx.org
+    if body.provider not in providers.PROVIDERS:
+        raise HTTPException(422, "That AI provider is not one Wiseflow can use")
+    removing = body.api_key is not None and not body.api_key.strip()
+    key = (body.api_key or "").strip() or (None if removing else decrypt(org.ai_key_encrypted or "") or None)
+    org.ai_quality = body.quality
+    if removing or not key:
+        if body.provider != "anthropic":
+            raise HTTPException(422, f"Enter your {providers.PROVIDERS[body.provider]['name']} key. Wiseflow's own key only works with Claude.")
+        org.ai_key_encrypted, org.ai_provider, org.ai_model, org.ai_base_url = None, "anthropic", None, None
+        await db.flush()
+        return _ai_out(org)
+
+    saved_provider = org.ai_provider or "anthropic"
+    if body.provider != saved_provider and not (body.api_key or "").strip():
+        raise HTTPException(422, "A key only works with the provider it came from. Enter the key for the provider you chose.")
+    model = (body.model or "").strip() or None
+    base = None
+    if body.provider == "anthropic":
+        if not (key.startswith("sk-ant-") and len(key) >= 24):
+            raise HTTPException(422, "That does not look like an Anthropic API key. They start with sk-ant-")
+    else:
+        if len(key) < 16:
+            raise HTTPException(422, "That key is too short to be an API key")
+        if body.provider == "custom":
+            base = (body.base_url or "").strip().rstrip("/")
+            try:
+                chatbot_auditor.check_endpoint(base)      # https, and not an address on a private network
+            except chatbot_auditor.ChatbotError:
+                raise HTTPException(422, "Enter the API's address starting with https://. Addresses on a private network are not accepted.")
+            if not model:
+                raise HTTPException(422, "Enter the model name to use with that API")
+        # Try the key and the model with one tiny call, so a typo is found now and not in the middle of a scan.
+        try:
+            await providers.chat(body.provider, base, key, providers.model_for(body.provider, "", body.quality, model),
+                                 messages=[{"role": "user", "content": "Reply with the word OK."}], max_tokens=16, timeout=30)
+        except providers.ProviderError as e:
+            raise HTTPException(400, f"{e}. Check the key and the model name.")
+    org.ai_key_encrypted, org.ai_provider, org.ai_model, org.ai_base_url = encrypt(key), body.provider, model, base
+    await db.flush()
+    return _ai_out(org)
+
+
 @router.delete("/org/connections/{kind}", status_code=204)
-async def disconnect(kind: Literal["slack", "teams", "github", "linear"], db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+async def disconnect(kind: Literal["slack", "teams", "github", "linear", "azure"], db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     ctx.require("org.edit")
     row = await _row(db, ctx.org.id, kind)
     if row:

@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 from datetime import datetime, timezone
 from typing import Literal
 from urllib.parse import urlparse
@@ -34,7 +35,7 @@ from app.models.audit_job import AuditJob, AuditStatus
 from app.models.user import User
 from app.api.deps import OrgContext, get_org_context
 from app.services.code_auditor import SourceError, parse_repo_url
-from app.services import api_spec_auditor, scan_control
+from app.services import api_spec_auditor, chatbot_auditor, scan_control
 from app.services.orgs import scans_this_month
 
 router = APIRouter(prefix="/audits", tags=["audits"])
@@ -47,11 +48,20 @@ def _launch(job_id: str) -> None:
 # Schemas
 # ---------------------------------------------------------------------------
 
+class ChatbotIn(BaseModel):
+    """How to talk to the chatbot being tested."""
+    body: str = Field(max_length=4000)                 # the JSON to send, with {{message}} where the message goes
+    reply_path: str = Field(max_length=200)            # where the reply is in the answer, e.g. choices.0.message.content
+    header_name: str | None = Field(default=None, max_length=100)
+    header_value: str | None = Field(default=None, max_length=2000)
+
+
 class AuditCreate(BaseModel):
-    source_type: Literal["web", "android", "ios", "code", "repo", "api"] = "web"
+    source_type: Literal["web", "android", "ios", "code", "repo", "api", "chatbot"] = "web"
     target_url: str | None = None
     repo_url: str | None = None     # public GitHub, GitLab or Bitbucket link, for source_type "repo"
     app_name: str | None = None
+    chatbot: ChatbotIn | None = None
     mobile_url: str | None = None   # Play Store / App Store URL
     # True keeps the original one-call behaviour: run everything straight away.
     autostart: bool = True
@@ -193,6 +203,17 @@ async def create_audit(
         # Optional: where the API runs, to probe it as well as reading its description.
         if target_url and not _is_web_address(target_url):
             raise HTTPException(422, "The API's address must start with http:// or https://")
+    elif body.source_type == "chatbot":
+        if not body.chatbot:
+            raise HTTPException(422, "Say how to send a message to the chatbot")
+        try:
+            chatbot_auditor.check_endpoint(target_url or "")
+            chatbot_auditor.check_config(body.chatbot.body, body.chatbot.reply_path)
+        except chatbot_auditor.ChatbotError as e:
+            raise HTTPException(422, str(e))
+        name = (body.chatbot.header_name or "").strip()
+        if name and (not re.fullmatch(r"[A-Za-z0-9-]{1,100}", name) or name.lower() in ("host", "content-length", "content-type", "transfer-encoding")):
+            raise HTTPException(422, "That header name cannot be used")
     else:
         target_url = None
     if body.mobile_url and not _is_web_address(body.mobile_url):
@@ -213,6 +234,10 @@ async def create_audit(
         mobile_url=body.mobile_url,
         repo_url=repo_url,
     )
+    if body.source_type == "chatbot":
+        job.chatbot_config = {"body": body.chatbot.body, "reply_path": body.chatbot.reply_path, "header_name": name or None}
+        if name:   # the header usually carries a key, so it is stored encrypted and wiped when the scan ends
+            job.login_encrypted = encrypt(json.dumps({"header": {"name": name, "value": body.chatbot.header_value or ""}}))
     # A mobile job needs its build uploaded first, so it always starts as a draft.
     autostart = body.autostart and (body.source_type == "web" or bool(body.mobile_url))
     if autostart:
@@ -361,7 +386,8 @@ async def start_audit(
     job.depth = body.depth
     job.ownership_confirmed_at = now
     job.started_at = now
-    job.login_encrypted = login
+    if login:
+        job.login_encrypted = login
     await db.commit()
     await db.refresh(job)
 

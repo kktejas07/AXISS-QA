@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowRight, FileText, Send, Trash2, X } from "lucide-react";
-import { addWiseDocument, askWise, getWiseDocuments, getWisePrompts, removeWiseDocument } from "../api/wise";
-import type { WiseDocument, WiseMessage, WisePrompt } from "../api/wise";
+import { addWiseDocument, askWise, doWiseAction, getWiseDocuments, getWisePrompts, removeWiseDocument } from "../api/wise";
+import type { WiseAction, WiseDocument, WiseMessage, WisePrompt } from "../api/wise";
 import { apiError } from "../utils/errors";
 import { WiseBot } from "./WiseBot";
 import type { BotState } from "./WiseBot";
@@ -125,8 +125,21 @@ export function Wise() {
                     <p className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[15px] ${m.role === "user" ? "rounded-br-md bg-ink text-white" : "rounded-bl-md bg-soft"}`}>
                       {m.content}
                     </p>
-                    {m.actions?.map((a) => (
-                      <Link key={a.path} to={a.path} onClick={() => setOpen(false)} className="flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3.5 py-2 text-sm font-bold text-white hover:bg-brand-700">
+                    {m.actions?.filter((a) => a.do).map((a) => (
+                      <WiseOffer
+                        key={a.label}
+                        action={a}
+                        // Once used or turned down, the offer is taken out of the conversation so it cannot be pressed again later.
+                        onClose={(result) =>
+                          setMessages((all) => [
+                            ...all.map((msg, at) => (at === i ? { ...msg, actions: msg.actions?.filter((x) => x.label !== a.label) } : msg)),
+                            ...(result ? [{ role: "assistant" as const, content: result.message, actions: [{ label: "Open it", path: result.path }] }] : []),
+                          ])
+                        }
+                      />
+                    ))}
+                    {m.actions?.filter((a) => a.path).map((a) => (
+                      <Link key={a.path} to={a.path!} onClick={() => setOpen(false)} className="flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-3.5 py-2 text-sm font-bold text-white hover:bg-brand-700">
                         {a.label}
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </Link>
@@ -188,6 +201,45 @@ export function Wise() {
         </span>
       </button>
     </>
+  );
+}
+
+/**
+ * Something Wise offers to do itself. Nothing happens until the person ticks that they may
+ * test the target and presses the button; after that the offer cannot be used a second time.
+ */
+function WiseOffer({ action, onClose }: { action: WiseAction; onClose: (result?: { message: string; path: string }) => void }) {
+  const [allowed, setAllowed] = useState(false);
+  const [state, setState] = useState<"ready" | "busy">("ready");
+  const [error, setError] = useState("");
+  const run = async () => {
+    setError("");
+    setState("busy");
+    try {
+      onClose((await doWiseAction(action.do!)).data);
+    } catch (e) {
+      setError(apiError(e, "That could not be done. Try again."));
+      setState("ready");
+    }
+  };
+  return (
+    <div role="group" aria-label={action.label} className="wf-fade-up flex w-full max-w-[92%] flex-col gap-2.5 rounded-xl border-2 border-ink bg-white p-3.5">
+      <p className="font-bold">{action.label}?</p>
+      <p className="text-[14px] text-body">{action.confirm}</p>
+      <label className="flex items-start gap-2.5 text-[14px] font-medium">
+        <input type="checkbox" checked={allowed} onChange={(e) => setAllowed(e.target.checked)} className="mt-0.5 h-[18px] w-[18px] flex-none accent-brand-600" />
+        I own this app or have permission to test it.
+      </label>
+      {error && <p role="alert" className="text-[13.5px] text-red-800">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={!allowed || state === "busy"} onClick={run} className="h-10 rounded-[9px] bg-brand-600 px-3.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50">
+          {state === "busy" ? "Working" : "Yes, do it"}
+        </button>
+        <button type="button" disabled={state === "busy"} onClick={() => onClose()} className="h-10 rounded-[9px] border-[1.5px] border-gray-400 bg-white px-3.5 text-sm font-semibold">
+          Not now
+        </button>
+      </div>
+    </div>
   );
 }
 

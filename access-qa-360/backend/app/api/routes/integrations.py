@@ -153,7 +153,7 @@ class IssueCreate(BaseModel):
     source: Literal["security", "mobile"]
     index: int = Field(ge=0)
     # Which tracker to use. Left out: the first one connected, in the order Jira, GitHub, Linear.
-    tracker: Literal["jira", "github", "linear"] | None = None
+    tracker: Literal["jira", "github", "linear", "azure"] | None = None
 
 
 class IssueOut(BaseModel):
@@ -200,10 +200,10 @@ async def create_issue(audit_id: str, body: IssueCreate, db: AsyncSession = Depe
         finding.setdefault("affected_url", job.source_filename or "Mobile build")
 
     rows = {r.kind: r for r in (await db.execute(select(Integration).where(Integration.organization_id == ctx.org.id))).scalars().all()}
-    usable = [k for k in ("jira", "github", "linear") if k in rows and (k != "github" or rows[k].config.get("repo"))]
+    usable = [k for k in ("jira", "github", "linear", "azure") if k in rows and (k != "github" or rows[k].config.get("repo"))]
     kind = body.tracker or (usable[0] if usable else None)
     if kind not in usable:
-        raise HTTPException(400, "No issue tracker is connected. An owner or admin can connect Jira, GitHub or Linear in Settings.")
+        raise HTTPException(400, "No issue tracker is connected. An owner or admin can connect Jira, GitHub, Linear or Azure Boards in Settings.")
     row = rows[kind]
     token = decrypt(row.secret_encrypted)
     if not token:
@@ -216,8 +216,10 @@ async def create_issue(audit_id: str, body: IssueCreate, db: AsyncSession = Depe
             key, url = await jira.create_issue(cfg["base_url"], cfg["email"], token, fields)
         elif kind == "github":
             key, url = await trackers.github_issue(token, cfg["repo"], finding, job.label, link)
-        else:
+        elif kind == "linear":
             key, url = await trackers.linear_issue(token, cfg["team_id"], finding, job.label, link)
+        else:
+            key, url = await trackers.azure_issue(cfg["organization"], cfg["project"], cfg["work_item_type"], token, finding, job.label, link)
     except (jira.JiraError, trackers.TrackerError) as e:
         raise HTTPException(502, str(e))
     issue = TrackerIssue(audit_id=job.id, finding_ref=ref, issue_key=key, issue_url=url, created_by=ctx.user.id)

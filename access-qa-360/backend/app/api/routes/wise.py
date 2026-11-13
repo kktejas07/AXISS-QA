@@ -41,6 +41,53 @@ async def chat(body: ChatIn, db: AsyncSession = Depends(get_db), ctx: OrgContext
     return await wise.answer(db, ctx.org.id, ctx.user.id, [m.model_dump() for m in body.messages], body.audit_id)
 
 
+class ActionIn(BaseModel):
+    kind: Literal["start_scan", "create_schedule", "rescan"]
+    target: str | None = Field(default=None, max_length=2048)
+    frequency: Literal["daily", "weekly", "monthly"] = "weekly"
+    audit_id: str | None = None
+    # The person pressed the button and ticked that they may test this target. Nothing happens without it.
+    confirmed: bool = False
+
+
+@router.post("/wise/actions")
+async def act(body: ActionIn, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """
+    Carry out something Wise offered. It runs as the signed-in person, through the same
+    rules as the screens: their role, the scan allowance and the permission-to-test check.
+    """
+    from app.api.routes import audits, schedules as schedule_routes
+    from app.models.audit_job import AuditJob
+    from sqlalchemy import and_, or_
+
+    if ctx.via_api_key:
+        raise HTTPException(403, "Wise acts for a signed-in person, not for an API key")
+    ctx.require("scan.run")
+    if not body.confirmed:
+        raise HTTPException(400, "Confirm that you own this app or have permission to test it")
+
+    if body.kind == "create_schedule":
+        made = await schedule_routes.create_schedule(
+            schedule_routes.ScheduleIn(source_type="web", target=body.target or "", frequency=body.frequency, ownership_confirmed=True), db, ctx)
+        return {"message": f"Done. {made.target} will be scanned {made.frequency}, first on {made.next_run_at:%d %B}.", "path": "/schedules"}
+
+    source, target, outputs, depth = "web", body.target, ["security", "manual"], "standard"
+    if body.kind == "rescan":
+        old = (await db.execute(select(AuditJob).where(AuditJob.id == (body.audit_id or ""), or_(
+            AuditJob.organization_id == ctx.org.id, and_(AuditJob.organization_id.is_(None), AuditJob.created_by == ctx.user.id))))).scalar_one_or_none()
+        if not old:
+            raise HTTPException(404, "Scan not found")
+        if old.source_type not in ("web", "repo"):
+            raise HTTPException(400, "That kind of scan needs its file uploaded again. Start it from New scan.")
+        source, target, depth = old.source_type, old.target_url or old.repo_url, old.depth or "standard"
+        outputs = [o for o in (old.outputs or outputs) if o in ("security", "manual", "playwright")] or outputs
+    create = audits.AuditCreate(source_type=source, autostart=False, **({"target_url": target} if source == "web" else {"repo_url": target}))
+    job = await audits.create_audit(create, db, ctx)
+    allowed = [o for o in outputs if o in job.allowed_outputs]
+    job = await audits.start_audit(job.id, audits.AuditStart(outputs=allowed, depth=depth, ownership_confirmed=True), db, ctx)
+    return {"message": f"The scan of {job.label} has started.", "path": f"/audits/{job.id}"}
+
+
 @router.get("/wise/prompts")
 async def prompts():
     return wise.PROMPTS

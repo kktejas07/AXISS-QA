@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download } from "lucide-react";
-import { getChanges, getStandards, standardsCsvPath } from "../api/insights";
+import { getAudit } from "../api/audits";
+import { getChanges, getStandards, standardsCsvPath, startSmokeRun } from "../api/insights";
+import { useCan } from "../hooks/useMe";
+import { apiError } from "../utils/errors";
 import type { Changes, FlatFinding, ScanBrief, Standards } from "../api/insights";
 import type { AuditJob } from "../api/audits";
 import { downloadFromApi } from "../utils/download";
 import { getFlows } from "../api/wise";
 import type { FlowNode, Flows } from "../api/wise";
 import { ApiBraces, CompareSheets, EmptyPanel, FlowMap, ShieldList, SpeedGauge } from "./Illustrations";
-import { LoadingSpinner } from "./LoadingSpinner";
+import { Dots, LoadingSpinner } from "./LoadingSpinner";
 import { SeverityTag } from "./ScanResults";
 import { card, errorBox } from "./ui";
 
@@ -417,5 +420,151 @@ export function FlowsTab({ job }: { job: AuditJob }) {
         </aside>
       </div>
     </div>
+  );
+}
+
+const verdictLook: Record<string, [string, string]> = {
+  pass: ["Passed", "bg-emerald-100 text-emerald-900"],
+  fail: ["Failed", "bg-red-100 text-red-900"],
+  review: ["Check by hand", "bg-amber-100 text-amber-900"],
+  error: ["No answer", "bg-gray-200 text-ink"],
+};
+
+/** Chatbot scans: every test message, what the bot replied, and the verdict. */
+export function ConversationsTab({ job }: { job: AuditJob }) {
+  const result = job.tier1_result?.chatbot;
+  const [show, setShow] = useState<"all" | "problems">("problems");
+  if (!result) {
+    return (
+      <EmptyPanel art={<ShieldList />} title="The chatbot was not tested">
+        {job.tier1_result?.error ?? "No test messages have been sent yet."}
+      </EmptyPanel>
+    );
+  }
+  const problems = result.probes.filter((p) => p.verdict !== "pass");
+  const shown = show === "all" ? result.probes : problems;
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="max-w-[72ch] text-body">{result.note}</p>
+      <dl className="grid gap-4 sm:grid-cols-4">
+        {[["Passed", result.passed, ""], ["Failed", result.failed, result.failed ? "text-red-800" : ""], ["Check by hand", result.review, ""], ["No answer", result.errors, ""]].map(([k, v, tone]) => (
+          <div key={k} className={`${card} p-5`}>
+            <dt className="text-[13.5px] font-semibold text-body">{k}</dt>
+            <dd className={`text-2xl font-extrabold ${tone}`}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div role="group" aria-label="Which conversations to show" className="flex gap-1 self-start rounded-[11px] border border-gray-300 bg-white p-1">
+        {([["problems", `Needs attention (${problems.length})`], ["all", `All (${result.probes.length})`]] as const).map(([id, text]) => (
+          <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)} className={`min-h-[40px] rounded-[8px] px-3.5 text-sm font-semibold ${show === id ? "bg-ink text-white" : "text-ink"}`}>
+            {text}
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
+        <p className={`${card} px-6 py-10 text-center text-body`}>Every test message got a safe reply.</p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {shown.map((p, i) => (
+            <li key={p.id} className={`${card} wf-fade-up flex flex-col gap-3 p-5`} style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-bold ${verdictLook[p.verdict][1]}`}>{verdictLook[p.verdict][0]}</span>
+                <span className="text-[13.5px] font-semibold text-body">{p.category}</span>
+                <h2 className="w-full text-lg font-bold">{p.name}</h2>
+              </div>
+              <p className="max-w-[90%] self-end whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-ink px-3.5 py-2.5 text-[15px] text-white">{p.prompt}</p>
+              {p.reply && <p className="max-w-[90%] self-start whitespace-pre-wrap break-words rounded-2xl rounded-bl-md bg-soft px-3.5 py-2.5 text-[15px]">{p.reply}</p>}
+              <p className="text-[15px]"><span className="font-semibold">Verdict:</span> {p.why}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const smokeLook: Record<string, [string, string]> = {
+  pass: ["Loads", "bg-emerald-100 text-emerald-900"],
+  warn: ["Loads, with problems", "bg-amber-100 text-amber-900"],
+  fail: ["Broken", "bg-red-100 text-red-900"],
+};
+
+/**
+ * Website scans: open every mapped page again in a real browser, now, and show which still load.
+ * The steps are Wiseflow's own; the AI-written scripts below it are for the person's own pipeline.
+ */
+export function SmokeTest({ job }: { job: AuditJob }) {
+  const canRun = useCan("scan.run");
+  const [run, setRun] = useState(job.tier1_result?.smoke_run);
+  const [error, setError] = useState("");
+  const [starting, setStarting] = useState(false);
+  const running = run?.state === "running";
+
+  // While a run is in progress, ask the server every few seconds whether it has finished.
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => {
+      getAudit(job.id).then((r) => setRun(r.data.tier1_result?.smoke_run)).catch(() => {});
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [running, job.id]);
+
+  const start = async () => {
+    setError("");
+    setStarting(true);
+    try {
+      const { data } = await startSmokeRun(job.id);
+      setRun({ state: "running", total: data.total, pages: [] });
+    } catch (e) {
+      setError(apiError(e, "The smoke test could not be started. Try again."));
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  return (
+    <section className={`${card} overflow-hidden`}>
+      <div className="flex flex-wrap items-center justify-between gap-4 p-5">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold">Smoke test</h2>
+          <p className="max-w-[64ch] text-body">
+            Wiseflow opens each page this scan mapped in a real browser and checks that it still loads, the server answers without an error, and the page's script does not crash. Public pages only.
+          </p>
+        </div>
+        {canRun && (
+          <button type="button" onClick={start} disabled={running || starting} className="flex h-12 items-center gap-2 rounded-[10px] bg-brand-600 px-5 font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+            {running ? "Running" : run ? "Run again" : "Run a smoke test"}
+          </button>
+        )}
+      </div>
+      {error && <p role="alert" className={`${errorBox} mx-5 mb-5`}>{error}</p>}
+      {running && (
+        <div role="status" className="flex items-center gap-3 border-t border-line px-5 py-4">
+          <Dots />
+          <span>Opening {run?.total ?? "the"} pages. This takes up to a minute.</span>
+        </div>
+      )}
+      {run?.state === "failed" && <p role="alert" className={`${errorBox} mx-5 mb-5`}>{run.error}</p>}
+      {run?.state === "done" && (
+        <div className="border-t border-line">
+          <p role="status" className="px-5 py-3 font-semibold">
+            {run.failed ? `${run.failed} of ${run.pages.length} pages are broken.` : run.warned ? `Every page loads; ${run.warned} have problems worth a look.` : `All ${run.pages.length} pages load cleanly.`}
+            <span className="font-normal text-body"> Run on {new Date(run.finished_at!).toLocaleString()}.</span>
+          </p>
+          <ul className="divide-y divide-line border-t border-line">
+            {run.pages.map((p) => (
+              <li key={p.url} className="flex flex-col gap-1 px-5 py-3">
+                <span className="flex flex-wrap items-center gap-2.5">
+                  <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-bold ${smokeLook[p.verdict][1]}`}>{smokeLook[p.verdict][0]}</span>
+                  <span className="break-all font-mono text-sm font-semibold">{p.path}</span>
+                  <span className="text-[13.5px] text-body">{p.status ? `status ${p.status}` : "no answer"}{p.ms !== null ? `, ${(p.ms / 1000).toFixed(1)} s` : ""}</span>
+                </span>
+                {p.problems.map((text, i) => <span key={i} className="break-words text-[14.5px]">{text}</span>)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }

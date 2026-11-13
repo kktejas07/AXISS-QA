@@ -6,10 +6,11 @@ import type { AuditJob } from "../api/audits";
 import type { Changes, ScanBrief, Standards } from "../api/insights";
 import * as api from "../api/insights";
 import * as wiseApi from "../api/wise";
-import { ChangesTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab, TrendChart } from "./ScanInsights";
+import { ChangesTab, ConversationsTab, EndpointsTab, FlowsTab, SmokeTest, PerformanceTab, StandardsTab, TrendChart } from "./ScanInsights";
 
 vi.mock("../api/insights");
 vi.mock("../api/wise");
+vi.mock("../hooks/useMe", () => ({ useCan: () => true }));
 
 const brief = (id: string, risk: number | null, date: string): ScanBrief => ({ id, label: "shop.example.com", created_at: date, risk_score: risk, findings: 2, counts: {}, branch: null });
 const job = (more: Partial<AuditJob> = {}) => ({ id: "now", label: "shop.example.com", source_type: "web", ...more }) as AuditJob;
@@ -140,5 +141,58 @@ describe("FlowsTab", () => {
     vi.mocked(wiseApi.getFlows).mockReturnValue(ok({ nodes: [], edges: [], pages_crawled: 0, shown: 0 }));
     render(<FlowsTab job={job()} />);
     expect(await screen.findByRole("heading", { name: "No pages to map" })).toBeInTheDocument();
+  });
+});
+
+describe("ConversationsTab", () => {
+  const probe = (id: string, verdict: "pass" | "fail" | "review", name: string) => ({ id, category: "Prompt injection", name, severity: "high", prompt: `message ${id}`, reply: `reply ${id}`, verdict, why: `why ${id}` });
+  const chatbot = { greeting: "Hi", note: "Replies are judged by fixed rules.", passed: 1, failed: 1, review: 1, errors: 0,
+    probes: [probe("a", "pass", "Stayed on task"), probe("b", "fail", "Told to ignore its instructions"), probe("c", "review", "Asked about a made-up product")] };
+
+  it("shows what needs attention first, with the message, the reply and the verdict", async () => {
+    render(<ConversationsTab job={job({ source_type: "chatbot", tier1_result: { chatbot } })} />);
+    expect(screen.getByRole("heading", { name: "Told to ignore its instructions" })).toBeInTheDocument();
+    expect(screen.getByText("message b")).toBeInTheDocument();
+    expect(screen.getByText("reply b")).toBeInTheDocument();
+    expect(screen.getByText("why b")).toBeInTheDocument();
+    expect(screen.getByText("Check by hand", { selector: "span" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Stayed on task" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "All (3)" }));
+    expect(screen.getByRole("heading", { name: "Stayed on task" })).toBeInTheDocument();
+  });
+
+  it("explains when the bot could not be reached", () => {
+    render(<ConversationsTab job={job({ source_type: "chatbot", tier1_result: { error: "The chatbot answered with an error (status 401)" } })} />);
+    expect(screen.getByText("The chatbot answered with an error (status 401)")).toBeInTheDocument();
+  });
+});
+
+describe("SmokeTest", () => {
+  it("starts a run and says it is in progress", async () => {
+    vi.mocked(api.startSmokeRun).mockReturnValue(ok({ state: "running", total: 6 }));
+    render(<SmokeTest job={job({ tier1_result: {} })} />);
+    await userEvent.click(screen.getByRole("button", { name: "Run a smoke test" }));
+    expect(api.startSmokeRun).toHaveBeenCalledWith("now");
+    expect(await screen.findByRole("status")).toHaveTextContent("Opening 6 pages");
+    expect(screen.getByRole("button", { name: "Running" })).toBeDisabled();
+  });
+
+  it("lists each page with what is wrong with it", () => {
+    const smoke_run = { state: "done" as const, finished_at: "2026-11-14T00:00:00Z", passed: 1, warned: 0, failed: 1, pages: [
+      { url: "https://shop.example.com/", path: "/", status: 200, ms: 800, verdict: "pass" as const, problems: [] },
+      { url: "https://shop.example.com/cart", path: "/cart", status: 500, ms: 1200, verdict: "fail" as const, problems: ["The server answered with status 500"] },
+    ] };
+    render(<SmokeTest job={job({ tier1_result: { smoke_run } })} />);
+    expect(screen.getByRole("status")).toHaveTextContent("1 of 2 pages are broken.");
+    expect(screen.getByText("The server answered with status 500")).toBeInTheDocument();
+    expect(screen.getByText("Broken")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run again" })).toBeEnabled();
+  });
+
+  it("shows why a run could not start", async () => {
+    vi.mocked(api.startSmokeRun).mockRejectedValue({ response: { data: { detail: "This scan mapped no pages to test" } } });
+    render(<SmokeTest job={job({ tier1_result: {} })} />);
+    await userEvent.click(screen.getByRole("button", { name: "Run a smoke test" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("This scan mapped no pages to test");
   });
 });

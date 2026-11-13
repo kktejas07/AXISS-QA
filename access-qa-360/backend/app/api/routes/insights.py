@@ -78,6 +78,26 @@ async def flows(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgConte
     return {"nodes": nodes, "edges": edges, "pages_crawled": (job.tier1_result or {}).get("pages_audited", len(pages)), "shown": len(nodes)}
 
 
+@router.post("/{audit_id}/smoke-run", status_code=202)
+async def smoke_run(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Open every page this website scan mapped in a real browser and check that each still loads without errors."""
+    from app.services import smoke
+
+    ctx.require("scan.run")
+    job = await _job(db, ctx, audit_id)
+    if job.source_type != "web":
+        raise HTTPException(400, "A smoke test opens web pages, so it is only for website scans")
+    urls = smoke.urls_for(job)
+    if not urls:
+        raise HTTPException(400, "This scan mapped no pages to test")
+    if smoke.is_running(job.id):
+        raise HTTPException(409, "A smoke test of this scan is already running")
+    job.tier1_result = {**(job.tier1_result or {}), "smoke_run": {"state": "running", "pages": [], "total": len(urls)}}
+    await db.commit()
+    smoke.start(job.id, urls)
+    return {"state": "running", "total": len(urls)}
+
+
 @router.get("/{audit_id}/standards")
 async def standards(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     return compliance.report(F.all_findings(await _job(db, ctx, audit_id)))

@@ -44,6 +44,14 @@ class Organization(Base):
     billing_cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     # Members must sign in with Google; passwords are refused. The owner is exempt, so nobody can be locked out.
     require_sso: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # AI settings: "fast", "balanced" or "best", and optionally the organisation's own Anthropic key (encrypted).
+    ai_quality: Mapped[str] = mapped_column(String(16), default="balanced", server_default="balanced", nullable=False)
+    ai_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Which provider that key is for ("anthropic", "openai", "gemini", ...), an exact model name if the
+    # organisation wants one, and the address for a "custom" OpenAI-compatible provider.
+    ai_provider: Mapped[str] = mapped_column(String(24), default="anthropic", server_default="anthropic", nullable=False)
+    ai_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    ai_base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class Invite(Base):

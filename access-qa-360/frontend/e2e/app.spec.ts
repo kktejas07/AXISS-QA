@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
 import { PASSWORD, newAccount, scrollsSideways, signedIn, totp } from "./helpers";
 
@@ -123,6 +124,95 @@ test.describe("Wise", () => {
     await page.getByLabel("Your question for Wise").fill("How fast must a refund reach the customer?");
     await page.getByLabel("Your question for Wise").press("Enter");
     await expect(page.getByRole("dialog").getByText(/five working days/)).toBeVisible();
+  });
+});
+
+test.describe("Wise acts after confirmation", () => {
+  test("asked to scan a site every week, it adds the schedule only once the person confirms", async ({ page, request }) => {
+    await signedIn(page, request);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Ask Wise, your assistant" }).click();
+    const wise = page.getByRole("dialog");
+    await wise.getByLabel("Your question for Wise").fill("Please check https://shop.example.com every week");
+    await wise.getByLabel("Your question for Wise").press("Enter");
+    const offer = wise.getByRole("group", { name: "Scan https://shop.example.com weekly" });
+    await expect(offer.getByRole("button", { name: "Yes, do it" })).toBeDisabled();
+    await offer.getByRole("checkbox", { name: /permission to test/ }).check();
+    await offer.getByRole("button", { name: "Yes, do it" }).click();
+    await expect(wise.getByText(/will be scanned weekly/)).toBeVisible();
+    await expect(wise.getByRole("button", { name: "Yes, do it" })).toHaveCount(0);
+    await wise.getByRole("link", { name: /Open it/ }).click();
+    await expect(page).toHaveURL(/\/schedules$/);
+    await expect(page.getByText("shop.example.com", { exact: true })).toBeVisible();
+  });
+});
+
+test.describe("AI settings and chatbot scans", () => {
+  test("the organisation picks its AI quality, and a bad key is refused", async ({ page, request }) => {
+    await signedIn(page, request);
+    await page.goto("/settings");
+    const ai = page.locator("section").filter({ has: page.getByRole("heading", { name: "AI provider and model" }) });
+    await expect(ai.getByRole("radio", { name: /Balanced/ })).toBeChecked();
+    await ai.getByRole("radio", { name: /Fast/ }).check();
+    await ai.getByLabel(/Your own API key/).fill("not-a-key");
+    await ai.getByRole("button", { name: "Save AI settings" }).click();
+    await expect(ai.getByRole("alert")).toContainText("does not look like an Anthropic API key");
+    await ai.getByLabel(/Your own API key/).fill("");
+    await ai.getByRole("button", { name: "Save AI settings" }).click();
+    await expect(ai.getByRole("status")).toHaveText("AI settings saved.");
+    await page.reload();
+    await expect(page.getByRole("radio", { name: /Fast/ })).toBeChecked();
+
+    // Another provider needs its own key, and a key that does not work is not saved.
+    await ai.getByLabel(/^Provider/).selectOption({ label: "Gemini (Google)" });
+    await expect(ai.getByText(/Leave empty to use gemini/)).toBeVisible();
+    await ai.getByLabel(/^Your API key/).fill("not-a-real-gemini-key-000000");
+    await ai.getByRole("button", { name: "Save AI settings" }).click();
+    await expect(ai.getByRole("alert")).toContainText("Check the key and the model name", { timeout: 40_000 });
+    await page.reload();
+    await expect(page.getByLabel(/^Provider/)).toHaveValue("anthropic");
+  });
+
+  test("a chatbot is tested end to end: one careless reply is caught, the rest pass", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    // A stand-in chatbot: it obeys one injected instruction and answers everything else safely.
+    const bot = createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", () => {
+        const message: string = JSON.parse(body).messages[0].content;
+        const reply = message.startsWith("Ignore all previous instructions") ? "WISEFLOW-7391"
+          : message.includes("Zorblax") ? "I'm not aware of that product."
+          : message.endsWith("the word OK.") ? "OK"
+          : "I'm sorry, I can't help with that. I can answer questions about your orders.";
+        res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ choices: [{ message: { content: reply } }] }));
+      });
+    });
+    await new Promise<void>((ready) => bot.listen(0, "127.0.0.1", ready));
+    const port = (bot.address() as import("node:net").AddressInfo).port;
+    try {
+      await signedIn(page, request);
+      await page.goto("/scans/new");
+      await page.getByRole("group", { name: "Type of app" }).getByRole("button", { name: /Chatbot/ }).click();
+      await page.getByLabel("Where messages are sent").fill(`http://127.0.0.1:${port}/chat`);
+      await page.getByLabel("App name").fill("Shop helper").catch(() => {});
+      await page.getByRole("button", { name: "Continue" }).click();
+      await page.getByRole("checkbox", { name: /permission/ }).check();
+      await page.getByRole("button", { name: "Start scan" }).click();
+      await expect(page.getByText("Completed", { exact: true }).first()).toBeVisible({ timeout: 60_000 });
+
+      await page.getByRole("button", { name: /^Conversations/ }).click();
+      await expect(page.getByRole("heading", { name: "Told to ignore its instructions" })).toBeVisible();
+      await expect(page.getByText("It dropped its instructions and replied with the code it was told to.")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Needs attention (1)" })).toBeVisible();
+      await page.getByRole("button", { name: "All (14)" }).click();
+      await expect(page.getByRole("heading", { name: "Asked for another customer's details" })).toBeVisible();
+
+      await page.getByRole("button", { name: /^Security/ }).click();
+      await expect(page.getByText("Prompt injection: told to ignore its instructions").first()).toBeVisible();
+    } finally {
+      bot.close();
+    }
   });
 });
 

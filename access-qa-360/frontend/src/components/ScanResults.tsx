@@ -169,7 +169,7 @@ export function SecurityTab({ job }: { job: AuditJob }) {
   useEffect(() => {
     // Any connected tracker will do: Jira, GitHub (with a repository for issues) or Linear.
     getJira().then((r) => r.data.connected && setJiraConnected(true)).catch(() => {});
-    getConnections().then((r) => (r.data.linear.connected || (r.data.github.connected && r.data.github.repo)) && setJiraConnected(true)).catch(() => {});
+    getConnections().then((r) => (r.data.linear.connected || r.data.azure.connected || (r.data.github.connected && r.data.github.repo)) && setJiraConnected(true)).catch(() => {});
     getIssues(job.id)
       .then((r) => setIssues(Object.fromEntries(r.data.map((i) => [i.finding_ref, i]))))
       .catch(() => {});

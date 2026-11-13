@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     FREE_SCANS_PER_MONTH: int = 2
     # Scheduled scans are started by the API server. Switch off on all but one server if you run several.
     SCHEDULER_ENABLED: bool = True
+    # Chatbot scans refuse addresses on private networks. Only switch this on for local development.
+    ALLOW_PRIVATE_TARGETS: bool = False
+    # Meaning-based search for Wise. Any OpenAI-compatible embeddings API; leave the key empty to search by words only.
+    EMBEDDINGS_API_KEY: str = ""
+    EMBEDDINGS_BASE_URL: str = "https://api.openai.com/v1"
+    EMBEDDINGS_MODEL: str = "text-embedding-3-small"
     # Where "Contact sales" on the pricing page sends people.
     SALES_EMAIL: str = ""
     # Leave a provider's keys empty to switch that provider off.

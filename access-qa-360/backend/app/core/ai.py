@@ -51,15 +51,43 @@ def _tokens(message) -> tuple[int, int]:
     return getattr(usage, "input_tokens", 0) or 0, getattr(usage, "output_tokens", 0) or 0
 
 
+# An organisation's choice of speed against quality. "balanced" keeps the model each feature was built with.
+FAST, BEST = "claude-haiku-4-5", "claude-sonnet-4-5"
+QUALITIES = {"fast": FAST, "balanced": None, "best": BEST}
+
+
+def choose_model(asked: str, quality: str | None) -> str:
+    return QUALITIES.get(quality or "balanced") or asked
+
+
 def ai_client(purpose: str) -> AsyncAnthropic:
-    """An async client whose messages.create is counted under `purpose`."""
+    """
+    An async client whose messages.create is counted under `purpose`.
+    The organisation in `ai_context` may have chosen a quality level and supplied
+    its own key; both are applied here, so no feature has to know about them.
+    """
     client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
     create = client.messages.create
 
     async def counted(*args, **kwargs):
-        model, context = kwargs.get("model", "unknown"), ai_context.get()
+        context = ai_context.get()
+        provider = context.get("provider") or "anthropic"
+        if provider != "anthropic" and context.get("api_key"):
+            # The organisation's own key with another provider: the same request, translated.
+            from app.core import providers
+
+            kwargs["model"] = providers.model_for(provider, kwargs.get("model", ""), context.get("quality"), context.get("model"))
+
+            async def call(*_args, **kw):
+                name = kw.pop("model")
+                return await providers.chat(provider, context.get("base_url"), context["api_key"], name, **kw)
+        else:
+            if "model" in kwargs:
+                kwargs["model"] = context.get("model") or choose_model(kwargs["model"], context.get("quality"))
+            call = AsyncAnthropic(api_key=context["api_key"]).messages.create if context.get("api_key") else create
+        model = kwargs.get("model", "unknown")
         try:
-            message = await create(*args, **kwargs)
+            message = await call(*args, **kwargs)
         except Exception:
             await asyncio.to_thread(record_usage, model, purpose, 0, 0, False, context)
             raise
@@ -87,3 +115,24 @@ def sync_ai_client(purpose: str) -> Anthropic:
 
     client.messages.create = counted  # type: ignore[method-assign]
     return client
+
+
+async def org_context(db, organization_id: str | None, audit_id: str | None = None) -> dict:
+    """What `ai_context` should hold for work done for this organisation: who it is for, and its AI settings."""
+    context: dict = {"organization_id": organization_id, "audit_id": audit_id}
+    if organization_id:
+        from app.core.secrets import decrypt
+        from app.models.organization import Organization
+
+        org = await db.get(Organization, organization_id)
+        if org:
+            context["quality"] = org.ai_quality or "balanced"
+            key = decrypt(org.ai_key_encrypted) if org.ai_key_encrypted else None
+            if key:
+                # The provider, model and address only apply together with the organisation's own key.
+                context.update(api_key=key, provider=org.ai_provider or "anthropic")
+                if org.ai_model:
+                    context["model"] = org.ai_model
+                if org.ai_base_url:
+                    context["base_url"] = org.ai_base_url
+    return context

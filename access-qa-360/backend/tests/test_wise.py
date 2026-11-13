@@ -42,8 +42,10 @@ def test_ranking_puts_the_named_thing_first():
     assert wise.rank("the and of", passages) == [] and wise.rank("zebra", passages) == []
 
 
-def test_requests_to_do_something_become_links_not_actions():
-    assert wise.actions("please scan https://shop.example.com/login for me") == [{"label": "Start a scan of https://shop.example.com/login", "path": "/scans/new?url=https://shop.example.com/login"}]
+def test_requests_to_do_something_become_offers_or_links():
+    # With enough to go on, Wise offers to do it (after confirmation); otherwise it links to the screen.
+    scan = wise.actions("please scan https://shop.example.com/login for me")[0]
+    assert scan["label"] == "Start a scan of https://shop.example.com/login" and scan["do"]["kind"] == "start_scan" and "path" not in scan
     assert {"label": "Set up a schedule", "path": "/schedules"} in wise.actions("run this scan every week")
     assert wise.actions("connect Slack")[0]["path"] == "/settings" and wise.actions("what is XSS?") == []
 
@@ -89,7 +91,7 @@ async def test_wise_uses_the_model_when_one_is_set_up_and_survives_it_failing(cl
                     raise RuntimeError("model is down")
                 return Reply()
 
-    monkeypatch.setattr(wise, "_ai_ready", lambda: True)
+    monkeypatch.setattr(wise, "_ai_ready", lambda *_: True)
     monkeypatch.setattr(wise, "ai_client", lambda purpose: Fake)
     ask = lambda: client.post(f"{API}/wise/chat", headers=auth_headers, json={"messages": [{"role": "user", "content": "What is the SQL injection finding?"}]})
     data = (await ask()).json()

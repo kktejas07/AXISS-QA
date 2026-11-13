@@ -1,6 +1,6 @@
 import api from "./client";
 
-export type SourceType = "web" | "android" | "ios" | "code" | "repo" | "api";
+export type SourceType = "web" | "android" | "ios" | "code" | "repo" | "api" | "chatbot";
 
 export const sourceName: Record<SourceType, string> = {
   web: "Web app",
@@ -9,6 +9,7 @@ export const sourceName: Record<SourceType, string> = {
   code: "Source code",
   repo: "Repository",
   api: "API description",
+  chatbot: "Chatbot",
 };
 export const isCode = (job: { source_type: SourceType }) => job.source_type === "code" || job.source_type === "repo";
 export type OutputKind = "security" | "manual" | "playwright" | "appium";
@@ -66,6 +67,9 @@ export interface WebResult {
   /** "ok", or why signing in to the app did not work. Only when the scan was given sign-in details. */
   sign_in?: string;
   performance?: Performance;
+  smoke_run?: SmokeRun;
+  /** Chatbot scans: each test message, the reply and the verdict. */
+  chatbot?: ChatbotResult;
   /** API description scans. */
   api?: { title: string; version: string; format: string; operations: number; secured: number; endpoints: { method: string; path: string; summary: string; secured: boolean }[] };
   a11y_summary?: { total_violations: number; critical: number; serious: number; moderate: number; minor: number; violations: A11yViolation[] };
@@ -75,6 +79,45 @@ export interface WebResult {
   languages?: Record<string, number>;
   routes?: CodeRoute[];
   qa_gaps?: QaGaps;
+}
+
+export interface SmokeRun {
+  state: "running" | "done" | "failed";
+  total?: number;
+  error?: string;
+  finished_at?: string;
+  passed?: number;
+  warned?: number;
+  failed?: number;
+  pages: { url: string; path: string; status: number | null; ms: number | null; verdict: "pass" | "warn" | "fail"; problems: string[] }[];
+}
+
+export interface ChatbotProbe {
+  id: string;
+  category: string;
+  name: string;
+  severity: string;
+  prompt: string;
+  reply: string;
+  verdict: "pass" | "fail" | "review" | "error";
+  why: string;
+}
+
+export interface ChatbotResult {
+  greeting: string;
+  probes: ChatbotProbe[];
+  passed: number;
+  failed: number;
+  review: number;
+  errors: number;
+  note: string;
+}
+
+export interface ChatbotSetup {
+  body: string;
+  reply_path: string;
+  header_name?: string;
+  header_value?: string;
 }
 
 export interface PagePerformance {
@@ -185,7 +228,7 @@ export interface AuditJob {
 }
 
 /** Step 1: record what is being tested. Nothing runs until startAudit. */
-export const createDraft = (body: { source_type: SourceType; target_url?: string; repo_url?: string; app_name?: string }) =>
+export const createDraft = (body: { source_type: SourceType; target_url?: string; repo_url?: string; app_name?: string; chatbot?: ChatbotSetup }) =>
   api.post<AuditJob>("/audits", { ...body, autostart: false });
 
 export const uploadBuild = (id: string, file: File, onProgress?: (percent: number) => void) => {
