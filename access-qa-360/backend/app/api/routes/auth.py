@@ -121,6 +121,8 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
 @router.post("/change-password", response_model=Token)
 async def change_password(body: ChangePasswordRequest, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
     """Change the signed-in user's password. Other devices are signed out; this one gets a fresh token."""
+    if ctx.via_api_key:
+        raise HTTPException(status_code=403, detail="API keys cannot change a password")
     user = ctx.user
     if not verify_password(body.current_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="The current password is not correct")

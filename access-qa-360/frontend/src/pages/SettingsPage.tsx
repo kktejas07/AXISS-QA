@@ -4,6 +4,7 @@ import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { cancelInvite, changeRole, createInvite, getInvites, getMembers, getOrg, removeMember, renameOrg } from "../api/org";
 import { changePassword } from "../api/auth";
+import { ApiKeysSection, JiraSection } from "../components/IntegrationSettings";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Invite, Member, Org, OrgRole } from "../types";
 import { apiError } from "../utils/errors";
@@ -17,7 +18,8 @@ const matrix: { label: string; allowed: OrgRole[] }[] = [
   { label: "See scans, findings and downloads", allowed: ["owner", "admin", "member", "viewer"] },
   { label: "Create and start scans", allowed: ["owner", "admin", "member"] },
   { label: "Invite people, change roles, remove people", allowed: ["owner", "admin"] },
-  { label: "Rename the organisation", allowed: ["owner", "admin"] },
+  { label: "Create Jira issues from findings", allowed: ["owner", "admin", "member"] },
+  { label: "Rename the organisation, manage API keys and Jira", allowed: ["owner", "admin"] },
   { label: "Transfer ownership", allowed: ["owner"] },
 ];
 
@@ -313,6 +315,9 @@ export function SettingsPage() {
             </form>
           )}
         </section>
+
+        {canEdit && <ApiKeysSection />}
+        <JiraSection canEdit={canEdit} />
 
         {/* Password */}
         <form

@@ -18,6 +18,8 @@ export type StepStatus = "pending" | "running" | "completed" | "failed" | "skipp
 
 export interface Finding {
   id?: string;
+  /** Where the finding sits in the scan's results; used to create an issue from it. */
+  ref?: { source: "security" | "mobile"; index: number };
   /** Code scans: "secrets", "code", "config" or "dependency". */
   check?: string;
   severity: string;

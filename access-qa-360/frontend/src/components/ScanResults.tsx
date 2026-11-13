@@ -1,8 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, Download } from "lucide-react";
 import type { AuditJob, ExportKind, Finding, ManualCase } from "../api/audits";
 import { exportPath, isCode } from "../api/audits";
 import { downloadFromApi } from "../utils/download";
+import { createIssue, getIssues, getJira } from "../api/integrations";
+import type { TrackerIssue } from "../api/integrations";
+import { useCan } from "../hooks/useMe";
+import { apiError } from "../utils/errors";
 
 const severityOrder = ["critical", "high", "medium", "low", "info", "informational"];
 const rank = (s: string) => {
@@ -35,9 +39,10 @@ export function SeverityTag({ severity }: { severity: string }) {
 
 /** Every security finding of a scan, worst first: web and API checks plus mobile build checks. */
 export function allFindings(job: AuditJob): Finding[] {
-  const web = job.tier3_result?.findings ?? [];
-  const mobile = (job.tier2_result?.security_flags ?? []).map((f) => ({
+  const web = (job.tier3_result?.findings ?? []).map((f, index) => ({ ...f, ref: { source: "security" as const, index } }));
+  const mobile = (job.tier2_result?.security_flags ?? []).map((f, index) => ({
     ...f,
+    ref: { source: "mobile" as const, index },
     description: f.description ?? f.detail,
     affected_url: f.affected_url ?? job.source_filename ?? "Mobile build",
   }));
@@ -118,8 +123,55 @@ function MasterDetail<T>({ items, row, detail, label }: { items: T[]; row: (item
   );
 }
 
+/** "Create Jira issue" for one finding, or the link to the issue it already has. */
+function JiraAction({ auditId, finding, issue, connected, onCreated }: { auditId: string; finding: Finding; issue?: TrackerIssue; connected: boolean; onCreated: (issue: TrackerIssue) => void }) {
+  const canCreate = useCan("scan.run");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  // The detail pane is reused for every finding; forget the last finding's error.
+  useEffect(() => setError(""), [finding.ref?.source, finding.ref?.index]);
+
+  if (issue) {
+    return (
+      <a href={issue.issue_url} target="_blank" rel="noreferrer" className="self-start font-semibold text-brand-600 hover:text-brand-700">
+        Jira issue {issue.issue_key}
+      </a>
+    );
+  }
+  if (!connected || !canCreate || !finding.ref) return null;
+  const { source, index } = finding.ref;
+  const create = async () => {
+    setError("");
+    setBusy(true);
+    try {
+      onCreated((await createIssue(auditId, source, index)).data);
+    } catch (e) {
+      setError(apiError(e, "The Jira issue could not be created. Try again."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      <button type="button" onClick={create} disabled={busy} className="h-11 rounded-[10px] border-[1.5px] border-ink bg-white px-4 text-sm font-semibold disabled:opacity-60">
+        {busy ? "Creating in Jira" : "Create Jira issue"}
+      </button>
+      {error && <span role="alert" className="text-[13.5px] text-red-800">{error}</span>}
+    </div>
+  );
+}
+
 export function SecurityTab({ job }: { job: AuditJob }) {
   const findings = useMemo(() => allFindings(job), [job]);
+  const [issues, setIssues] = useState<Record<string, TrackerIssue>>({});
+  const [jiraConnected, setJiraConnected] = useState(false);
+  useEffect(() => {
+    getJira().then((r) => setJiraConnected(r.data.connected)).catch(() => {});
+    getIssues(job.id)
+      .then((r) => setIssues(Object.fromEntries(r.data.map((i) => [i.finding_ref, i]))))
+      .catch(() => {});
+  }, [job.id]);
+  const refOf = (f: Finding) => (f.ref ? `${f.ref.source}:${f.ref.index}` : "");
   const skipped = job.tier3_result?.skipped && !job.tier2_result?.security_flags?.length;
   if (job.tier3_result?.error && findings.length === 0) {
     return <p role="alert" className={`${empty} text-red-800`}>The security checks failed: {job.tier3_result.error}</p>;
@@ -161,6 +213,7 @@ export function SecurityTab({ job }: { job: AuditJob }) {
             <span className="font-semibold">{f.title}</span>
           </span>
           {f.affected_url && <span className="break-all font-mono text-[13px] text-body">{f.affected_url}</span>}
+          {issues[refOf(f)] && <span className="text-[13px] font-semibold text-brand-700">In Jira as {issues[refOf(f)].issue_key}</span>}
         </>
       )}
       detail={(f) => (
@@ -172,6 +225,13 @@ export function SecurityTab({ job }: { job: AuditJob }) {
             </div>
             <h2 className="text-[22px] font-bold leading-tight">{f.title}</h2>
           </div>
+          <JiraAction
+            auditId={job.id}
+            finding={f}
+            issue={issues[refOf(f)]}
+            connected={jiraConnected}
+            onCreated={(issue) => setIssues((all) => ({ ...all, [issue.finding_ref]: issue }))}
+          />
           {f.affected_url && (
             <Field label="Where">
               <span className="break-all font-mono text-sm">{[f.method, f.affected_url].filter(Boolean).join(" ")}</span>
