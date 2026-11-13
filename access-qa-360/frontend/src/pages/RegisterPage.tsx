@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ShieldCheck } from "lucide-react";
+import { Logo } from "../components/Logo";
 import { login, previewInvite, register } from "../api/auth";
 import { clearMe } from "../hooks/useMe";
 import { apiError } from "../utils/errors";
@@ -50,11 +50,8 @@ export function RegisterPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-soft p-4 font-sans text-ink">
       <div className="w-full max-w-md rounded-2xl border-2 border-ink bg-white p-8 shadow-hard">
-        <div className="mb-6 flex items-center gap-2.5 text-[19px] font-extrabold tracking-tight">
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-brand-600 text-white">
-            <ShieldCheck className="h-[17px] w-[17px]" strokeWidth={2.4} aria-hidden="true" />
-          </span>
-          Wiseflow
+        <div className="mb-6">
+          <Logo />
         </div>
 
         <h1 className="text-2xl font-extrabold tracking-tight">
