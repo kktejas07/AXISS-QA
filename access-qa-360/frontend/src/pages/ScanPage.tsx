@@ -1,310 +1,222 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { createScan } from "../api/scans";
-import type { ScanType, ScanProfile, AuthConfig } from "../types";
-import { Globe, ChevronDown, ChevronUp, Radar, Loader2 } from "lucide-react";
+import { getProjects } from "../api/projects";
+import { useCan } from "../hooks/useMe";
+import type { AuthConfig, Project, ScanProfile, ScanType } from "../types";
+import { apiError } from "../utils/errors";
+import { backLink, card, errorBox, field, hint, label, pageTitle, primaryButton } from "../components/ui";
 
+const scanTypes: { value: ScanType; label: string; desc: string }[] = [
+  { value: "passive", label: "Passive", desc: "Only reads pages. Safe for a live site." },
+  { value: "active", label: "Active", desc: "Submits forms and changes data. Use on a test site." },
+  { value: "hybrid", label: "Hybrid", desc: "Reads everything, submits only low-risk forms." },
+];
+
+const profiles: { value: ScanProfile; label: string }[] = [
+  { value: "owasp_top10", label: "OWASP Top 10" },
+  { value: "pci_dss", label: "PCI DSS" },
+  { value: "hipaa", label: "HIPAA" },
+  { value: "custom", label: "Custom" },
+];
+
+const split = (text: string) => text.split(",").map((s) => s.trim()).filter(Boolean);
+
+/** A quick OWASP check of one address. The full flow, with test cases and automation, is under New scan. */
 export function ScanPage() {
   const navigate = useNavigate();
+  const canScan = useCan("scan.run");
   const [url, setUrl] = useState("");
+  const [projects, setProjects] = useState<Project[] | null>(null);
+  const [projectId, setProjectId] = useState("");
+
+  useEffect(() => {
+    getProjects()
+      .then((r) => {
+        setProjects(r.data);
+        if (r.data[0]) {
+          setProjectId(r.data[0].id);
+          setUrl((current) => current || r.data[0].base_url);
+        }
+      })
+      .catch(() => setProjects([]));
+  }, []);
   const [scanType, setScanType] = useState<ScanType>("passive");
   const [profile, setProfile] = useState<ScanProfile>("owasp_top10");
-  const [showAuth, setShowAuth] = useState(false);
   const [auth, setAuth] = useState<AuthConfig>({ type: "none" });
   const [includePaths, setIncludePaths] = useState("");
   const [excludePaths, setExcludePaths] = useState("");
   const [crawlDepth, setCrawlDepth] = useState(3);
   const [rateLimit, setRateLimit] = useState(10);
-  const [scanning, setScanning] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const handleScan = async () => {
-    if (!url.trim()) { setError("URL is required"); return; }
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
-    setScanning(true);
-    setProgress(5);
+    setBusy(true);
     try {
       const { data } = await createScan({
+        project_id: projectId,
         url: url.trim(),
         scan_type: scanType,
         profile,
         auth,
-        include_paths: includePaths ? includePaths.split(",").map(s => s.trim()) : [],
-        exclude_paths: excludePaths ? excludePaths.split(",").map(s => s.trim()) : [],
+        include_paths: split(includePaths),
+        exclude_paths: split(excludePaths),
         crawl_depth: crawlDepth,
         rate_limit: rateLimit,
       });
-
-      const scanId = data.id;
-      // Stream real-time progress via SSE
-      const apiBase = import.meta.env.VITE_API_URL || "";
-      const token = localStorage.getItem("access_token");
-      const evtSource = new EventSource(
-        `${apiBase}/api/v1/scans/${scanId}/stream?token=${encodeURIComponent(token || "")}`
-      );
-
-      evtSource.addEventListener("progress", (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          setProgress(payload.progress ?? 0);
-        } catch {}
-      });
-
-      evtSource.addEventListener("done", () => {
-        evtSource.close();
-        setProgress(100);
-        navigate(`/scans/${scanId}`);
-      });
-
-      evtSource.addEventListener("error", () => {
-        evtSource.close();
-        navigate(`/scans/${scanId}`);
-      });
-
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Scan failed to start");
-      setScanning(false);
-      setProgress(0);
+      // The results page shows progress while the scan runs.
+      navigate(`/scans/${data.id}`);
+    } catch (err) {
+      setError(apiError(err, "The scan could not start. Check the address and try again."));
+      setBusy(false);
     }
   };
 
-  const scanTypes: { value: ScanType; label: string; desc: string }[] = [
-    { value: "passive", label: "Passive", desc: "Read-only, zero writes" },
-    { value: "active", label: "Active", desc: "Form submissions, state mutations" },
-    { value: "hybrid", label: "Hybrid", desc: "Balanced approach" },
-  ];
+  if (canScan === false) {
+    return (
+      <Layout>
+        <h1 className={`${pageTitle} mb-4`}>Quick security scan</h1>
+        <p className={`${card} max-w-xl px-5 py-4`}>Your role is Viewer, so you can see scans and results but not start new ones.</p>
+      </Layout>
+    );
+  }
 
-  const profiles: { value: ScanProfile; label: string }[] = [
-    { value: "owasp_top10", label: "OWASP Top 10" },
-    { value: "pci_dss", label: "PCI-DSS" },
-    { value: "hipaa", label: "HIPAA" },
-    { value: "custom", label: "Custom" },
-  ];
+  if (projects && projects.length === 0) {
+    return (
+      <Layout>
+        <Link to="/scans/new" className={backLink}>New scan</Link>
+        <h1 className={`${pageTitle} mb-4 mt-1`}>Quick security scan</h1>
+        <div className={`${card} flex max-w-xl flex-col items-start gap-4 p-6`}>
+          <p>A quick scan is saved under a project, and you do not have one yet.</p>
+          <Link to="/projects/new" className={primaryButton}>Create a project</Link>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-brand-900 flex items-center gap-2">
-            <Radar className="w-6 h-6 text-indigo-500" /> New Scan
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Enter a URL to scan for vulnerabilities, QA gaps, and generate test cases
-          </p>
-        </div>
+      <Link to="/scans/new" className={backLink}>New scan</Link>
+      <h1 className={`${pageTitle} mt-1`}>Quick security scan</h1>
+      <p className="mb-7 mt-1 max-w-2xl text-body">Checks one web address against a security profile. For test cases and automation scripts as well, use New scan.</p>
 
-        {/* URL Input */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Target URL</label>
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com"
-                className="w-full pl-11 pr-4 py-3.5 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                disabled={scanning}
-              />
+      <form onSubmit={submit} className="flex max-w-3xl flex-col gap-6">
+        <div className={`${card} flex flex-col gap-5 p-7`}>
+          <label className={`${label} max-w-md`}>
+            Project
+            <select
+              required
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                const chosen = projects?.find((p) => p.id === e.target.value);
+                if (chosen) setUrl(chosen.base_url);
+              }}
+              className={`${field} px-2.5`}
+            >
+              {(projects ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Web address
+            <input type="url" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-app.com" className={`${field} font-mono`} />
+          </label>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold">How far the scan may go</legend>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {scanTypes.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  aria-pressed={scanType === t.value}
+                  onClick={() => setScanType(t.value)}
+                  className={`flex flex-col gap-1 rounded-[12px] border-2 p-4 text-left ${scanType === t.value ? "border-brand-600 bg-brand-50" : "border-gray-300 bg-white"}`}
+                >
+                  <span className="font-bold">{t.label}</span>
+                  <span className="text-[13.5px] text-body">{t.desc}</span>
+                </button>
+              ))}
             </div>
-          </div>
-          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+          </fieldset>
+
+          <label className={`${label} max-w-xs`}>
+            Security profile
+            <select value={profile} onChange={(e) => setProfile(e.target.value as ScanProfile)} className={`${field} px-2.5`}>
+              {profiles.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        {/* Scan Type */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Scan Mode</label>
-          <div className="grid grid-cols-3 gap-3">
-            {scanTypes.map((t) => (
-              <button
-                key={t.value}
-                onClick={() => setScanType(t.value)}
-                disabled={scanning}
-                className={`p-3 rounded-lg border text-left transition ${
-                  scanType === t.value
-                    ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <p className="font-medium text-sm text-brand-900">{t.label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Profile */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Scan Profile</label>
-          <select
-            value={profile}
-            onChange={(e) => setProfile(e.target.value as ScanProfile)}
-            disabled={scanning}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
-          >
-            {profiles.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Scope */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Include Paths</label>
-            <input
-              type="text"
-              value={includePaths}
-              onChange={(e) => setIncludePaths(e.target.value)}
-              placeholder="/api/v2/*, /app/*"
-              disabled={scanning}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Exclude Paths</label>
-            <input
-              type="text"
-              value={excludePaths}
-              onChange={(e) => setExcludePaths(e.target.value)}
-              placeholder="/admin/*, /static/*"
-              disabled={scanning}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Crawl Depth & Rate Limit */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Crawl Depth: <span className="text-indigo-600 font-semibold">{crawlDepth}</span>
-            </label>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={crawlDepth}
-              onChange={(e) => setCrawlDepth(Number(e.target.value))}
-              disabled={scanning}
-              className="w-full accent-indigo-600"
-            />
-            <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+        <details className={`${card} group`}>
+          <summary className="flex min-h-[56px] cursor-pointer items-center px-7 font-bold">Scope, speed and sign-in</summary>
+          <div className="flex flex-col gap-5 border-t border-line p-7">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <label className={label}>
+                Only these paths
+                <input value={includePaths} onChange={(e) => setIncludePaths(e.target.value)} placeholder="/app/*, /api/v2/*" className={`${field} font-mono`} />
+                <span className={hint}>Separate with commas. Empty means the whole site.</span>
+              </label>
+              <label className={label}>
+                Skip these paths
+                <input value={excludePaths} onChange={(e) => setExcludePaths(e.target.value)} placeholder="/admin/*, /static/*" className={`${field} font-mono`} />
+              </label>
+              <label className={label}>
+                Link levels to follow: {crawlDepth}
+                <input type="range" min={1} max={5} value={crawlDepth} onChange={(e) => setCrawlDepth(Number(e.target.value))} className="h-12 w-full accent-brand-600" />
+              </label>
+              <label className={label}>
+                Requests per second
+                <input type="number" min={1} max={100} value={rateLimit} onChange={(e) => setRateLimit(Number(e.target.value))} className={field} />
+              </label>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Rate Limit (req/s)</label>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={rateLimit}
-              onChange={(e) => setRateLimit(Number(e.target.value))}
-              disabled={scanning}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Auth Config */}
-        <div className="mb-6 border border-gray-200 rounded-lg">
-          <button
-            onClick={() => setShowAuth(!showAuth)}
-            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-          >
-            Authentication Configuration
-            {showAuth ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {showAuth && (
-            <div className="px-4 pb-4 space-y-3">
-              <select
-                value={auth.type}
-                onChange={(e) => setAuth({ type: e.target.value as AuthConfig["type"] })}
-                disabled={scanning}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-              >
-                <option value="none">No Authentication</option>
-                <option value="cookie">Cookie-based</option>
-                <option value="bearer">Bearer Token</option>
+            <label className={`${label} max-w-xs`}>
+              Signing in to the app
+              <select value={auth.type} onChange={(e) => setAuth({ type: e.target.value as AuthConfig["type"] })} className={`${field} px-2.5`}>
+                <option value="none">Not needed</option>
+                <option value="cookie">Session cookie</option>
+                <option value="bearer">Bearer token</option>
+                <option value="basic">Username and password</option>
                 <option value="oauth">OAuth 2.0</option>
-                <option value="basic">Basic Auth</option>
               </select>
-              {auth.type === "bearer" && (
-                <input
-                  type="text"
-                  placeholder="Bearer token value"
-                  value={auth.value || ""}
-                  onChange={(e) => setAuth({ ...auth, value: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
-              )}
-              {auth.type === "cookie" && (
-                <input
-                  type="text"
-                  placeholder="Cookie header value"
-                  value={auth.value || ""}
-                  onChange={(e) => setAuth({ ...auth, value: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
-              )}
-              {auth.type === "basic" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    placeholder="Username"
-                    value={auth.username || ""}
-                    onChange={(e) => setAuth({ ...auth, username: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    value={auth.password || ""}
-                    onChange={(e) => setAuth({ ...auth, password: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Progress Bar */}
-        {scanning && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-600 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                Scan in progress...
-              </span>
-              <span className="text-indigo-600 font-medium">{progress}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            </label>
+            {(auth.type === "bearer" || auth.type === "cookie" || auth.type === "oauth") && (
+              <label className={label}>
+                {auth.type === "cookie" ? "Cookie header" : "Token"}
+                <input value={auth.value ?? ""} onChange={(e) => setAuth({ ...auth, value: e.target.value })} autoComplete="off" className={`${field} font-mono`} />
+                <span className={hint}>Use a test account. The value is sent with every request of the scan.</span>
+              </label>
+            )}
+            {auth.type === "basic" && (
+              <div className="grid gap-5 sm:grid-cols-2">
+                <label className={label}>
+                  Username
+                  <input value={auth.username ?? ""} onChange={(e) => setAuth({ ...auth, username: e.target.value })} autoComplete="off" className={field} />
+                </label>
+                <label className={label}>
+                  Password
+                  <input type="password" value={auth.password ?? ""} onChange={(e) => setAuth({ ...auth, password: e.target.value })} autoComplete="off" className={field} />
+                </label>
+              </div>
+            )}
           </div>
-        )}
+        </details>
 
-        {/* Start Button */}
-        <button
-          onClick={handleScan}
-          disabled={scanning || !url.trim()}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition flex items-center justify-center gap-2 text-lg"
-        >
-          {scanning ? (
-            <><Loader2 className="w-5 h-5 animate-spin" /> Scanning...</>
-          ) : (
-            <><Radar className="w-5 h-5" /> Start Scan</>
-          )}
+        {error && <p role="alert" className={errorBox}>{error}</p>}
+        <button type="submit" disabled={busy} className={`${primaryButton} self-start`}>
+          {busy ? "Starting" : "Start scan"}
+          {!busy && <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2.4} aria-hidden="true" />}
         </button>
-      </div>
+      </form>
     </Layout>
   );
 }

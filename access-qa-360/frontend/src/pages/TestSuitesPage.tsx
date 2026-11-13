@@ -1,81 +1,76 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { Layout } from "../components/Layout";
+import { LoadingSpinner } from "../components/LoadingSpinner";
 import { getSuites } from "../api/suites";
 import type { Suite } from "../types";
-import { Plus, CheckCircle, Clock, Code } from "lucide-react";
+import { backLink, card, emptyState, errorBox, pageTitle, primaryButton } from "../components/ui";
 
-const statusIcon = (status: Suite["status"]) => {
-  if (status === "active") return <CheckCircle className="w-4 h-4 text-emerald-400" />;
-  if (status === "draft")  return <Clock       className="w-4 h-4 text-yellow-400" />;
-  return                          <Code        className="w-4 h-4 text-muted" />;
+const statusLook: Record<Suite["status"], { text: string; look: string }> = {
+  active: { text: "Ready", look: "bg-emerald-100 text-emerald-800" },
+  draft: { text: "Being written", look: "bg-yellow-100 text-yellow-900" },
+  archived: { text: "Archived", look: "bg-gray-100 text-gray-800" },
 };
 
 export function TestSuitesPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [suites, setSuites] = useState<Suite[]>([]);
+  const [suites, setSuites] = useState<Suite[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (projectId) getSuites(projectId).then((r) => setSuites(r.data));
-  }, [projectId]);
+    if (!projectId) return;
+    let alive = true;
+    const load = () =>
+      getSuites(projectId)
+        .then((r) => alive && setSuites(r.data))
+        .catch(() => alive && setFailed(true));
+    load();
+    // A new suite is written in the background; keep checking until none are still drafts.
+    const timer = setInterval(() => suites?.some((s) => s.status === "draft") && load(), 4000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [projectId, suites?.some((s) => s.status === "draft")]);
 
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link to="/" className="text-sm text-muted hover:text-accent transition-colors">
-            &larr; Projects
-          </Link>
-          <h1 className="text-2xl font-bold text-fg mt-1">Test Suites</h1>
+          <Link to="/projects" className={backLink}>Projects</Link>
+          <h1 className={`${pageTitle} mt-1`}>Test suites</h1>
         </div>
-        <Link
-          to={`/projects/${projectId}/suites/new`}
-          className="refero-btn-primary flex items-center gap-2 text-sm px-4 py-2"
-        >
-          <Plus className="w-4 h-4" /> Generate Tests
+        <Link to={`/projects/${projectId}/suites/new`} className={primaryButton}>
+          <Plus className="h-[18px] w-[18px]" strokeWidth={2.4} aria-hidden="true" /> Generate tests
         </Link>
       </div>
-
-      <div className="space-y-3">
-        {suites.map((s) => (
-          <div
-            key={s.id}
-            className="bg-surface-1 border border-surface-3 rounded-card p-4 flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              {statusIcon(s.status)}
-              <div>
-                <p className="font-medium text-fg">{s.name}</p>
-                <p className="text-xs text-muted mt-0.5 line-clamp-1">{s.feature_description}</p>
+      {failed ? (
+        <p role="alert" className={errorBox}>The test suites could not be loaded. Check the project still exists, then reload the page.</p>
+      ) : !suites ? (
+        <LoadingSpinner />
+      ) : suites.length === 0 ? (
+        <p className={emptyState}>No test suites yet. Describe a feature in plain words and Wiseflow writes Playwright tests for it.</p>
+      ) : (
+        <ul className={`${card} overflow-hidden`}>
+          {suites.map((s, i) => (
+            <li key={s.id} className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4 ${i ? "border-t border-line" : ""}`}>
+              <div className="min-w-0 flex-[1_1_320px]">
+                <p className="font-bold">{s.name}</p>
+                <p className="line-clamp-2 text-[14.5px] text-body">{s.feature_description}</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded-badge border ${
-                  s.status === "active"
-                    ? "bg-emerald-900/20 text-emerald-400 border-emerald-800/40"
-                    : "bg-yellow-900/20 text-yellow-400 border-yellow-800/40"
-                }`}
-              >
-                {s.status}
-              </span>
-              {s.status === "active" && (
-                <Link
-                  to={`/projects/${projectId}/suites/${s.id}/runs`}
-                  className="text-sm text-accent hover:text-accent/80 font-medium transition-colors"
-                >
-                  Run history &rarr;
-                </Link>
-              )}
-            </div>
-          </div>
-        ))}
-        {suites.length === 0 && (
-          <p className="text-center text-muted py-12">
-            No test suites yet. Click "Generate Tests" to create your first one.
-          </p>
-        )}
-      </div>
+              <div className="flex items-center gap-4">
+                <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-bold ${statusLook[s.status].look}`}>{statusLook[s.status].text}</span>
+                {s.status === "active" && (
+                  <Link to={`/projects/${projectId}/suites/${s.id}/runs`} className="whitespace-nowrap font-semibold text-brand-600 hover:text-brand-700">
+                    Runs
+                  </Link>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Layout>
   );
 }

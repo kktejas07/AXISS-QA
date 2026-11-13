@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { createSuite } from "../api/suites";
-import { Sparkles } from "lucide-react";
+import { apiError } from "../utils/errors";
+import { backLink, card, errorBox, field, hint, label, pageTitle, primaryButton, textarea } from "../components/ui";
 
 export function NewTestPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -10,72 +11,48 @@ export function NewTestPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId) return;
+    setError("");
     setSubmitting(true);
     try {
-      await createSuite(projectId, { name, feature_description: description });
+      await createSuite(projectId, { name: name.trim(), feature_description: description.trim() });
       navigate(`/projects/${projectId}/suites`);
-    } finally {
+    } catch (err) {
+      setError(apiError(err, "Could not start writing the tests. Try again."));
       setSubmitting(false);
     }
   };
 
   return (
     <Layout>
-      <Link
-        to={`/projects/${projectId}/suites`}
-        className="text-sm text-muted hover:text-accent transition-colors"
-      >
-        &larr; Back to Suites
-      </Link>
-
-      <h1 className="text-2xl font-bold text-fg mt-2 mb-6">Generate Test Suite</h1>
-
-      <div className="bg-surface-1 border border-surface-3 rounded-card p-6 max-w-2xl">
-        <div className="flex items-center gap-2 mb-5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-badge w-fit">
-          <Sparkles className="w-4 h-4 text-accent" />
-          <span className="text-sm font-semibold text-accent">
-            Claude Sonnet will generate Playwright tests from your description
-          </span>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="refero-label">Suite name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              placeholder="e.g. User login flow"
-              className="refero-input"
-            />
-          </div>
-
-          <div>
-            <label className="refero-label">Feature description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              rows={5}
-              placeholder="Describe what to test in plain English. E.g. 'Test that a user can log in with valid credentials, see their dashboard, and that invalid passwords show an error message.'"
-              className="refero-input resize-none"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="refero-btn-primary w-full py-2.5 flex items-center justify-center gap-2"
-          >
-            <Sparkles className="w-4 h-4" />
-            {submitting ? "Sending to Claude…" : "Generate Tests with AI"}
-          </button>
-        </form>
-      </div>
+      <Link to={`/projects/${projectId}/suites`} className={backLink}>Test suites</Link>
+      <h1 className={`${pageTitle} mb-7 mt-1`}>Generate a test suite</h1>
+      <form onSubmit={handleSubmit} className={`${card} flex max-w-2xl flex-col gap-5 p-7`}>
+        <label className={label}>
+          Suite name
+          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} placeholder="Sign-in" className={field} />
+        </label>
+        <label className={label}>
+          What should be tested
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+            rows={6}
+            placeholder="A user can sign in with a valid email and password and lands on their dashboard. A wrong password shows an error and keeps them on the page."
+            className={`${textarea} resize-y`}
+          />
+          <span className={hint}>Plain words are enough. Wiseflow writes Playwright tests from this with AI; it takes about a minute.</span>
+        </label>
+        {error && <p role="alert" className={errorBox}>{error}</p>}
+        <button type="submit" disabled={submitting} className={`${primaryButton} self-start`}>
+          {submitting ? "Starting" : "Generate tests"}
+        </button>
+      </form>
     </Layout>
   );
 }

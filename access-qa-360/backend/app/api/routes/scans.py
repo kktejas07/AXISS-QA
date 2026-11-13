@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sqlfunc
 from app.core.database import get_db
+from app.models.project import Project
 from app.models.scan import Scan
 from app.models.vulnerability import Vulnerability, Severity
 from app.models.qa_gap import QAGap
@@ -15,6 +16,14 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 
 @router.post("", response_model=ScanOut, status_code=201)
 async def create_scan(body: ScanCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    # A quick scan is always saved under one of the user's own projects.
+    project = None
+    if body.project_id:
+        project = (await db.execute(select(Project).where(Project.id == body.project_id, Project.owner_id == user.id))).scalar_one_or_none()
+    if not project:
+        raise HTTPException(422, "Choose one of your projects for this scan")
+    if not body.url.strip().lower().startswith(("http://", "https://")):
+        raise HTTPException(422, "Enter a full web address starting with http:// or https://")
     scan = Scan(**body.model_dump(), created_by=user.id)
     db.add(scan)
     await db.commit()
