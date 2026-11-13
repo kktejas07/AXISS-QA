@@ -27,10 +27,10 @@ from urllib.parse import urlparse, urljoin
 
 import httpx
 
-from anthropic import AsyncAnthropic
+from app.core.ai import ai_client
 from app.core.config import settings
 
-ai = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+ai = ai_client("Security checks")
 
 # ---------------------------------------------------------------------------
 # Data structures

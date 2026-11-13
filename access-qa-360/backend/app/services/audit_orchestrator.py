@@ -28,11 +28,11 @@ from app.services.mobile_auditor import run_mobile_audit
 from app.services.api_auditor import run_api_audit
 from app.services import code_auditor
 
-from anthropic import AsyncAnthropic
+from app.core.ai import ai_client, ai_context
 from app.core.config import settings
 from app.core.storage import storage_path
 
-ai = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+ai = ai_client("Scan summary")
 
 # ---------------------------------------------------------------------------
 # Progress helpers
@@ -380,6 +380,8 @@ async def run_audit(audit_job_id: str):
         outputs = set(job.outputs or ALL_OUTPUTS)
         depth = job.depth or "standard"
         is_code = job.is_code
+        # AI calls made during this scan are counted against its organisation.
+        ai_context.set({"organization_id": job.organization_id, "audit_id": job.id})
 
     if is_code:
         await _run_code_audit(audit_job_id)

@@ -3,13 +3,13 @@ AI Test Generation Service — uses Claude Sonnet to generate Playwright Python 
 from a plain-English feature description.
 """
 import asyncio
-from anthropic import Anthropic
+from app.core.ai import sync_ai_client
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.suite import Suite, SuiteStatus
 from sqlalchemy import select
 
-client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+client = sync_ai_client("Test suites")
 
 GENERATION_PROMPT = """You are an expert QA engineer specialising in Playwright (Python).
 

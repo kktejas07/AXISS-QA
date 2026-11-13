@@ -868,9 +868,9 @@ async def generate_code_test_cases(scan: CodeScan, app: str, depth: str = "stand
     note = None
     cases: list[dict] = []
     try:
-        from anthropic import AsyncAnthropic
+        from app.core.ai import ai_client
 
-        ai = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        ai = ai_client("Code test cases")
         msg = await ai.messages.create(
             model="claude-haiku-4-5", max_tokens=8000,
             messages=[{"role": "user", "content": CODE_TEST_PROMPT.format(

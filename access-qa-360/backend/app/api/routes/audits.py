@@ -4,6 +4,7 @@ A scan in the app is an "audit job". The flow is:
 POST /api/v1/audits                     — step 1: say what is being tested (draft, nothing runs)
 POST /api/v1/audits/{id}/upload         — step 1: attach the .apk or .ipa, or a .zip of source code
 POST /api/v1/audits/{id}/start          — step 2: choose outputs and depth, confirm permission, run
+POST /api/v1/audits/{id}/stop           — stop a scan that is queued or running
 GET  /api/v1/audits/{id}                — status, per-step progress and results
 GET  /api/v1/audits/{id}/stream         — the same progress as server-sent events
 GET  /api/v1/audits/{id}/export/{kind}  — download: report, test-cases, playwright, appium, results
@@ -32,20 +33,13 @@ from app.models.audit_job import AuditJob, AuditStatus
 from app.models.user import User
 from app.api.deps import OrgContext, get_org_context
 from app.services.code_auditor import SourceError, parse_repo_url
+from app.services import scan_control
 from app.services.orgs import scans_this_month
 
 router = APIRouter(prefix="/audits", tags=["audits"])
 
-# Keep a reference to running audits so the event loop does not drop them mid-run.
-_running: set[asyncio.Task] = set()
-
-
 def _launch(job_id: str) -> None:
-    from app.services.audit_orchestrator import run_audit
-
-    task = asyncio.create_task(run_audit(job_id))
-    _running.add(task)
-    task.add_done_callback(_running.discard)
+    scan_control.launch(job_id)
 
 
 # ---------------------------------------------------------------------------
@@ -332,6 +326,20 @@ async def start_audit(
     await db.refresh(job)
 
     _launch(job.id)
+    return job
+
+
+@router.post("/{audit_id}/stop", response_model=AuditOut)
+async def stop_audit(audit_id: str, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Stop a scan that is queued or running. Results from steps that already finished are kept."""
+    ctx.require("scan.run")
+    job = await _get_job(audit_id, db, ctx)
+    try:
+        await scan_control.stop(db, job, f"Stopped by {ctx.user.full_name}")
+    except scan_control.NotActive:
+        raise HTTPException(409, "This scan is not running")
+    await db.commit()
+    await db.refresh(job)
     return job
 
 

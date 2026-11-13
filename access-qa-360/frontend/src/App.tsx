@@ -16,6 +16,7 @@ import { ChooseTestsPage } from "./pages/ChooseTestsPage";
 import { ScanDetailPage } from "./pages/ScanDetailPage";
 import { ScansListPage } from "./pages/ScansListPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { AdminAiUsagePage, AdminHealthPage, AdminQueuePage } from "./pages/AdminOpsPages";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AdminAuditPage, AdminOrgDetailPage, AdminOrgsPage } from "./pages/AdminOrgsPage";
@@ -59,6 +60,9 @@ export default function App() {
         <Route path="/admin" element={<RequireAuth><RequireSuperAdmin><AdminPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/organizations" element={<RequireAuth><RequireSuperAdmin><AdminOrgsPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/organizations/:id" element={<RequireAuth><RequireSuperAdmin><AdminOrgDetailPage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/admin/queue" element={<RequireAuth><RequireSuperAdmin><AdminQueuePage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/admin/ai-usage" element={<RequireAuth><RequireSuperAdmin><AdminAiUsagePage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/admin/health" element={<RequireAuth><RequireSuperAdmin><AdminHealthPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/audit-log" element={<RequireAuth><RequireSuperAdmin><AdminAuditPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/audits" element={<RequireAuth><ScansListPage /></RequireAuth>} />
         <Route path="/audits/new" element={<Navigate to="/scans/new" replace />} />

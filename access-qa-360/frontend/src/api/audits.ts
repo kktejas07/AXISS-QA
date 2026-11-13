@@ -178,3 +178,6 @@ export const listAudits = () => api.get<AuditJob[]>("/audits");
 export const getAudit = (id: string) => api.get<AuditJob>(`/audits/${id}`);
 
 export const exportPath = (id: string, kind: ExportKind) => `/audits/${id}/export/${kind}`;
+
+/** Stop a scan that is queued or running. Finished steps keep their results. */
+export const stopAudit = (id: string) => api.post<AuditJob>(`/audits/${id}/stop`);
