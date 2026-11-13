@@ -1,186 +1,96 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Layout } from "../components/Layout";
-import { getScan } from "../api/scans";
-import type { Scan } from "../types";
-import { Shield, Bug, TestTubeDiagonal, FileText, ArrowLeft, Loader2 } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { LoadingSpinner } from "../components/LoadingSpinner";
+import { QuickScanShell } from "../components/QuickScanShell";
+import { getVulnerabilities } from "../api/scans";
+import type { Scan, Severity, Vulnerability } from "../types";
+import { card } from "../components/ui";
 
-const gradeColour: Record<string, string> = {
-  A: "text-emerald-600 bg-emerald-50 border-emerald-200",
-  B: "text-blue-600 bg-blue-50 border-blue-200",
-  C: "text-yellow-600 bg-yellow-50 border-yellow-200",
-  D: "text-orange-600 bg-orange-50 border-orange-200",
-  F: "text-red-600 bg-red-50 border-red-200",
-};
+function Stat({ label, value, note, bad }: { label: string; value: string | number; note: string; bad?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1 border-b border-line px-6 py-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+      <dt className="text-sm font-semibold text-body">{label}</dt>
+      <dd className={`text-[40px] font-extrabold leading-tight ${bad ? "text-red-700" : ""}`}>{value}</dd>
+      <span className="text-[13.5px] text-body">{note}</span>
+    </div>
+  );
+}
 
+const levels: [Severity, string, string][] = [
+  ["critical", "Critical", "bg-red-700"],
+  ["high", "High", "bg-orange-500"],
+  ["medium", "Medium", "bg-yellow-500"],
+  ["low", "Low", "bg-gray-500"],
+  ["informational", "Informational", "bg-gray-300"],
+];
+
+/** Overview of a quick security scan. */
 export function ScanResultsPage() {
   const { id } = useParams<{ id: string }>();
   const [scan, setScan] = useState<Scan | null>(null);
-  const [tab, setTab] = useState<"overview" | "vulns" | "gaps" | "tests" | "reports">("overview");
+  const [vulns, setVulns] = useState<Vulnerability[]>([]);
+  const finished = scan?.status === "completed";
 
   useEffect(() => {
-    if (id) getScan(id).then((r) => setScan(r.data));
-  }, [id]);
+    if (id && finished) getVulnerabilities(id).then((r) => setVulns(r.data)).catch(() => {});
+  }, [id, finished]);
 
-  if (!scan) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-        </div>
-      </Layout>
-    );
-  }
-
-  const vc = scan.vulnerability_count;
-  const totalVulns = vc.critical + vc.high + vc.medium + vc.low + vc.informational;
-  const tabs = [
-    { key: "overview" as const, label: "Overview" },
-    { key: "vulns" as const, label: `Vulnerabilities (${totalVulns})` },
-    { key: "gaps" as const, label: "QA Gaps" },
-    { key: "tests" as const, label: `Test Cases (${scan.test_cases_generated})` },
-    { key: "reports" as const, label: "Reports" },
-  ];
-
-  const tabRoutes: Record<string, string> = {
-    vulns: `/scans/${id}/vulnerabilities`,
-    gaps: `/scans/${id}/gaps`,
-    tests: `/scans/${id}/test-cases`,
-    reports: `/scans/${id}/reports`,
-  };
+  const total = scan?.vulnerability_count ?? 0;
+  const critical = scan?.critical_count ?? 0;
 
   return (
-    <Layout>
-      <Link to="/" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-4">
-        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-      </Link>
+    <QuickScanShell id={id} tab="overview" onScan={setScan}>
+      {!scan ? (
+        <LoadingSpinner />
+      ) : scan.status === "failed" ? (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-800">
+          This scan could not finish. Check the address is reachable, then run it again.
+        </p>
+      ) : !finished ? (
+        <p className={`${card} px-6 py-10 text-center text-body`}>The scan is still running. Results appear here as soon as it finishes; you can leave this page.</p>
+      ) : (
+        <div className="flex flex-col gap-6">
+          <dl className="grid overflow-hidden rounded-2xl border-2 border-ink bg-white shadow-hard sm:grid-cols-2 lg:grid-cols-4">
+            <Stat label="Vulnerabilities" value={total} note={total === 0 ? "None found by the checks that ran" : "across all severities"} bad={critical > 0} />
+            <Stat label="Critical and high" value={critical + (scan.high_count ?? 0)} note={`${critical} critical, ${scan.high_count ?? 0} high`} bad={critical > 0} />
+            <Stat label="QA gaps" value={scan.gap_count ?? 0} note="Routes and flows without enough tests" />
+            <Stat label="Test cases" value={scan.test_case_count ?? 0} note="written from this scan" />
+          </dl>
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-brand-900">Scan Results</h1>
-          <p className="text-gray-500 text-sm mt-1 font-mono">{scan.url}</p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-            scan.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-            scan.status === "failed" ? "bg-red-100 text-red-700" :
-            "bg-indigo-100 text-indigo-700 animate-pulse"
-          }`}>
-            {scan.status.toUpperCase()}
-          </span>
-        </div>
-      </div>
+          {total > 0 && (
+            <section className={`${card} p-6`}>
+              <h2 className="mb-4 text-lg font-bold">Vulnerabilities by severity</h2>
+              <dl className="flex flex-col gap-2.5">
+                {levels.map(([key, label, colour]) => {
+                  const count = vulns.filter((v) => v.severity === key).length;
+                  return (
+                    <div key={key} className="flex items-center gap-3">
+                      <dt className="w-28 flex-none text-[14.5px]">{label}</dt>
+                      <div className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line">
+                        <div className={`h-full ${colour}`} style={{ width: `${vulns.length ? (count / vulns.length) * 100 : 0}%` }} />
+                      </div>
+                      <dd className="w-8 flex-none text-right font-bold">{count}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </section>
+          )}
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-6">
-          {tabs.map((t) => (
-            t.key === "overview" ? (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`pb-3 text-sm font-medium border-b-2 transition ${
-                  tab === t.key
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {t.label}
-              </button>
-            ) : (
-              <Link
-                key={t.key}
-                to={tabRoutes[t.key]}
-                className="pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-indigo-600 transition"
-              >
-                {t.label}
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              [`/scans/${id}/vulnerabilities`, "Vulnerabilities", "Every finding with its evidence and fix"],
+              [`/scans/${id}/test-cases`, "Test cases", "Cases written for the pages found"],
+              [`/scans/${id}/reports`, "Reports", "Create a PDF, JSON or CSV to share"],
+            ].map(([to, title, note]) => (
+              <Link key={to} to={to} className={`${card} flex flex-col gap-1 p-5 hover:border-ink`}>
+                <span className="font-bold text-brand-600">{title}</span>
+                <span className="text-[14.5px] text-body">{note}</span>
               </Link>
-            )
-          ))}
-        </nav>
-      </div>
-
-      {/* Overview Tab */}
-      {tab === "overview" && (
-        <div className="space-y-6">
-          {/* Risk Scorecard */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className={`border rounded-xl p-5 text-center ${gradeColour[scan.risk_grade] || gradeColour.C}`}>
-              <p className="text-5xl font-bold">{scan.risk_grade}</p>
-              <p className="text-sm mt-1 opacity-70">Risk Grade</p>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-5 text-center">
-              <p className="text-3xl font-bold text-brand-900">{scan.coverage_percent}%</p>
-              <p className="text-sm text-gray-500 mt-1">QA Coverage</p>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-5 text-center">
-              <p className="text-3xl font-bold text-brand-900">{totalVulns}</p>
-              <p className="text-sm text-gray-500 mt-1">Vulnerabilities</p>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-5 text-center">
-              <p className="text-3xl font-bold text-brand-900">{scan.test_cases_generated}</p>
-              <p className="text-sm text-gray-500 mt-1">Test Cases</p>
-            </div>
-          </div>
-
-          {/* Vulnerability Breakdown */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-semibold text-brand-900 mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-indigo-500" /> Vulnerability Breakdown
-            </h3>
-            <div className="grid grid-cols-5 gap-3">
-              {[
-                { label: "Critical", count: vc.critical, colour: "bg-red-500" },
-                { label: "High", count: vc.high, colour: "bg-orange-500" },
-                { label: "Medium", count: vc.medium, colour: "bg-yellow-500" },
-                { label: "Low", count: vc.low, colour: "bg-blue-500" },
-                { label: "Info", count: vc.informational, colour: "bg-gray-400" },
-              ].map((v) => (
-                <div key={v.label} className="text-center">
-                  <div className={`${v.colour} text-white text-xl font-bold rounded-lg py-3`}>
-                    {v.count}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1.5">{v.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link
-              to={`/scans/${id}/vulnerabilities`}
-              className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 hover:border-indigo-300 transition group"
-            >
-              <Bug className="w-8 h-8 text-red-500" />
-              <div>
-                <p className="font-semibold text-brand-900 group-hover:text-indigo-600">Vulnerabilities</p>
-                <p className="text-xs text-gray-500">View all findings with evidence</p>
-              </div>
-            </Link>
-            <Link
-              to={`/scans/${id}/test-cases`}
-              className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 hover:border-indigo-300 transition group"
-            >
-              <TestTubeDiagonal className="w-8 h-8 text-indigo-500" />
-              <div>
-                <p className="font-semibold text-brand-900 group-hover:text-indigo-600">Test Cases</p>
-                <p className="text-xs text-gray-500">AI-generated test suites</p>
-              </div>
-            </Link>
-            <Link
-              to={`/scans/${id}/reports`}
-              className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 hover:border-indigo-300 transition group"
-            >
-              <FileText className="w-8 h-8 text-emerald-500" />
-              <div>
-                <p className="font-semibold text-brand-900 group-hover:text-indigo-600">Reports</p>
-                <p className="text-xs text-gray-500">Export PDF, Word, JSON</p>
-              </div>
-            </Link>
+            ))}
           </div>
         </div>
       )}
-    </Layout>
+    </QuickScanShell>
   );
 }
