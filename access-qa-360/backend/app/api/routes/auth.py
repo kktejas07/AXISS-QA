@@ -136,7 +136,7 @@ async def change_password(body: ChangePasswordRequest, db: AsyncSession = Depend
     return Token(access_token=create_access_token(user.id))
 
 
-# ---- sign in with Google or Microsoft ------------------------------------------
+# ---- sign in with Google ------------------------------------------
 
 SSO_COOKIE = "wf_sso"
 
@@ -151,7 +151,7 @@ async def sso_providers():
 
 
 @router.get("/sso/{provider}/start")
-async def sso_start(provider: Literal["google", "microsoft"], invite: str | None = None):
+async def sso_start(provider: Literal["google"], invite: str | None = None):
     """Send the browser to the provider's sign-in page."""
     try:
         url, nonce = sso.authorize_url(provider, invite)
@@ -164,7 +164,7 @@ async def sso_start(provider: Literal["google", "microsoft"], invite: str | None
 
 @router.get("/sso/{provider}/callback")
 async def sso_callback(
-    request: Request, provider: Literal["google", "microsoft"], code: str | None = None, state: str | None = None, error: str | None = None,
+    request: Request, provider: Literal["google"], code: str | None = None, state: str | None = None, error: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     """The provider sends the person back here. Sign them in, creating the account on first use."""

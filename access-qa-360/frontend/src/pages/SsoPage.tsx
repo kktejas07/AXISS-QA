@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthCard } from "../components/AuthCard";
 import { clearMe } from "../hooks/useMe";
 
-/** Where Google or Microsoft sign-in lands: picks up the session from the address and opens the app. */
+/** Where Google sign-in lands: picks up the session from the address and opens the app. */
 export function SsoPage() {
   const navigate = useNavigate();
 

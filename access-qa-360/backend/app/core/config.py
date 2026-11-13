@@ -28,13 +28,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
     PASSWORD_RESET_MINUTES: int = 60
-    # ---- Sign in with Google or Microsoft. Leave a provider's client id empty to switch it off. ----
+    # ---- Sign in with Google. Leave the client id empty to switch it off. ----
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    MICROSOFT_CLIENT_ID: str = ""
-    MICROSOFT_CLIENT_SECRET: str = ""
-    # Your Microsoft Entra tenant id. Required for Microsoft sign-in: only accounts in this tenant may sign in.
-    MICROSOFT_TENANT_ID: str = ""
     # Public address of this API, used as the address providers send people back to.
     # Empty means APP_URL + "/api/v1", which is right when the web app proxies /api (the production setup).
     SSO_REDIRECT_BASE: str = ""
@@ -43,7 +39,7 @@ class Settings(BaseSettings):
     TEAM_PRICE_USD: int = 29
     TEAM_PRICE_INR: int = 2400
     # Scans a free Individual account may start each month. 0 means no limit. Applies to new sign-ups.
-    FREE_SCANS_PER_MONTH: int = 10
+    FREE_SCANS_PER_MONTH: int = 2
     # Where "Contact sales" on the pricing page sends people.
     SALES_EMAIL: str = ""
     # Leave a provider's keys empty to switch that provider off.

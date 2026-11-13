@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { getSsoProviders, ssoStartUrl } from "../api/auth";
 
-const names = { google: "Google", microsoft: "Microsoft" } as const;
+const names = { google: "Google" } as const;
 
-/** "Continue with Google / Microsoft", shown only for the providers this server has set up. */
+/** "Continue with Google", shown only when this server has it set up. */
 export function SsoButtons({ invite }: { invite?: string }) {
-  const [on, setOn] = useState<("google" | "microsoft")[]>([]);
+  const [on, setOn] = useState<"google"[]>([]);
 
   useEffect(() => {
     getSsoProviders()
-      .then((r) => setOn((["google", "microsoft"] as const).filter((p) => r.data[p])))
+      .then((r) => setOn((["google"] as const).filter((p) => r.data[p])))
       .catch(() => setOn([]));
   }, []);
 

@@ -25,10 +25,10 @@ export const changePassword = (current_password: string, new_password: string) =
   api.post<{ access_token: string }>("/auth/change-password", { current_password, new_password });
 
 /** Which "Continue with ..." buttons this server offers. */
-export const getSsoProviders = () => api.get<{ google: boolean; microsoft: boolean }>("/auth/sso/providers");
+export const getSsoProviders = () => api.get<{ google: boolean }>("/auth/sso/providers");
 
 /** The address that starts a sign-in with the provider; the browser goes there and comes back to /sso. */
-export const ssoStartUrl = (provider: "google" | "microsoft", invite?: string) => {
+export const ssoStartUrl = (provider: "google", invite?: string) => {
   const base = (api.defaults.baseURL ?? "").replace(/\/$/, "");
   return `${base}/auth/sso/${provider}/start${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`;
 };

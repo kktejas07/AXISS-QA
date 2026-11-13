@@ -1,4 +1,4 @@
-"""Sign in with Google or Microsoft."""
+"""Sign in with Google."""
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -8,17 +8,14 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.models.organization import Invite, Organization
 from app.models.user import User
-from app.services import sso
 from tests.conftest import TestSessionLocal
 
 API = "/api/v1/auth/sso"
-TENANT = "11111111-2222-3333-4444-555555555555"
 
 
 @pytest.fixture
 def configured(monkeypatch):
-    for key, value in (("GOOGLE_CLIENT_ID", "g-id"), ("GOOGLE_CLIENT_SECRET", "g-secret"), ("MICROSOFT_CLIENT_ID", "m-id"),
-                       ("MICROSOFT_CLIENT_SECRET", "m-secret"), ("MICROSOFT_TENANT_ID", TENANT), ("APP_URL", "http://app.example.com")):
+    for key, value in (("GOOGLE_CLIENT_ID", "g-id"), ("GOOGLE_CLIENT_SECRET", "g-secret"), ("APP_URL", "http://app.example.com")):
         monkeypatch.setattr(settings, key, value)
 
 
@@ -33,14 +30,10 @@ async def _start(client: AsyncClient, provider="google", invite=None) -> str:
     return parse_qs(urlparse(r.headers["location"]).query)["state"][0]
 
 
-async def test_providers_are_off_until_configured(client: AsyncClient, monkeypatch):
-    assert (await client.get(f"{API}/providers")).json() == {"google": False, "microsoft": False}
+async def test_providers_are_off_until_configured(client: AsyncClient):
+    assert (await client.get(f"{API}/providers")).json() == {"google": False}
     r = await client.get(f"{API}/google/start")
     assert r.status_code == 302 and r.headers["location"].endswith("/login?sso_error=unavailable")
-    # Microsoft needs a named tenant; the shared endpoint is refused.
-    for key, value in (("MICROSOFT_CLIENT_ID", "m"), ("MICROSOFT_CLIENT_SECRET", "s"), ("MICROSOFT_TENANT_ID", "common")):
-        monkeypatch.setattr(settings, key, value)
-    assert (await client.get(f"{API}/providers")).json()["microsoft"] is False
 
 
 async def test_start_sends_the_browser_to_the_provider(client: AsyncClient, configured):
@@ -49,8 +42,7 @@ async def test_start_sends_the_browser_to_the_provider(client: AsyncClient, conf
     q = parse_qs(url.query)
     assert url.netloc == "accounts.google.com" and q["client_id"] == ["g-id"] and q["scope"] == ["openid email profile"]
     assert q["redirect_uri"] == ["http://app.example.com/api/v1/auth/sso/google/callback"]
-    r = await client.get(f"{API}/microsoft/start")
-    assert f"login.microsoftonline.com/{TENANT}/oauth2/v2.0/authorize" in r.headers["location"]
+    assert (await client.get(f"{API}/microsoft/start")).status_code == 422       # Google is the only provider
 
 
 async def test_first_google_sign_in_creates_an_account_and_later_ones_reuse_it(client: AsyncClient, configured, httpx_mock):
@@ -89,7 +81,7 @@ async def test_sign_in_is_refused_when_it_should_be(client: AsyncClient, test_us
     assert await outcome(error="access_denied") == "cancelled"
     assert await outcome(state="forged", code="c") == "expired"
     google_state = await _start(client)
-    assert await outcome(state=await _start(client, "microsoft"), code="c") == "expired"      # state from another provider
+    await _start(client)                                                                        # a newer attempt replaces it
     assert await outcome(state=google_state, code="c") == "expired"                             # an older attempt in this browser
 
     # A link started in someone else's browser: the state is genuine but this browser has no matching cookie.
@@ -131,10 +123,3 @@ async def test_an_invitation_is_honoured_only_for_its_own_email(client: AsyncCli
     me = (await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})).json()
     assert me["organization_id"] == org_id and me["org_role"] == "viewer"
 
-
-async def test_microsoft_sign_in(client: AsyncClient, configured, httpx_mock):
-    httpx_mock.add_response(url=f"https://login.microsoftonline.com/{TENANT}/oauth2/v2.0/token", method="POST", json={"access_token": "at"})
-    httpx_mock.add_response(url="https://graph.microsoft.com/oidc/userinfo", json={"email": "sam@contoso.com", "name": "Sam Staff"})
-    r = await client.get(f"{API}/microsoft/callback", params={"code": "c", "state": await _start(client, "microsoft")})
-    assert "#token=" in r.headers["location"]
-    assert sso.redirect_uri("microsoft") == "http://app.example.com/api/v1/auth/sso/microsoft/callback"
