@@ -13,7 +13,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    const signedOutPage = /^\/(login|register|forgot-password|reset-password)/.test(window.location.pathname);
+    if (err.response?.status === 401 && !signedOutPage) {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }

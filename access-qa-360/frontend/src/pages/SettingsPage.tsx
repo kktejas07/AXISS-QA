@@ -3,6 +3,7 @@ import { Check, Copy, Minus } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { cancelInvite, changeRole, createInvite, getInvites, getMembers, getOrg, removeMember, renameOrg } from "../api/org";
+import { changePassword } from "../api/auth";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Invite, Member, Org, OrgRole } from "../types";
 import { apiError } from "../utils/errors";
@@ -40,6 +41,8 @@ export function SettingsPage() {
   const [inviteRole, setInviteRole] = useState<OrgRole>("member");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   const load = async () => {
     const o = (await getOrg()).data;
@@ -54,14 +57,14 @@ export function SettingsPage() {
   }, []);
 
   /** Run a change, show the server's reason if it is refused, then reload. */
-  const run = async (action: () => Promise<unknown>, done: string, fallback: string) => {
+  const run = async (action: () => Promise<unknown>, done: string | (() => string), fallback: string) => {
     setError("");
     setNotice("");
     setBusy(true);
     try {
       await action();
       await load();
-      setNotice(done);
+      setNotice(typeof done === "string" ? done : done());
     } catch (e) {
       setError(apiError(e, fallback));
     } finally {
@@ -276,12 +279,17 @@ export function SettingsPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                let emailed = false;
+                const to = inviteEmail.trim();
                 run(
                   async () => {
-                    await createInvite(inviteEmail.trim(), inviteRole);
+                    emailed = (await createInvite(to, inviteRole)).data.emailed === true;
                     setInviteEmail("");
                   },
-                  "Invitation created. Copy the link from the list and send it to them; Wiseflow does not email it.",
+                  () =>
+                    emailed
+                      ? `Invitation emailed to ${to}. You can also copy the link from the list.`
+                      : "Invitation created. This server does not send email, so copy the link from the list and send it to them.",
                   "Could not create the invitation."
                 );
               }}
@@ -305,6 +313,43 @@ export function SettingsPage() {
             </form>
           )}
         </section>
+
+        {/* Password */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            run(
+              async () => {
+                // Other devices are signed out; this one continues with the fresh token.
+                localStorage.setItem("token", (await changePassword(currentPassword, newPassword)).data.access_token);
+                setCurrentPassword("");
+                setNewPassword("");
+              },
+              "Password changed. Other devices have been signed out.",
+              "Could not change the password."
+            );
+          }}
+          className="flex flex-col gap-4 rounded-2xl border border-gray-300 bg-white p-6"
+        >
+          <div>
+            <h2 className="text-lg font-bold">Your password</h2>
+            <p className="text-body">For {me.email}. Changing it signs you out on every other device.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5 text-sm font-semibold">
+              Current password
+              <input type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" className={`${input} w-full`} />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-semibold">
+              New password
+              <input type="password" required minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" className={`${input} w-full`} />
+              <span className="font-normal text-body">At least 8 characters.</span>
+            </label>
+          </div>
+          <button type="submit" disabled={busy} className="h-12 self-start rounded-[10px] bg-ink px-5 font-bold text-white disabled:opacity-50">
+            Change password
+          </button>
+        </form>
 
         {/* Permission matrix */}
         <section className={card}>

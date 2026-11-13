@@ -8,7 +8,12 @@ from app.models.user import User, ROLE_SUPER_ADMIN, ROLE_USER
 from datetime import datetime, timezone
 
 from app.models.organization import Invite, Organization
-from app.schemas.auth import Token, LoginRequest, RegisterRequest, UserOut, MeOut, OrgBrief
+from app.schemas.auth import (
+    Token, LoginRequest, RegisterRequest, UserOut, MeOut, OrgBrief,
+    ForgotPasswordRequest, ForgotPasswordOut, ResetPasswordRequest, ChangePasswordRequest,
+)
+from app.services import password_reset
+from app.services.mailer import email_configured, send_email
 from app.api.deps import OrgContext, get_org_context
 from app.services.orgs import create_personal_org, member_count, permissions_for
 
@@ -70,6 +75,58 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=403, detail="This account has been deactivated")
     if not user.is_super_admin and _is_bootstrap_admin(user.email):
         user.role = ROLE_SUPER_ADMIN
+    return Token(access_token=create_access_token(user.id))
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordOut)
+async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Email a reset link. The answer is the same whether or not the address has an
+    account, so this cannot be used to find out who is registered.
+    """
+    if not email_configured():
+        return ForgotPasswordOut(delivery="admin")
+    user = (await db.execute(select(User).where(User.email == body.email.lower()))).scalar_one_or_none()
+    if user and user.is_active and await password_reset.recent_link_count(db, user.id) < password_reset.MAX_LINKS_PER_HOUR:
+        token, _ = await password_reset.create_reset(db, user)
+        await db.commit()
+        await send_email(
+            user.email,
+            "Reset your Wiseflow password",
+            f"Hello {user.full_name},\n\nUse this link to choose a new password. It works once and expires in "
+            f"{settings.PASSWORD_RESET_MINUTES} minutes.\n\n{password_reset.reset_url(token)}\n\n"
+            "If you did not ask for this, ignore this email; your password stays as it is.\n",
+        )
+    return ForgotPasswordOut(delivery="email")
+
+
+@router.get("/reset-password/{token}")
+async def check_reset_link(token: str, db: AsyncSession = Depends(get_db)):
+    """Public: whether a reset link still works, and which account it is for."""
+    found = await password_reset.find_reset(db, token)
+    if not found:
+        raise HTTPException(status_code=404, detail="This reset link has expired or was already used")
+    return {"email": found[1].email}
+
+
+@router.post("/reset-password")
+async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    found = await password_reset.find_reset(db, body.token)
+    if not found:
+        raise HTTPException(status_code=400, detail="This reset link has expired or was already used. Ask for a new one.")
+    await password_reset.set_password(db, found[1], body.password)
+    return {"email": found[1].email}
+
+
+@router.post("/change-password", response_model=Token)
+async def change_password(body: ChangePasswordRequest, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
+    """Change the signed-in user's password. Other devices are signed out; this one gets a fresh token."""
+    user = ctx.user
+    if not verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="The current password is not correct")
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=400, detail="Choose a password that is different from the current one")
+    await password_reset.set_password(db, user, body.new_password)
     return Token(access_token=create_access_token(user.id))
 
 

@@ -13,9 +13,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import OrgContext, get_org_context
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.organization import Invite, Organization
 from app.models.user import User
+from app.services.mailer import send_email
 from app.services.orgs import (
     by_seniority,
     create_personal_org,
@@ -23,6 +25,7 @@ from app.services.orgs import (
     pending_invite_count,
     permissions_for,
     scans_this_month,
+    ROLE_NAMES,
 )
 
 router = APIRouter(tags=["organisation"])
@@ -72,6 +75,8 @@ class InviteOut(BaseModel):
     role: str
     token: str
     created_at: datetime
+    # True when the link was emailed to the person; otherwise the inviter shares it.
+    emailed: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -170,7 +175,7 @@ async def list_invites(db: AsyncSession = Depends(get_db), ctx: OrgContext = Dep
 
 @router.post("/org/invites", response_model=InviteOut, status_code=201)
 async def create_invite(body: InviteCreate, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
-    """Create an invitation link. No email is sent: the inviter shares the link."""
+    """Create an invitation link. It is emailed when email is set up; otherwise the inviter shares it."""
     ctx.require("members.manage")
     org = ctx.org
     if org.account_type == "individual":
@@ -193,7 +198,15 @@ async def create_invite(body: InviteCreate, db: AsyncSession = Depends(get_db), 
     db.add(invite)
     await db.flush()
     await db.refresh(invite)
-    return invite
+    emailed = await send_email(
+        email,
+        f"{ctx.user.full_name} invited you to {org.name} on Wiseflow",
+        f"{ctx.user.full_name} invited you to join {org.name} on Wiseflow as {ROLE_NAMES.get(body.role, body.role)}.\n\n"
+        f"Create your account here:\n{settings.APP_URL.rstrip('/')}/register?invite={invite.token}\n",
+    )
+    out = InviteOut.model_validate(invite)
+    out.emailed = emailed
+    return out
 
 
 @router.delete("/org/invites/{invite_id}", status_code=204)

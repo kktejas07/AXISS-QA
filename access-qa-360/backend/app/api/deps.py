@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.core.security import decode_token
+from app.core.security import decode_token, token_is_current
 from dataclasses import dataclass
 
 from app.models.organization import Organization
@@ -25,6 +25,8 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not token_is_current(token, user.password_changed_at):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your password was changed. Sign in again.")
     return user
 
 

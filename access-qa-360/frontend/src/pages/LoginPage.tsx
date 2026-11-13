@@ -1,70 +1,65 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../api/auth";
+import { AuthAlert, AuthCard, authButton, authField } from "../components/AuthCard";
 import { clearMe } from "../hooks/useMe";
 
 export function LoginPage() {
-  const [email, setEmail] = useState("");
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setBusy(true);
     try {
-      const res = await login(email, password);
+      const res = await login(email.trim(), password);
       clearMe();
       localStorage.setItem("token", res.data.access_token);
       navigate("/");
-    } catch {
-      setError("Invalid email or password");
+    } catch (err) {
+      const status = (err as { response?: { status?: number } }).response?.status;
+      setError(
+        status === 401
+          ? "That email and password do not match an account."
+          : status === 403
+            ? "This account has been deactivated. Contact your administrator."
+            : "Could not sign in. Check your connection and try again."
+      );
+      setBusy(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-brand-900 mb-1">Wiseflow</h1>
-        <p className="text-gray-500 mb-6 text-sm">Sign in to your workspace</p>
-        {error && (
-          <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-2 mb-4">{error}</div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+    <AuthCard title="Sign in" intro="Welcome back to your workspace.">
+      {params.get("reset") && !error && <AuthAlert tone="ok">Your password was changed. Sign in with the new one.</AuthAlert>}
+      {error && <AuthAlert>{error}</AuthAlert>}
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <label className="flex flex-col gap-1.5 text-sm font-semibold">
+          Email
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={authField} />
+        </label>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <label htmlFor="password" className="text-sm font-semibold">Password</label>
+            <Link to="/forgot-password" className="text-sm font-semibold text-brand-600">Forgot password?</Link>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 rounded-lg transition"
-          >
-            Sign in
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-gray-500">
-          No account yet?{" "}
-          <Link to="/register" className="text-indigo-600 font-medium">
-            Create one
-          </Link>
-        </p>
-      </div>
-    </div>
+          <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className={authField} />
+        </div>
+        <button type="submit" disabled={busy} className={authButton}>
+          {busy ? "Signing in" : "Sign in"}
+        </button>
+      </form>
+      <p className="mt-5 text-center text-sm text-body">
+        No account yet?{" "}
+        <Link to="/register" className="font-semibold text-brand-600">
+          Create one
+        </Link>
+      </p>
+    </AuthCard>
   );
 }

@@ -19,6 +19,25 @@ class RegisterRequest(BaseModel):
     invite_token: str | None = None
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordOut(BaseModel):
+    # "email": a link was emailed if the account exists. "admin": this server sends no email.
+    delivery: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
 class UserOut(BaseModel):
     id: str
     email: str
