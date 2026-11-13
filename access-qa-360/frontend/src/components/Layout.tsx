@@ -1,9 +1,10 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Activity, Building2, CalendarClock, FolderKanban, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookOpen, Building2, CalendarClock, FolderKanban, LayoutDashboard, ListChecks, LogOut, Plus, ScrollText, Settings, Sparkles, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Permission } from "../types";
 import { Logo } from "./Logo";
+import { Wise } from "./Wise";
 
 // `needs` hides an item from roles that cannot use it (viewers cannot start scans).
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; needs?: Permission };
@@ -13,6 +14,7 @@ const userNav: NavItem[] = [
   { to: "/scans/new", label: "New scan", icon: Plus, needs: "scan.run" },
   { to: "/audits", label: "Scans", icon: ListChecks },
   { to: "/schedules", label: "Schedules", icon: CalendarClock },
+  { to: "/library", label: "Library", icon: BookOpen },
   { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -110,8 +112,9 @@ export function Layout({ children, variant = "user" }: { children: React.ReactNo
       </aside>
 
       <main className="flex-1 min-w-0 px-4 py-8 md:px-12">
-        <div className="max-w-6xl">{children}</div>
+        <div className="wf-fade-up max-w-6xl pb-20">{children}</div>
       </main>
+      {!admin && <Wise />}
     </div>
   );
 }

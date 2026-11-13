@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { getLibrary } from "../api/wise";
+import type { ScanPreset } from "../api/wise";
 import { ArrowRight, Check, Code2, ListChecks, ShieldCheck, Smartphone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Layout } from "../components/Layout";
@@ -66,6 +68,9 @@ export function ChooseTestsPage() {
   const [picked, setPicked] = useState<Set<OutputKind>>(new Set());
   const [depth, setDepth] = useState<Depth>("standard");
   const [confirmed, setConfirmed] = useState(false);
+  const [query] = useSearchParams();
+  const [presets, setPresets] = useState<ScanPreset[]>([]);
+  const [preset, setPreset] = useState("");
   const [signIn, setSignIn] = useState({ on: false, url: "", username: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -73,12 +78,24 @@ export function ChooseTestsPage() {
   useEffect(() => {
     if (!id) return;
     getAudit(id)
-      .then((r) => {
+      .then(async (r) => {
         setJob(r.data);
         setPicked(new Set(r.data.allowed_outputs));
+        // Presets are a convenience: the page works the same if they cannot be loaded.
+        const all = await getLibrary().then((lib) => lib.data.scan_presets).catch(() => []);
+        const fitting = all.filter((p) => p.for.includes(r.data.source_type) && p.outputs.some((o) => r.data.allowed_outputs.includes(o as OutputKind)));
+        setPresets(fitting);
+        const asked = fitting.find((p) => p.id === query.get("preset"));
+        if (asked) applyPreset(asked, r.data.allowed_outputs);
       })
       .catch(() => setMissing(true));
   }, [id]);
+
+  const applyPreset = (p: ScanPreset, allowed: OutputKind[]) => {
+    setPicked(new Set(allowed.filter((o) => p.outputs.includes(o))));
+    setDepth(p.depth);
+    setPreset(p.id);
+  };
 
   if (missing) {
     return (
@@ -149,6 +166,20 @@ export function ChooseTestsPage() {
 
       <div className="flex flex-wrap items-start gap-7">
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-3.5">
+          {presets.length > 0 && (
+            <div className="mb-2 flex flex-col gap-2">
+              <h2 className="text-lg font-bold">Start from a preset</h2>
+              <div role="group" aria-label="Presets" className="flex flex-wrap gap-2">
+                {presets.map((p) => (
+                  <button key={p.id} type="button" title={p.about} aria-pressed={preset === p.id} onClick={() => applyPreset(p, job.allowed_outputs)}
+                    className={`min-h-[44px] rounded-full border-[1.5px] px-4 text-sm font-semibold ${preset === p.id ? "border-ink bg-ink text-white" : "border-gray-400 bg-white hover:border-ink"}`}>
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+              {preset && <p className="text-[13.5px] text-body">{presets.find((p) => p.id === preset)?.about} You can still change anything below.</p>}
+            </div>
+          )}
           <h2 className="text-lg font-bold">Outputs</h2>
           <div role="group" aria-label="Outputs" className="grid gap-3.5 sm:grid-cols-2">
             {order.map((kind) => {

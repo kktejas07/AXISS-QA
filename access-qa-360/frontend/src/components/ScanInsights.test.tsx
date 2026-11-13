@@ -5,9 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuditJob } from "../api/audits";
 import type { Changes, ScanBrief, Standards } from "../api/insights";
 import * as api from "../api/insights";
-import { ChangesTab, EndpointsTab, PerformanceTab, StandardsTab, TrendChart } from "./ScanInsights";
+import * as wiseApi from "../api/wise";
+import { ChangesTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab, TrendChart } from "./ScanInsights";
 
 vi.mock("../api/insights");
+vi.mock("../api/wise");
 
 const brief = (id: string, risk: number | null, date: string): ScanBrief => ({ id, label: "shop.example.com", created_at: date, risk_score: risk, findings: 2, counts: {}, branch: null });
 const job = (more: Partial<AuditJob> = {}) => ({ id: "now", label: "shop.example.com", source_type: "web", ...more }) as AuditJob;
@@ -113,5 +115,30 @@ describe("EndpointsTab", () => {
     expect(screen.getByText(/1 of 2 endpoints need sign-in/)).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Not required" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Not described" })).toBeInTheDocument();
+  });
+});
+
+describe("FlowsTab", () => {
+  const node = (id: number, path: string, depth: number, more = {}) => ({ id, path, url: `https://shop.example.com${path}`, title: `Page ${path}`, status: 200, depth, forms: 0, form_fields: [], api_calls: [], a11y: 0, lcp_ms: 900, ...more });
+
+  it("draws each page, and shows the picked page's forms and requests", async () => {
+    vi.mocked(wiseApi.getFlows).mockReturnValue(ok({
+      nodes: [node(0, "/", 0), node(1, "/cart", 1), node(2, "/checkout", 2, { forms: 1, form_fields: ["card", "expiry"], api_calls: ["POST https://shop.example.com/api/pay"], a11y: 2 })],
+      edges: [{ from: 0, to: 1 }, { from: 1, to: 2 }, { from: 1, to: 0 }], pages_crawled: 30, shown: 3,
+    }));
+    render(<FlowsTab job={job()} />);
+    expect(await screen.findByRole("button", { name: "Page /" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/The first 3 of 30 pages are shown/)).toBeInTheDocument();
+    expect(screen.getByText("No forms on this page")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Page /checkout" }));
+    expect(screen.getByRole("heading", { name: "/checkout" })).toBeInTheDocument();
+    expect(screen.getByText("card")).toBeInTheDocument();
+    expect(screen.getByText("POST https://shop.example.com/api/pay")).toBeInTheDocument();
+  });
+
+  it("says so when the scan visited no pages", async () => {
+    vi.mocked(wiseApi.getFlows).mockReturnValue(ok({ nodes: [], edges: [], pages_crawled: 0, shown: 0 }));
+    render(<FlowsTab job={job()} />);
+    expect(await screen.findByRole("heading", { name: "No pages to map" })).toBeInTheDocument();
   });
 });

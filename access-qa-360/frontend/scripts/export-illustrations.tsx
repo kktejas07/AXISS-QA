@@ -14,7 +14,8 @@ mkdirSync("public/illustrations", { recursive: true });
 for (const [name, Picture] of Object.entries(pictures)) {
   const svg = renderToStaticMarkup(<Picture />)
     .replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ')
-    .replace(/ class="[^"]*"/, ' width="240" height="180"')
+    .replace(/ class="[^"]*"/, name === "WiseOwl" ? ' width="64" height="64"' : ' width="240" height="180"')
+    .replace(/ class="[^"]*"/g, "")
     .replace(/ (role|aria-hidden)="[^"]*"/g, "");
   writeFileSync(`public/illustrations/${kebab(name)}.svg`, svg + "\n");
   console.log(`public/illustrations/${kebab(name)}.svg`);

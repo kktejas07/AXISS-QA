@@ -3,7 +3,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Check, Minus, X } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { ChangesTab, EndpointsTab, PerformanceTab, StandardsTab } from "../components/ScanInsights";
+import { ChangesTab, EndpointsTab, FlowsTab, PerformanceTab, StandardsTab } from "../components/ScanInsights";
 import { ScanSteps } from "../components/ScanSteps";
 import { StatusPill } from "../components/StatusPill";
 import {
@@ -87,7 +87,7 @@ function Stat({ label, value, note, bad }: { label: string; value: string | numb
   );
 }
 
-type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "changes" | "standards" | "performance" | "endpoints" | "downloads";
+type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "changes" | "standards" | "performance" | "endpoints" | "flows" | "downloads";
 
 /** One scan: progress while it runs, then tabbed results. */
 export function ScanDetailPage() {
@@ -200,6 +200,7 @@ export function ScanDetailPage() {
       : api
         ? [{ id: "endpoints" as const, label: "Endpoints", count: job.tier1_result?.api?.operations ?? 0 }]
         : [{ id: "accessibility" as const, label: "Accessibility", count: a11y }]),
+    ...(job.source_type === "web" ? [{ id: "flows" as const, label: "Flows", count: job.total_pages_audited }] : []),
     ...(job.source_type === "web" ? [{ id: "performance" as const, label: "Performance", count: job.tier1_result?.performance?.findings.length ?? 0 }] : []),
     { id: "cases", label: "Test cases", count: cases },
     ...(code || api ? [] : [{ id: "code" as const, label: "Automation" }]),
@@ -325,6 +326,7 @@ export function ScanDetailPage() {
       {tab === "gaps" && <QaGapsTab job={job} />}
       {tab === "cases" && <TestCasesTab job={job} />}
       {tab === "code" && <AutomationTab job={job} />}
+      {tab === "flows" && <FlowsTab job={job} />}
       {tab === "performance" && <PerformanceTab job={job} />}
       {tab === "endpoints" && <EndpointsTab job={job} />}
       {tab === "changes" && <ChangesTab job={job} />}

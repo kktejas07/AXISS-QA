@@ -2,3 +2,43 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ---- Motion ---------------------------------------------------------------
+   A small set of named movements used across the app. Each answers something
+   that happened (a page opened, a panel slid in, work is in progress). All of
+   them stop for people who ask their device for reduced motion. */
+@keyframes wf-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes wf-slide-in { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes wf-pop { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes wf-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes wf-blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes wf-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes wf-dot { 0%, 80%, 100% { transform: translateY(0); opacity: 0.35; } 40% { transform: translateY(-5px); opacity: 1; } }
+@keyframes wf-draw { 0% { stroke-dashoffset: 260; } 55%, 100% { stroke-dashoffset: 0; } }
+@keyframes wf-sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes wf-ring { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.7); opacity: 0; } }
+@keyframes wf-stripes { from { background-position: 0 0; } to { background-position: 28px 0; } }
+@keyframes wf-dash { to { stroke-dashoffset: -16; } }
+
+@layer utilities {
+  .wf-fade-up { animation: wf-fade-up 0.35s ease-out both; }
+  .wf-slide-in { animation: wf-slide-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: bottom right; }
+  .wf-pop { animation: wf-pop 0.3s ease-out both; }
+  .wf-bob { animation: wf-bob 3.2s ease-in-out infinite; }
+  .wf-blink { animation: wf-blink 4.5s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  .wf-dot { animation: wf-dot 1.1s ease-in-out infinite; }
+  .wf-draw { stroke-dasharray: 260; animation: wf-draw 1.6s ease-in-out infinite alternate; }
+  .wf-sweep { animation: wf-sweep 2.4s linear infinite; transform-origin: center; transform-box: fill-box; }
+  .wf-ring { animation: wf-ring 1.8s ease-out infinite; }
+  .wf-flow { stroke-dasharray: 5 3; animation: wf-dash 0.9s linear infinite; }
+  .wf-skeleton { background: linear-gradient(90deg, #eceef5 25%, #f8f9fc 50%, #eceef5 75%); background-size: 200% 100%; animation: wf-shimmer 1.4s linear infinite; border-radius: 8px; }
+  .wf-stripes { background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.28) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0.28) 75%, transparent 75%); background-size: 28px 28px; animation: wf-stripes 0.9s linear infinite; }
+  .wf-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .wf-lift:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #3730a3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-fade-up, .wf-slide-in, .wf-pop, .wf-bob, .wf-blink, .wf-dot, .wf-draw, .wf-sweep, .wf-ring, .wf-flow, .wf-skeleton, .wf-stripes { animation: none; }
+  .wf-draw { stroke-dashoffset: 0; }
+  .wf-lift, .wf-lift:hover { transition: none; transform: none; }
+}

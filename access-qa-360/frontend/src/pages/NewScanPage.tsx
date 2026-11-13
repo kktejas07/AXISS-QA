@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Code2, GitBranch, Globe, Smartphone, Upload, Braces } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Layout } from "../components/Layout";
@@ -32,7 +32,10 @@ const uploads = {
 export function NewScanPage() {
   const navigate = useNavigate();
   const [source, setSource] = useState<Source>("web");
-  const [url, setUrl] = useState("");
+  const [query] = useSearchParams();
+  const preset = query.get("preset");
+  const after = preset ? `?preset=${encodeURIComponent(preset)}` : "";
+  const [url, setUrl] = useState(query.get("url") ?? "");
   const [repo, setRepo] = useState("");
   const [apiUrl, setApiUrl] = useState("");
   const [appName, setAppName] = useState("");
@@ -81,16 +84,16 @@ export function NewScanPage() {
       const name = appName.trim() || undefined;
       if (source === "web") {
         const { data } = await createDraft({ source_type: "web", target_url: url.trim(), app_name: name });
-        navigate(`/audits/${data.id}/setup`);
+        navigate(`/audits/${data.id}/setup${after}`);
       } else if (source === "repo") {
         const { data } = await createDraft({ source_type: "repo", repo_url: repo.trim(), app_name: name });
-        navigate(`/audits/${data.id}/setup`);
+        navigate(`/audits/${data.id}/setup${after}`);
       } else if (file) {
         const type: SourceType = source === "code" || source === "api" ? source : /\.ipa$/i.test(file.name) ? "ios" : "android";
         const { data } = await createDraft({ source_type: type, app_name: name, ...(source === "api" && apiUrl.trim() ? { target_url: apiUrl.trim() } : {}) });
         setUploaded(0);
         await uploadBuild(data.id, file, setUploaded);
-        navigate(`/audits/${data.id}/setup`);
+        navigate(`/audits/${data.id}/setup${after}`);
       }
     } catch (err) {
       setError(apiError(err, "Could not save this app. Check your connection and try again."));

@@ -7,6 +7,7 @@ import { changePassword } from "../api/auth";
 import { ApiKeysSection, JiraSection } from "../components/IntegrationSettings";
 import { BillingSection } from "../components/BillingSection";
 import { ConnectionsSection } from "../components/ConnectionsSection";
+import { WiseDocuments } from "../components/Wise";
 import { RequireSsoSection, TwoStepSection } from "../components/SecuritySettings";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Invite, Member, Org, OrgRole } from "../types";
@@ -324,6 +325,7 @@ export function SettingsPage() {
         {canEdit && <ApiKeysSection />}
         <JiraSection canEdit={canEdit} />
         <ConnectionsSection canEdit={canEdit} />
+        <WiseDocuments canEdit={canEdit} />
 
         {/* Password */}
         <form
