@@ -1,3 +1,4 @@
+import { getConnections } from "../api/insights";
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Download } from "lucide-react";
 import type { AuditJob, ExportKind, Finding, ManualCase } from "../api/audits";
@@ -134,7 +135,7 @@ function JiraAction({ auditId, finding, issue, connected, onCreated }: { auditId
   if (issue) {
     return (
       <a href={issue.issue_url} target="_blank" rel="noreferrer" className="self-start font-semibold text-brand-600 hover:text-brand-700">
-        Jira issue {issue.issue_key}
+        Issue {issue.issue_key}
       </a>
     );
   }
@@ -146,7 +147,7 @@ function JiraAction({ auditId, finding, issue, connected, onCreated }: { auditId
     try {
       onCreated((await createIssue(auditId, source, index)).data);
     } catch (e) {
-      setError(apiError(e, "The Jira issue could not be created. Try again."));
+      setError(apiError(e, "The issue could not be created. Try again."));
     } finally {
       setBusy(false);
     }
@@ -154,7 +155,7 @@ function JiraAction({ auditId, finding, issue, connected, onCreated }: { auditId
   return (
     <div className="flex flex-col items-start gap-1.5">
       <button type="button" onClick={create} disabled={busy} className="h-11 rounded-[10px] border-[1.5px] border-ink bg-white px-4 text-sm font-semibold disabled:opacity-60">
-        {busy ? "Creating in Jira" : "Create Jira issue"}
+        {busy ? "Creating the issue" : "Create an issue"}
       </button>
       {error && <span role="alert" className="text-[13.5px] text-red-800">{error}</span>}
     </div>
@@ -166,7 +167,9 @@ export function SecurityTab({ job }: { job: AuditJob }) {
   const [issues, setIssues] = useState<Record<string, TrackerIssue>>({});
   const [jiraConnected, setJiraConnected] = useState(false);
   useEffect(() => {
-    getJira().then((r) => setJiraConnected(r.data.connected)).catch(() => {});
+    // Any connected tracker will do: Jira, GitHub (with a repository for issues) or Linear.
+    getJira().then((r) => r.data.connected && setJiraConnected(true)).catch(() => {});
+    getConnections().then((r) => (r.data.linear.connected || (r.data.github.connected && r.data.github.repo)) && setJiraConnected(true)).catch(() => {});
     getIssues(job.id)
       .then((r) => setIssues(Object.fromEntries(r.data.map((i) => [i.finding_ref, i]))))
       .catch(() => {});
@@ -213,7 +216,7 @@ export function SecurityTab({ job }: { job: AuditJob }) {
             <span className="font-semibold">{f.title}</span>
           </span>
           {f.affected_url && <span className="break-all font-mono text-[13px] text-body">{f.affected_url}</span>}
-          {issues[refOf(f)] && <span className="text-[13px] font-semibold text-brand-700">In Jira as {issues[refOf(f)].issue_key}</span>}
+          {issues[refOf(f)] && <span className="text-[13px] font-semibold text-brand-700">Tracked as {issues[refOf(f)].issue_key}</span>}
         </>
       )}
       detail={(f) => (

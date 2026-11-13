@@ -42,6 +42,9 @@ class AuditJob(Base):
     # Source code scans: the uploaded archive (deleted once scanned) or the repository link.
     source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    repo_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)      # branch to scan; the default branch when empty
+    # What started the scan when it was not a person: {"kind": "schedule", ...} or {"kind": "pull_request", ...}
+    trigger: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # What the user asked for: any of "security", "manual", "playwright", "appium"
     outputs: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -89,6 +92,15 @@ class AuditJob(Base):
     def label(self) -> str:
         repo = "/".join(self.repo_url.removesuffix(".git").split("/")[3:]) if self.repo_url else None
         return self.app_name or self.source_filename or repo or self.target_url or "Untitled app"
+
+    @property
+    def target_key(self) -> str:
+        """Scans with the same key are scans of the same thing, so they can be compared."""
+        if self.source_type == "web":
+            return "web:" + (self.target_url or "").rstrip("/").lower()
+        if self.source_type == "repo":
+            return "repo:" + (self.repo_url or "").removesuffix(".git").lower()
+        return f"{self.source_type}:{(self.app_name or self.source_filename or '').lower()}"
 
     @property
     def is_code(self) -> bool:

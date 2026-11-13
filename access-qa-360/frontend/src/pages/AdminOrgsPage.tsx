@@ -1,3 +1,4 @@
+import { downloadFromApi } from "../utils/download";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
@@ -312,7 +313,12 @@ export function AdminAuditPage() {
   return (
     <Layout variant="admin">
       <h1 className="text-4xl font-extrabold tracking-tight">Audit log</h1>
-      <p className="mb-7 mt-1 text-body">Every change a super admin makes to an account or organisation, newest first.</p>
+      <div className="mb-7 mt-1 flex flex-wrap items-center justify-between gap-4">
+        <p className="text-body">Every change a super admin makes to an account or organisation, newest first.</p>
+        <button type="button" onClick={() => downloadFromApi("/admin/audit-log.csv", "wiseflow-audit-log.csv")} className="h-11 rounded-[10px] border-[1.5px] border-ink bg-white px-4 text-sm font-semibold">
+          Download as CSV
+        </button>
+      </div>
       {!entries ? (
         <LoadingSpinner />
       ) : entries.length === 0 ? (

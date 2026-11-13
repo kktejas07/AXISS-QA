@@ -270,3 +270,24 @@ async def audit_log(limit: int = 100, db: AsyncSession = Depends(get_db)):
         AuditLogOut(id=entry.id, actor_email=email, action=entry.action, target=entry.target, detail=entry.detail, created_at=entry.created_at)
         for entry, email in rows.all()
     ]
+
+
+@router.get("/audit-log.csv")
+async def audit_log_csv(db: AsyncSession = Depends(get_db)):
+    """The whole audit log as a spreadsheet, newest first."""
+    import csv
+    import io
+
+    from fastapi.responses import Response
+
+    rows = await db.execute(
+        select(AdminAuditLog, User.email).join(User, User.id == AdminAuditLog.actor_id).order_by(AdminAuditLog.created_at.desc(), AdminAuditLog.id)
+    )
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["When (UTC)", "Who", "Action", "Target", "Detail"])
+    for entry, email in rows.all():
+        # A leading quote stops a spreadsheet treating a value as a formula.
+        writer.writerow([entry.created_at.isoformat() if entry.created_at else "", email, entry.action]
+                        + [("'" + v) if v[:1] in "=+-@" else v for v in (entry.target, entry.detail)])
+    return Response(out.getvalue(), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="wiseflow-audit-log.csv"'})

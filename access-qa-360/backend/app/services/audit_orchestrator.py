@@ -361,6 +361,16 @@ def _count(items: list[dict], severity: str) -> int:
 
 
 async def run_audit(audit_job_id: str):
+    """Run the scan, then tell whoever is waiting for it (chat, email, the pull request)."""
+    try:
+        await _run_audit(audit_job_id)
+    finally:
+        from app.services import notify
+
+        await notify.scan_finished(audit_job_id)
+
+
+async def _run_audit(audit_job_id: str):
     """
     Run the tiers the user asked for and update the AuditJob throughout.
 
@@ -530,6 +540,14 @@ async def _run_code_audit(audit_job_id: str) -> None:
         source_type, zip_path, repo_url, label = job.source_type, job.source_path, job.repo_url, job.label
         outputs = set(job.outputs or ALL_OUTPUTS)
         depth = job.depth or "standard"
+        ref, token = job.repo_ref, None
+        # A pull request on a private repository is fetched with the organisation's GitHub token.
+        if (job.trigger or {}).get("private"):
+            from app.core.secrets import decrypt
+            from app.models.integration import Integration
+
+            row = (await db.execute(select(Integration).where(Integration.organization_id == job.organization_id, Integration.kind == "github"))).scalar_one_or_none()
+            token = decrypt(row.secret_encrypted) if row else None
 
     await _set_progress(
         audit_job_id, 5, status=AuditStatus.running, tier1_status="running",
@@ -543,7 +561,7 @@ async def _run_code_audit(audit_job_id: str) -> None:
     try:
         # ---- Tier 1: fetch the code, list files and routes, find missing tests ----
         try:
-            work = await asyncio.to_thread(code_auditor.prepare_source, source_type, zip_path, repo_url)
+            work = await asyncio.to_thread(code_auditor.prepare_source, source_type, zip_path, repo_url, ref, token)
             scan = await asyncio.to_thread(code_auditor.scan_tree, os.path.join(work, "src"), depth, "security" in outputs)
         except Exception as e:
             tier1_data = {"error": str(e) if isinstance(e, code_auditor.SourceError) else _reason(e)}

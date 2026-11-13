@@ -122,7 +122,7 @@ async def test_a_finding_becomes_one_jira_issue(client: AsyncClient, test_user, 
     url = f"/api/v1/audits/{job_id}/issues"
 
     not_connected = await client.post(url, headers=auth_headers, json={"source": "security", "index": 0})
-    assert not_connected.status_code == 400 and "not connected" in not_connected.json()["detail"]
+    assert not_connected.status_code == 400 and "No issue tracker is connected" in not_connected.json()["detail"]
 
     jira_ok(httpx_mock)
     assert (await client.put(JIRA, headers=auth_headers, json=GOOD)).status_code == 200

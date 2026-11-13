@@ -11,6 +11,7 @@ Everything here is static. Nothing from the scanned project is executed, install
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import re
@@ -92,15 +93,25 @@ def parse_repo_url(url: str) -> tuple[str, str]:
     return f"https://{host}/{name}.git", name
 
 
-def clone_repo(url: str, dest: str, timeout: int = 180) -> None:
-    """Shallow-clone the default branch. No credentials, no prompts, no submodules."""
+_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$")
+
+
+def clone_repo(url: str, dest: str, timeout: int = 180, ref: str | None = None, token: str | None = None) -> None:
+    """
+    Shallow-clone one branch (the default one unless `ref` names another). No prompts, no submodules.
+    A token, when given, is sent as a request header and never written to disk.
+    """
     clone_url, name = parse_repo_url(url)
+    if ref and (not _REF.match(ref) or ".." in ref):
+        raise SourceError("That branch name cannot be used")
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "true", "GIT_LFS_SKIP_SMUDGE": "1"}
+    command = ["git", "-c", "core.hooksPath=/dev/null"]
+    if token:
+        basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        command += ["-c", f"http.extraHeader=Authorization: Basic {basic}"]
+    command += ["clone", "--depth", "1", "--single-branch", "--no-tags"] + (["--branch", ref] if ref else []) + [clone_url, dest]
     try:
-        done = subprocess.run(
-            ["git", "-c", "core.hooksPath=/dev/null", "clone", "--depth", "1", "--single-branch", "--no-tags", clone_url, dest],
-            capture_output=True, text=True, timeout=timeout, env=env,
-        )
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=env)
     except subprocess.TimeoutExpired:
         raise SourceError(f"Cloning {name} took longer than {timeout} seconds. Try uploading a .zip of the code instead.")
     except FileNotFoundError:
@@ -792,14 +803,14 @@ def scan_tree(root: str, depth: str = "standard", with_security: bool = True) ->
     return scan
 
 
-def prepare_source(source_type: str, zip_path: str | None, repo_url: str | None) -> str:
+def prepare_source(source_type: str, zip_path: str | None, repo_url: str | None, ref: str | None = None, token: str | None = None) -> str:
     """Put the code in a fresh temporary folder and return its path. The caller deletes it."""
     work = tempfile.mkdtemp(prefix="wiseflow-src-")
     try:
         if source_type == "repo":
             if not repo_url:
                 raise SourceError("No repository link was given")
-            clone_repo(repo_url, os.path.join(work, "src"))
+            clone_repo(repo_url, os.path.join(work, "src"), ref=ref, token=token)
         else:
             if not zip_path or not os.path.exists(zip_path):
                 raise SourceError("The uploaded code could not be found. Upload it again.")

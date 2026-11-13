@@ -6,6 +6,7 @@ import { cancelInvite, changeRole, createInvite, getInvites, getMembers, getOrg,
 import { changePassword } from "../api/auth";
 import { ApiKeysSection, JiraSection } from "../components/IntegrationSettings";
 import { BillingSection } from "../components/BillingSection";
+import { ConnectionsSection } from "../components/ConnectionsSection";
 import { clearMe, useMe } from "../hooks/useMe";
 import type { Invite, Member, Org, OrgRole } from "../types";
 import { apiError } from "../utils/errors";
@@ -321,6 +322,7 @@ export function SettingsPage() {
 
         {canEdit && <ApiKeysSection />}
         <JiraSection canEdit={canEdit} />
+        <ConnectionsSection canEdit={canEdit} />
 
         {/* Password */}
         <form
