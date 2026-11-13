@@ -3,6 +3,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Check, Minus, X } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { ChangesTab, StandardsTab } from "../components/ScanInsights";
 import { ScanSteps } from "../components/ScanSteps";
 import { StatusPill } from "../components/StatusPill";
 import {
@@ -86,7 +87,7 @@ function Stat({ label, value, note, bad }: { label: string; value: string | numb
   );
 }
 
-type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "downloads";
+type TabId = "summary" | "security" | "accessibility" | "gaps" | "cases" | "code" | "changes" | "standards" | "performance" | "downloads";
 
 /** One scan: progress while it runs, then tabbed results. */
 export function ScanDetailPage() {
@@ -198,6 +199,8 @@ export function ScanDetailPage() {
       : [{ id: "accessibility" as const, label: "Accessibility", count: a11y }]),
     { id: "cases", label: "Test cases", count: cases },
     ...(code ? [] : [{ id: "code" as const, label: "Automation" }]),
+    { id: "changes", label: "Changes" },
+    { id: "standards", label: "Standards" },
     { id: "downloads", label: "Downloads", count: job.exports.length },
   ];
   const tab = tabs.find((t) => t.id === params.get("tab"))?.id ?? "summary";
@@ -306,6 +309,8 @@ export function ScanDetailPage() {
       {tab === "gaps" && <QaGapsTab job={job} />}
       {tab === "cases" && <TestCasesTab job={job} />}
       {tab === "code" && <AutomationTab job={job} />}
+      {tab === "changes" && <ChangesTab job={job} />}
+      {tab === "standards" && <StandardsTab job={job} />}
       {tab === "downloads" && <DownloadsTab job={job} />}
     </Layout>
   );

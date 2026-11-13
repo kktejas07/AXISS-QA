@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.api.routes import auth, projects, suites, runs, webhooks, scans, vulnerabilities, gaps, test_cases, reports, audits, admin, admin_ops, billing, dashboard, org, integrations
+from app.api.routes import auth, projects, suites, runs, webhooks, scans, vulnerabilities, gaps, test_cases, reports, audits, admin, admin_ops, billing, dashboard, org, integrations, insights, schedules, connections
 from app.api.deps import get_current_user
 from app.models.user import User
 
@@ -54,6 +54,19 @@ app.include_router(org.router, prefix="/api/v1")
 app.include_router(integrations.router, prefix="/api/v1")
 app.include_router(admin_ops.router, prefix="/api/v1")
 app.include_router(billing.router, prefix="/api/v1")
+app.include_router(insights.router, prefix="/api/v1")
+app.include_router(schedules.router, prefix="/api/v1")
+app.include_router(connections.router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+async def _start_scheduler():
+    """Scheduled scans are started from here, once a minute."""
+    if settings.ENVIRONMENT != "test" and settings.SCHEDULER_ENABLED:
+        from app.services import schedules as due
+
+        app.state.scheduler = asyncio.create_task(due.ticker())
+
 
 
 @app.get("/health")

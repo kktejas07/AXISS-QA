@@ -21,7 +21,7 @@ from app.core.secrets import decrypt, encrypt
 from app.models.audit_job import AuditJob
 from app.models.integration import ApiKey, Integration, TrackerIssue
 from app.models.user import User
-from app.services import jira
+from app.services import jira, trackers
 from app.services.api_keys import new_api_key
 
 router = APIRouter(tags=["integrations"])
@@ -152,6 +152,8 @@ async def disconnect_jira(db: AsyncSession = Depends(get_db), ctx: OrgContext = 
 class IssueCreate(BaseModel):
     source: Literal["security", "mobile"]
     index: int = Field(ge=0)
+    # Which tracker to use. Left out: the first one connected, in the order Jira, GitHub, Linear.
+    tracker: Literal["jira", "github", "linear"] | None = None
 
 
 class IssueOut(BaseModel):
@@ -182,7 +184,7 @@ async def list_issues(audit_id: str, db: AsyncSession = Depends(get_db), ctx: Or
 
 @router.post("/audits/{audit_id}/issues", response_model=IssueOut, status_code=201)
 async def create_issue(audit_id: str, body: IssueCreate, db: AsyncSession = Depends(get_db), ctx: OrgContext = Depends(get_org_context)):
-    """Create a Jira issue from one finding. A finding gets one issue; asking again returns the same one."""
+    """Create an issue in the connected tracker from one finding. A finding gets one issue; asking again returns the same one."""
     ctx.require("scan.run")
     job = await _job(db, ctx, audit_id)
     ref = f"{body.source}:{body.index}"
@@ -197,17 +199,26 @@ async def create_issue(audit_id: str, body: IssueCreate, db: AsyncSession = Depe
     if body.source == "mobile":
         finding.setdefault("affected_url", job.source_filename or "Mobile build")
 
-    row = await _jira(db, ctx.org.id)
-    if not row:
-        raise HTTPException(400, "Jira is not connected. An owner or admin can connect it in Settings.")
+    rows = {r.kind: r for r in (await db.execute(select(Integration).where(Integration.organization_id == ctx.org.id))).scalars().all()}
+    usable = [k for k in ("jira", "github", "linear") if k in rows and (k != "github" or rows[k].config.get("repo"))]
+    kind = body.tracker or (usable[0] if usable else None)
+    if kind not in usable:
+        raise HTTPException(400, "No issue tracker is connected. An owner or admin can connect Jira, GitHub or Linear in Settings.")
+    row = rows[kind]
     token = decrypt(row.secret_encrypted)
     if not token:
-        raise HTTPException(400, "The saved Jira token can no longer be read. Connect Jira again in Settings.")
+        raise HTTPException(400, "The saved token can no longer be read. Connect the tracker again in Settings.")
     cfg = row.config
+    link = f"{settings.APP_URL.rstrip('/')}/audits/{job.id}?tab=security"
     try:
-        fields = jira.issue_fields(finding, job.label, f"{settings.APP_URL.rstrip('/')}/audits/{job.id}?tab=security", cfg["project_key"], cfg["issue_type"])
-        key, url = await jira.create_issue(cfg["base_url"], cfg["email"], token, fields)
-    except jira.JiraError as e:
+        if kind == "jira":
+            fields = jira.issue_fields(finding, job.label, link, cfg["project_key"], cfg["issue_type"])
+            key, url = await jira.create_issue(cfg["base_url"], cfg["email"], token, fields)
+        elif kind == "github":
+            key, url = await trackers.github_issue(token, cfg["repo"], finding, job.label, link)
+        else:
+            key, url = await trackers.linear_issue(token, cfg["team_id"], finding, job.label, link)
+    except (jira.JiraError, trackers.TrackerError) as e:
         raise HTTPException(502, str(e))
     issue = TrackerIssue(audit_id=job.id, finding_ref=ref, issue_key=key, issue_url=url, created_by=ctx.user.id)
     db.add(issue)

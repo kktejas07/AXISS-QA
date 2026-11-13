@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     TEAM_PRICE_INR: int = 2400
     # Scans a free Individual account may start each month. 0 means no limit. Applies to new sign-ups.
     FREE_SCANS_PER_MONTH: int = 2
+    # Scheduled scans are started by the API server. Switch off on all but one server if you run several.
+    SCHEDULER_ENABLED: bool = True
     # Where "Contact sales" on the pricing page sends people.
     SALES_EMAIL: str = ""
     # Leave a provider's keys empty to switch that provider off.

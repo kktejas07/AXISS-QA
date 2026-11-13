@@ -21,6 +21,7 @@ import { SsoPage } from "./pages/SsoPage";
 import { AdminAiUsagePage, AdminHealthPage, AdminQueuePage } from "./pages/AdminOpsPages";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SchedulesPage } from "./pages/SchedulesPage";
 import { AdminAuditPage, AdminOrgDetailPage, AdminOrgsPage } from "./pages/AdminOrgsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/admin/ai-usage" element={<RequireAuth><RequireSuperAdmin><AdminAiUsagePage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/health" element={<RequireAuth><RequireSuperAdmin><AdminHealthPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/audit-log" element={<RequireAuth><RequireSuperAdmin><AdminAuditPage /></RequireSuperAdmin></RequireAuth>} />
+        <Route path="/schedules" element={<RequireAuth><SchedulesPage /></RequireAuth>} />
         <Route path="/audits" element={<RequireAuth><ScansListPage /></RequireAuth>} />
         <Route path="/audits/new" element={<Navigate to="/scans/new" replace />} />
         <Route path="/audits/:id/setup" element={<RequireAuth><ChooseTestsPage /></RequireAuth>} />
