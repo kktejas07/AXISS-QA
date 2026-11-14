@@ -87,7 +87,7 @@ export function Wise() {
         >
           <header className="flex items-center gap-3 border-b-2 border-ink bg-brand-600 px-4 py-3 text-white">
             <span className="flex h-12 w-12 flex-none items-center justify-center overflow-hidden rounded-full bg-white">
-              <WiseBot state={mood} className="h-11 w-11" />
+              <WiseBot state={mood} className="h-10 w-10" />
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-bold leading-tight">Wise</h2>
@@ -197,7 +197,7 @@ export function Wise() {
       >
         {!open && <span aria-hidden="true" className="wf-ring absolute inset-0 rounded-full border-2 border-brand-600" />}
         <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
-          <WiseBot state={busy ? "working" : "idle"} className="h-14 w-14" />
+          <WiseBot state={busy ? "working" : "idle"} className="h-12 w-12" />
         </span>
       </button>
     </>

@@ -52,3 +52,35 @@ export const faqs: { q: string; a: string }[] = [
     a: "Only scan what you own or have permission to test. Wiseflow asks you to confirm this before every scan.",
   },
 ];
+
+/**
+ * The plans as the pricing page shows them before the server has answered, and if it cannot be
+ * reached. The server's answer replaces these, and it alone knows the prices and the free plan's
+ * scan allowance, so neither is written here.
+ */
+export const fallbackPlans = [
+  {
+    id: "individual" as const, name: "Individual", price_usd: 0, price_inr: 0, per: null,
+    summary: "For trying Wiseflow on your own apps.",
+    features: ["1 person", "A set number of scans each month", "Every kind of scan: websites, mobile builds, code, APIs and chatbots", "Reports, test cases and scripts to download", "Schedules, pull request scans and Wise, the assistant"],
+  },
+  {
+    id: "team" as const, name: "Team", price_usd: undefined, price_inr: undefined, per: "per person, per month",
+    summary: "For teams that test together.",
+    features: ["Everything in Individual", "As many people as you pay for", "No limit on scans", "Roles: owner, admin, member, viewer", "One shared list of findings, each with an owner"],
+  },
+  {
+    id: "enterprise" as const, name: "Enterprise", price_usd: null, price_inr: null, per: null,
+    summary: "For larger organisations with their own terms.",
+    features: ["Everything in Team", "No limit on people or scans", "Limits and terms agreed with you", "Invoicing instead of a card", "A named contact at Wiseflow"],
+  },
+];
+
+/** Questions about paying, for the pricing page. */
+export const pricingFaqs: { q: string; a: string }[] = [
+  { q: "What counts as a scan?", a: "Each scan you start counts once, whatever it is of: a website, a mobile build, code, an API or a chatbot. Scans started by a schedule or a pull request count too." },
+  { q: "What happens when I use up the free scans?", a: "The next scan is not started and you are told why. The allowance starts again with the next calendar month, or you can move to a Team plan, which has no limit." },
+  { q: "Can I cancel a Team plan?", a: "Yes, at any time, in Settings. The plan stays active until the end of the month already paid for, and you are not charged again." },
+  { q: "How do I pay?", a: "Team is billed monthly by card, per person. Prices are shown in US dollars and Indian rupees, and taxes may be added at checkout. Enterprise is invoiced." },
+  { q: "Can I change the number of people?", a: "Yes. A Team plan is for as many people as you pay for, and an owner can change that number in Settings." },
+];

@@ -6,7 +6,7 @@ import { site } from "../content/site";
 // The pages anyone can open. Everything else is the signed-in app and is kept out of search results.
 const pages: Record<string, { title: string; description: string; index: boolean }> = {
   "/": { title: site.title, description: site.description, index: true },
-  "/pricing": { title: "Pricing: Wiseflow", description: "Wiseflow plans: a free plan for one person with two scans a month, and team plans with more people and scans.", index: true },
+  "/pricing": { title: "Pricing: Wiseflow", description: "Wiseflow plans: a free plan for one person, a Team plan per person per month with no limit on scans, and Enterprise on agreed terms.", index: true },
   "/register": { title: "Create a free account: Wiseflow", description: "Start scanning websites, mobile builds, code, APIs and chatbots on Wiseflow's free plan. No card needed.", index: true },
   "/guides": { title: "Guides: Wiseflow", description: "Short, practical guides to testing and security: prompt injection, the OWASP Top 10, SBOMs, open-source licences and pull request scans.", index: true },
   "/login": { title: "Sign in: Wiseflow", description: "Sign in to your Wiseflow workspace.", index: true },

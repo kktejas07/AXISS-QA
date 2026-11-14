@@ -1,67 +1,37 @@
-import { render, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { WiseBot } from "./WiseBot";
+import type { BotState } from "./WiseBot";
 
-const player = vi.hoisted(() => ({ loadAnimation: vi.fn(), destroy: vi.fn(), goToAndStop: vi.fn() }));
-vi.mock("lottie-web/build/player/lottie_light", () => ({ default: { loadAnimation: player.loadAnimation } }));
-
-const json = (body: unknown, type = "application/json") => Promise.resolve(new Response(JSON.stringify(body), { headers: { "content-type": type } }));
-// A fresh copy of the module for each test, because it remembers the files it has fetched.
-const load = async () => (await import("./WiseBot")).WiseBot;
-
-beforeEach(() => {
-  vi.resetModules();
-  player.loadAnimation.mockReset().mockReturnValue({ destroy: player.destroy, goToAndStop: player.goToAndStop });
-  player.destroy.mockReset();
-  player.goToAndStop.mockReset();
-  window.matchMedia = undefined as never;
-});
+const owl = (state?: BotState) => render(<WiseBot state={state} />).container.querySelector("svg")!;
 
 describe("WiseBot", () => {
-  it("plays the animation for what Wise is doing, and swaps it when that changes", async () => {
-    const fetched = vi.spyOn(globalThis, "fetch").mockImplementation(() => json({ layers: [], w: 200, h: 200 }));
-    const WiseBot = await load();
-    const { container, rerender } = render(<WiseBot state="searching" />);
-    await waitFor(() => expect(player.loadAnimation).toHaveBeenCalledTimes(1));
-    expect(fetched.mock.calls[0][0]).toBe("/wise-bot/searching.json");
-    expect(player.loadAnimation.mock.calls[0][0]).toMatchObject({ renderer: "svg", loop: true, autoplay: true });
-    expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
-
-    rerender(<WiseBot state="done" />);
-    await waitFor(() => expect(player.loadAnimation).toHaveBeenCalledTimes(2));
-    expect(player.destroy).toHaveBeenCalledTimes(1);
-    expect(fetched.mock.calls[1][0]).toBe("/wise-bot/done.json");
+  it("is a drawing for decoration, with nothing to fetch", () => {
+    const svg = owl();
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(svg).toHaveAttribute("data-bot", "idle");
+    expect(svg.querySelector(".owl-body-breathe")).not.toBeNull();
+    expect(svg.querySelector(".owl-blink")).not.toBeNull();
   });
 
-  it("fetches each file only once", async () => {
-    const fetched = vi.spyOn(globalThis, "fetch").mockImplementation(() => json({ layers: [] }));
-    const WiseBot = await load();
-    const { unmount } = render(<WiseBot state="idle" />);
-    await waitFor(() => expect(player.loadAnimation).toHaveBeenCalledTimes(1));
-    unmount();
-    render(<WiseBot state="idle" />);
-    await waitFor(() => expect(player.loadAnimation).toHaveBeenCalledTimes(2));
-    expect(fetched).toHaveBeenCalledTimes(1);
+  it("moves differently for what Wise is doing", () => {
+    expect(owl("thinking").querySelectorAll(".owl-dot")).toHaveLength(3);
+    expect(owl("thinking").querySelector(".owl-look-up")).not.toBeNull();
+    expect(owl("searching").querySelector(".owl-look-scan")).not.toBeNull();
+    expect(owl("typing").querySelector(".owl-beak-talk")).not.toBeNull();
+    expect(owl("working").querySelectorAll(".owl-wings-flap")).toHaveLength(2);
+    expect(owl("done").querySelector(".owl-body-hop")).not.toBeNull();
+    expect(owl("error").querySelector(".owl-body-shake")).not.toBeNull();
   });
 
-  it("shows one still frame to people who ask for reduced motion", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(() => json({ layers: [] }));
-    window.matchMedia = ((q: string) => ({ matches: q.includes("reduce") })) as never;
-    const WiseBot = await load();
-    render(<WiseBot />);
-    await waitFor(() => expect(player.goToAndStop).toHaveBeenCalledWith(40, true));
-    expect(player.loadAnimation.mock.calls[0][0]).toMatchObject({ loop: false, autoplay: false });
+  it("closes its eyes to sleep and to smile", () => {
+    expect(owl("sleeping").querySelector(".owl-blink")).toBeNull();
+    expect(owl("sleeping").querySelectorAll(".owl-zzz")).toHaveLength(2);
+    expect(owl("done").querySelector(".owl-blink")).toBeNull();
   });
 
-  it.each([
-    ["the file is not installed and the app's own page comes back", () => Promise.resolve(new Response("<!doctype html>", { headers: { "content-type": "text/html" } }))],
-    ["the server answers 404", () => Promise.resolve(new Response("", { status: 404 }))],
-    ["the network fails", () => Promise.reject(new Error("offline"))],
-    ["the file is not an animation", () => json({ hello: "world" })],
-  ])("falls back to the drawn owl when %s", async (_name, answer) => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(answer as never);
-    const WiseBot = await load();
-    const { container } = render(<WiseBot />);
-    await waitFor(() => expect(container.querySelector("svg[role=presentation]")).not.toBeNull());
-    expect(player.loadAnimation).not.toHaveBeenCalled();
+  it("has a movement for every state", () => {
+    const states: BotState[] = ["idle", "working", "typing", "thinking", "reading", "writing", "designing", "coding", "searching", "listening", "sleeping", "done", "error"];
+    for (const s of states) expect(owl(s).getAttribute("data-bot")).toBe(s);
   });
 });
