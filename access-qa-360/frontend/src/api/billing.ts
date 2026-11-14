@@ -4,8 +4,9 @@ export interface Plan {
   id: "individual" | "team" | "enterprise";
   name: string;
   /** Whole US dollars; null means "ask us". */
-  price_usd: number | null;
-  price_inr: number | null;
+  /** Left out when the price is not known yet (the server has not answered). */
+  price_usd?: number | null;
+  price_inr?: number | null;
   per: string | null;
   summary: string;
   features: string[];

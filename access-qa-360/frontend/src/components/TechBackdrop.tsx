@@ -11,7 +11,15 @@ import type { LucideIcon } from "lucide-react";
 type Spot = { icon: LucideIcon; x: number; y: number; size: number; turn: number; wait: number; phone?: boolean };
 
 // x and y are percentages of the box. The middle is left clear so text stays easy to read.
-const layouts: Record<"hero" | "band" | "auth", Spot[]> = {
+const layouts: Record<"hero" | "band" | "auth" | "band-light", Spot[]> = {
+  // Along the top and the right of a page's opening, clear of its heading.
+  "band-light": [
+    { icon: ShieldCheck, x: 62, y: 6, size: 40, turn: 7, wait: 0.4 },
+    { icon: CodeXml, x: 78, y: 16, size: 46, turn: -8, wait: 1.3, phone: true },
+    { icon: Bug, x: 93, y: 7, size: 42, turn: 10, wait: 2.2 },
+    { icon: Braces, x: 97, y: 30, size: 40, turn: -6, wait: 0.9 },
+    { icon: Bot, x: 86, y: 34, size: 36, turn: 6, wait: 2.8 },
+  ],
   hero: [
     { icon: CodeXml, x: 2.5, y: 12, size: 46, turn: -8, wait: 0 },
     { icon: Bug, x: 93, y: 9, size: 44, turn: 10, wait: 1.2, phone: true },
@@ -49,7 +57,7 @@ const layouts: Record<"hero" | "band" | "auth", Spot[]> = {
   ],
 };
 
-export function TechBackdrop({ variant = "hero" }: { variant?: "hero" | "band" | "auth" }) {
+export function TechBackdrop({ variant = "hero" }: { variant?: "hero" | "band" | "auth" | "band-light" }) {
   const dark = variant === "band";
   return (
     <div aria-hidden="true" data-testid="tech-backdrop" className="pointer-events-none absolute inset-0 select-none overflow-hidden">

@@ -18,9 +18,10 @@ import { join } from "node:path";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { guides } from "../src/content/guides";
-import { faqs, site } from "../src/content/site";
+import { faqs, pricingFaqs, site } from "../src/content/site";
 import { GuidePage, GuidesPage } from "../src/pages/GuidesPage";
 import { LandingPage } from "../src/pages/LandingPage";
+import { PricingPage } from "../src/pages/PricingPage";
 
 const out = process.argv[2] || "dist";
 const url = (process.env.SITE_URL || "https://qa.vatax360.com").replace(/\/+$/, "");
@@ -99,6 +100,10 @@ for (const g of guides) {
       { "@type": "ListItem", position: 3, name: g.title, item: `${url}${path}` }] },
   ], `${g.title}: Wiseflow`, g.description));
 }
+// Pricing, with the plans' built-in wording. The live page fills in the prices from the server.
+write("/pricing", page("/pricing", html("/pricing", <PricingPage />),
+  [{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: pricingFaqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }],
+  "Pricing: Wiseflow", "Wiseflow plans: a free plan for one person, a Team plan per person per month with no limit on scans, and Enterprise on agreed terms."));
 writeFileSync(file, page("/", html("/", <LandingPage />), home));
 
 const listed: [string, string, string][] = [["/", "1.0", today], ["/guides", "0.8", today], ...guides.map((g): [string, string, string] => [`/guides/${g.slug}`, "0.7", g.updated]),

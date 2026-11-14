@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Bot, Braces, CalendarClock, Check, Code2, GitBranch, GitPullRequest, Globe, Inbox, ShieldCheck, Smartphone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getPlans } from "../api/billing";
+import { Faq } from "../components/Faq";
 import { faqs } from "../content/site";
 import { BranchCheck, CompareSheets, Plugs } from "../components/Illustrations";
 import { Logo } from "../components/Logo";
@@ -180,14 +181,7 @@ export function LandingPage() {
               <h2 id="faq" className="text-3xl font-extrabold tracking-tight">Questions people ask first</h2>
               <p className="mt-2 text-body">Short, plain answers. The <Link to="/pricing" className="font-semibold text-brand-600 underline">pricing page</Link> has the plans.</p>
             </div>
-            <dl className="flex flex-col divide-y divide-line rounded-2xl border border-gray-300 bg-white">
-              {faqs.map((f) => (
-                <div key={f.q} className="px-6 py-5">
-                  <dt className="text-lg font-bold">{f.q}</dt>
-                  <dd className="mt-1.5 max-w-[68ch] text-body">{f.a}</dd>
-                </div>
-              ))}
-            </dl>
+            <Faq items={faqs} />
           </div>
         </section>
 

@@ -187,6 +187,42 @@ test.describe("guides", () => {
   });
 });
 
+test.describe("questions and pricing", () => {
+  test("a question drops open when pressed, and the pricing page stands on its own", async ({ page }) => {
+    await page.goto("/");
+    const first = page.getByRole("button", { name: "What is Wiseflow?" }), second = page.getByRole("button", { name: "Is there a free plan?" });
+    await second.scrollIntoViewIfNeeded();
+    await expect(first).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("region", { name: "Is there a free plan?" })).toBeHidden();
+    await second.click();
+    await expect(second).toHaveAttribute("aria-expanded", "true");
+    await expect(first).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("region", { name: "Is there a free plan?" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "What is Wiseflow?" })).toBeHidden();
+    // Opened from the keyboard too.
+    await first.focus();
+    await page.keyboard.press("Enter");
+    await expect(first).toHaveAttribute("aria-expanded", "true");
+
+    // The pricing page is written out at build time, so it shows its plans before, and without, the server.
+    const source = await (await page.request.get("/pricing/")).text();
+    expect(source).toContain("Start free. Pay when your team joins.");
+    expect(source).toContain("Everything in Individual");
+    expect(source).toContain("What counts as a scan?");
+    await page.route("**/billing/plans", (route) => route.abort());
+    await page.goto("/pricing");
+    for (const name of ["Individual", "Team", "Enterprise"]) await expect(page.getByRole("region", { name, exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Team", exact: true })).toContainText("Per person");          // no invented price
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "On every plan, including the free one" })).toBeVisible();
+    await page.getByRole("button", { name: "Can I cancel a Team plan?" }).click();
+    await expect(page.getByRole("region", { name: "Can I cancel a Team plan?" })).toContainText("Yes, at any time");
+    await page.unroute("**/billing/plans");
+    await page.reload();
+    await expect(page.getByRole("region", { name: "Team", exact: true })).toContainText("$29");
+  });
+});
+
 test.describe("signed out", () => {
   test("pricing shows the free plan's two scans, and sign-in offers no Microsoft button", async ({ page }) => {
     await page.goto("/pricing");

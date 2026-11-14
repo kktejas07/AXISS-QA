@@ -36,17 +36,18 @@ def plans() -> list[dict]:
         {
             "id": "individual", "name": "Individual", "price_usd": 0, "price_inr": 0, "per": None,
             "summary": "For trying Wiseflow on your own apps.",
-            "features": ["1 person", f"{free} scans a month" if free else "No limit on scans", "Web, mobile and source code scans", "Reports and test cases to download"],
+            "features": ["1 person", f"{free} scans a month" if free else "No limit on scans", "Every kind of scan: websites, mobile builds, code, APIs and chatbots",
+                         "Reports, test cases and scripts to download", "Schedules, pull request scans and Wise, the assistant"],
         },
         {
             "id": "team", "name": "Team", "price_usd": settings.TEAM_PRICE_USD, "price_inr": settings.TEAM_PRICE_INR, "per": "per person, per month",
             "summary": "For teams that test together.",
-            "features": ["As many people as you pay for", "No limit on scans", "Roles: owner, admin, member, viewer", "API keys for build pipelines", "Jira integration"],
+            "features": ["Everything in Individual", "As many people as you pay for", "No limit on scans", "Roles: owner, admin, member, viewer", "One shared list of findings, each with an owner"],
         },
         {
             "id": "enterprise", "name": "Enterprise", "price_usd": None, "price_inr": None, "per": None,
             "summary": "For larger organisations with their own terms.",
-            "features": ["No limit on people or scans", "Limits and terms agreed with you", "Invoicing instead of a card", "A named contact at Wiseflow"],
+            "features": ["Everything in Team", "No limit on people or scans", "Limits and terms agreed with you", "Invoicing instead of a card", "A named contact at Wiseflow"],
         },
     ]
 
