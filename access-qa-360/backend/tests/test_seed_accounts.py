@@ -62,3 +62,21 @@ async def test_it_refuses_something_that_is_not_a_domain():
         with pytest.raises(ValueError):
             async with TestSessionLocal() as db:
                 await seed(db, bad)
+
+
+async def test_one_chosen_password_can_be_given_to_every_account(client: AsyncClient):
+    async with TestSessionLocal() as db:
+        with pytest.raises(ValueError):
+            await seed(db, "demo.example", password="short")                      # the same rule as at sign-up
+        rows = await seed(db, "demo.example", password="Chosen-by-me-1")
+        await db.commit()
+    assert {r["password"] for r in rows} == {"Chosen-by-me-1"}
+    for row in rows:
+        await sign_in(client, row)
+    # A later run with another password leaves them alone unless reset is asked for.
+    async with TestSessionLocal() as db:
+        assert all(r["password"] is None for r in await seed(db, "demo.example", password="Another-one-2"))
+        changed = await seed(db, "demo.example", reset=True, password="Another-one-2")
+        await db.commit()
+    await sign_in(client, changed[0])
+    assert (await client.post(f"{API}/auth/login", json={"email": rows[0]["email"], "password": "Chosen-by-me-1"})).status_code in (400, 401)
