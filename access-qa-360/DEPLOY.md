@@ -76,6 +76,17 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs -f api
 - Scans run inside the API process. Restarting the API while a scan is running stops that scan; start it again from the app.
 - Run one API container. Several would each work, but a scan belongs to the container that started it.
 
+## Accounts to try it with
+
+Once the API is running, one command creates a super admin and four users and prints their emails and passwords:
+
+```bash
+# in the API container (on Dokploy: the backend service, Open Terminal)
+python -m app.seed_accounts --domain yourdomain.com
+```
+
+It makes `admin@` (super admin), `owner@`, `member@` and `viewer@` (one Team organisation, one role each) and `solo@` (free Individual plan) at that domain. Passwords are random and shown once, so copy them. Use a domain you own. Run it again with `--reset` for new passwords.
+
 ## Search engines and AI assistants
 
 The web app's build writes the landing page's full HTML into `index.html`, with the structured data search engines read, and generates `sitemap.xml`, `robots.txt` and `llms.txt`. All of them carry the site's public address, which comes from the `SITE_URL` build argument of the `web` image (default `https://qa.vatax360.com`). Change it if the domain changes, then rebuild.
