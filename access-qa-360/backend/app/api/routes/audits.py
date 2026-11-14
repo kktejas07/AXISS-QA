@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_, select
 
+from app.core import netguard
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.secrets import encrypt
@@ -187,6 +188,23 @@ async def _save_upload(file: UploadFile, audit_id: str, suffix: str) -> str:
 # Routes
 # ---------------------------------------------------------------------------
 
+def _not_a_build(path: str, ext: str) -> str | None:
+    """Why this file is not an app build, or None when it is. Both kinds are zip files with a known file inside."""
+    import zipfile
+
+    kind = "an Android .apk" if ext == ".apk" else "an iOS .ipa"
+    try:
+        with zipfile.ZipFile(path) as z:
+            names = z.namelist()
+    except (zipfile.BadZipFile, OSError):
+        return f"That file is not {kind}: it cannot be opened as an app build. Export the build again and upload that."
+    if ext == ".apk" and "AndroidManifest.xml" not in names:
+        return "That file is not an Android .apk: it has no AndroidManifest.xml inside."
+    if ext == ".ipa" and not any(n.startswith("Payload/") and n.endswith(".app/Info.plist") for n in names):
+        return "That file is not an iOS .ipa: it has no app inside its Payload folder."
+    return None
+
+
 @router.post("", response_model=AuditOut, status_code=201)
 async def create_audit(
     body: AuditCreate,
@@ -216,6 +234,8 @@ async def create_audit(
             raise HTTPException(422, "That header name cannot be used")
     else:
         target_url = None
+    if body.source_type in ("web", "api") and netguard.private_target(target_url):
+        raise HTTPException(422, netguard.REFUSED)
     if body.mobile_url and not _is_web_address(body.mobile_url):
         raise HTTPException(422, "The app store link must start with http:// or https://")
     repo_url = None
@@ -322,6 +342,10 @@ async def upload_build(
         raise HTTPException(415, f"This scan is for {job.source_type}. Upload a {expected} file.")
 
     path = await _save_upload(file, audit_id, ext)
+    problem = await asyncio.to_thread(_not_a_build, path, ext)
+    if problem:
+        os.remove(path)
+        raise HTTPException(422, problem)
     if ext == ".apk":
         job.apk_path, job.ipa_path = path, None
     else:

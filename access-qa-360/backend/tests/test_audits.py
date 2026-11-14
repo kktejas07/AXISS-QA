@@ -87,6 +87,17 @@ async def test_original_one_call_create_still_runs_everything(client: AsyncClien
 
 
 @pytest.mark.asyncio
+def _apk() -> bytes:
+    """The smallest file that is still an Android build: a zip with a manifest in it."""
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        z.writestr("AndroidManifest.xml", "x")
+    return out.getvalue()
+
+
 async def test_mobile_scan_needs_its_build(client: AsyncClient, auth_headers, launched, storage):
     job = await _draft(client, auth_headers, source_type="android")
     assert job["target_url"] is None
@@ -103,7 +114,7 @@ async def test_mobile_scan_needs_its_build(client: AsyncClient, auth_headers, la
     r = await client.post(f"{base}/upload", headers=auth_headers, files={"file": ("empty.apk", b"")})
     assert r.status_code == 400
 
-    r = await client.post(f"{base}/upload", headers=auth_headers, files={"file": ("../shop-2.4.apk", b"PK\x03\x04fake")})
+    r = await client.post(f"{base}/upload", headers=auth_headers, files={"file": ("../shop-2.4.apk", _apk())})
     assert r.status_code == 200, r.text
     assert r.json()["source_filename"] == "shop-2.4.apk" and r.json()["label"] == "shop-2.4.apk"
     assert [f.name for f in (storage / "uploads").iterdir()] == [f"{job['id']}.apk"]

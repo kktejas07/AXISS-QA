@@ -32,6 +32,7 @@ GROUPS: dict[str, tuple[str, str, list[tuple[str, str, bool]]]] = {
     "ai": ("AI model", "Writes test cases, scripts, summaries and Wise's answers for organisations without their own key.", [
         ("DEFAULT_AI_PROVIDER", "Provider", False),
         ("ANTHROPIC_API_KEY", "Claude (Anthropic) key", True),
+        ("ANTHROPIC_BASE_URL", "Address, if the Claude key is for a Claude-compatible service", False),
         ("DEFAULT_AI_KEY", "Key for another provider", True),
         ("DEFAULT_AI_MODEL", "Model name (optional)", False),
         ("DEFAULT_AI_BASE_URL", "Address, for a custom provider", False),
@@ -65,7 +66,7 @@ GROUPS: dict[str, tuple[str, str, list[tuple[str, str, bool]]]] = {
 }
 KEYS: dict[str, tuple[str, str, bool]] = {key: (group, label, secret) for group, (_, _, fields) in GROUPS.items() for key, label, secret in fields}
 NUMBERS = {"SMTP_PORT": (1, 65535), "AI_MONTHLY_CAP_USD": (0, 1_000_000)}
-ADDRESSES = ("DEFAULT_AI_BASE_URL", "EMBEDDINGS_BASE_URL")
+ADDRESSES = ("ANTHROPIC_BASE_URL", "DEFAULT_AI_BASE_URL", "EMBEDDINGS_BASE_URL")
 
 # What the server's environment said when it started, to go back to when a console value is removed.
 _ENV = {key: getattr(settings, key) for key in KEYS}
@@ -241,12 +242,12 @@ def _smtp_login() -> None:
 
 async def _try_ai() -> tuple[bool, str]:
     from app.core import providers
-    from app.core.ai import FAST, AsyncAnthropic
+    from app.core.ai import FAST, _claude
 
     provider, ask = ai_provider(), [{"role": "user", "content": "Reply with the word OK."}]
     if provider == "anthropic":
         model = settings.DEFAULT_AI_MODEL or FAST
-        await AsyncAnthropic(api_key=ai_key()).messages.create(model=model, max_tokens=5, messages=ask)
+        await _claude(ai_key()).messages.create(model=model, max_tokens=5, messages=ask)
     else:
         model = providers.model_for(provider, "", "fast", settings.DEFAULT_AI_MODEL or None)
         if not model:

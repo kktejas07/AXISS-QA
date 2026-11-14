@@ -306,6 +306,12 @@ export function ChooseTestsPage() {
           {error && (
             <p role="alert" className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-red-800">
               {error}
+              {/used all \d+ scans/.test(error) && (
+                <>
+                  {" "}
+                  <Link to="/pricing" className="font-semibold underline">See plans with more scans</Link>
+                </>
+              )}
             </p>
           )}
 

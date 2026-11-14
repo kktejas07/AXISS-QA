@@ -215,7 +215,7 @@ async def test_an_organisation_sets_its_ai_quality_and_key(client: AsyncClient, 
     seen = {}
 
     class Fake:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, base_url=None):
             seen.setdefault("keys", []).append(api_key)
             self.messages = self
 

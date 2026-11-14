@@ -76,13 +76,19 @@ def choose_model(asked: str, quality: str | None) -> str:
     return QUALITIES.get(quality or "balanced") or asked
 
 
+def _claude(key: str, own: bool = False) -> AsyncAnthropic:
+    """A Claude client. The platform's key may be for a Claude-compatible service at another address; an organisation's own key is always for Anthropic."""
+    return AsyncAnthropic(api_key=key, base_url=None if own else (settings.ANTHROPIC_BASE_URL or None))
+
+
 def ai_client(purpose: str) -> AsyncAnthropic:
     """
     An async client whose messages.create is counted under `purpose`.
     The organisation in `ai_context` may have chosen a quality level and supplied
     its own key; both are applied here, so no feature has to know about them.
     """
-    client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = _claude(settings.ANTHROPIC_API_KEY)
+    made_with = (settings.ANTHROPIC_API_KEY, settings.ANTHROPIC_BASE_URL)
     create = client.messages.create
 
     async def counted(*args, **kwargs):
@@ -102,7 +108,7 @@ def ai_client(purpose: str) -> AsyncAnthropic:
             if settings.DEFAULT_AI_MODEL:
                 context["model"] = settings.DEFAULT_AI_MODEL
             # Made here, not above, so a key replaced from the console is used at once.
-            create_now = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY).messages.create if settings.ANTHROPIC_API_KEY != client.api_key else create
+            create_now = _claude(settings.ANTHROPIC_API_KEY).messages.create if (settings.ANTHROPIC_API_KEY, settings.ANTHROPIC_BASE_URL) != made_with else create
         else:
             create_now = create
         provider = context.get("provider") or "anthropic"
@@ -118,7 +124,7 @@ def ai_client(purpose: str) -> AsyncAnthropic:
         else:
             if "model" in kwargs:
                 kwargs["model"] = context.get("model") or choose_model(kwargs["model"], context.get("quality"))
-            call = AsyncAnthropic(api_key=context["api_key"]).messages.create if context.get("api_key") else create_now
+            call = _claude(context["api_key"], own=True).messages.create if context.get("api_key") else create_now
         model = kwargs.get("model", "unknown")
         try:
             message = await call(*args, **kwargs)
@@ -140,7 +146,7 @@ def sync_ai_client(purpose: str) -> Anthropic:
         from app.core import platform
 
         platform.refresh_sync()
-    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY, base_url=settings.ANTHROPIC_BASE_URL or None)
     create = client.messages.create
 
     def counted(*args, **kwargs):

@@ -123,8 +123,11 @@ class FakeClaude:
     calls: list = []
     error: Exception | None = None
 
-    def __init__(self, api_key=None):
+    addresses: list = []
+
+    def __init__(self, api_key=None, base_url=None):
         self.api_key = api_key
+        FakeClaude.addresses.append(base_url)
         self.messages = SimpleNamespace(create=self._create)
 
     async def _create(self, **kwargs):
@@ -136,7 +139,7 @@ class FakeClaude:
 
 @pytest.fixture
 def claude(monkeypatch):
-    FakeClaude.calls, FakeClaude.error = [], None
+    FakeClaude.calls, FakeClaude.error, FakeClaude.addresses = [], None, []
     monkeypatch.setattr(ai, "AsyncAnthropic", FakeClaude)
     return FakeClaude
 
@@ -174,6 +177,20 @@ async def test_a_replaced_claude_key_is_used_at_once(client: AsyncClient, admin_
     await client.put(f"{API}/admin/platform", headers=admin_headers, json={"values": {"ANTHROPIC_API_KEY": new}})
     await ask({"organization_id": "org-1"})
     assert claude.calls == [(new, "claude-haiku-4-5")]
+
+
+async def test_the_claude_key_can_be_for_a_claude_compatible_service(client: AsyncClient, admin_headers, claude, monkeypatch):
+    """A reseller or company gateway that speaks Claude's API: the platform's key goes to its address; an organisation's own key still goes to Anthropic."""
+    monkeypatch.setattr(settings, "ALLOW_PRIVATE_TARGETS", False)
+    put = lambda **values: client.put(f"{API}/admin/platform", headers=admin_headers, json={"values": values})
+    refused = await put(ANTHROPIC_BASE_URL="http://10.0.0.8/claude")
+    assert refused.status_code == 422 and "public address starting with https://" in refused.json()["detail"]
+    monkeypatch.setattr(platform, "clean", lambda key, value: value.strip())          # the address check needs the network, which tests do not have
+    await put(ANTHROPIC_API_KEY="sk-gateway-key-0123456789abcdef", ANTHROPIC_BASE_URL="https://claude.gateway.example")
+    await ask({"organization_id": "org-1"})
+    await ask({"organization_id": "org-1", "api_key": "sk-ant-their-own"})
+    assert claude.calls == [("sk-gateway-key-0123456789abcdef", "claude-haiku-4-5"), ("sk-ant-their-own", "claude-haiku-4-5")]
+    assert claude.addresses[-2:] == ["https://claude.gateway.example", None]
 
 
 async def test_the_monthly_allowance_stops_calls_on_the_platform_key_only(client: AsyncClient, test_user, admin_headers, claude):

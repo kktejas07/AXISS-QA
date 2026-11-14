@@ -74,7 +74,7 @@ export interface WebResult {
   chatbot?: ChatbotResult;
   /** API description scans. */
   api?: { title: string; version: string; format: string; operations: number; secured: number; endpoints: { method: string; path: string; summary: string; secured: boolean }[] };
-  a11y_summary?: { total_violations: number; critical: number; serious: number; moderate: number; minor: number; violations: A11yViolation[] };
+  a11y_summary?: { pages_not_checked?: number; total_violations: number; critical: number; serious: number; moderate: number; minor: number; violations: A11yViolation[] };
   // Source code scans
   files_scanned?: number;
   truncated?: boolean;

@@ -26,10 +26,11 @@ from app.services.web_auditor import (
 )
 from app.services.mobile_auditor import run_mobile_audit
 from app.services.api_auditor import run_api_audit
-from app.services import api_spec_auditor, chatbot_auditor, code_auditor
+from app.services import api_spec_auditor, chatbot_auditor, code_auditor, web_checks
 from app.core.secrets import decrypt
 
 from app.core.ai import ai_client, ai_context, org_context
+from app.core import netguard
 from app.core.config import settings
 from app.core.storage import storage_path
 
@@ -421,6 +422,13 @@ async def _run_audit(audit_job_id: str):
     critical = high = 0
     tier_states: list[str] = []
 
+    refused = await asyncio.to_thread(netguard.private_target, target_url)
+    if refused:
+        # Asked again here because a name can be pointed at a private address after the scan was created.
+        await _set_progress(audit_job_id, 100, status=AuditStatus.failed, tier1_status="failed", tier1_result={"error": refused},
+                            tier2_status="skipped", tier3_status="skipped", tier4_status="skipped", tier5_status="skipped", completed_at=datetime.now(timezone.utc))
+        return
+
     await _set_progress(audit_job_id, 5, status=AuditStatus.running)
 
     # ---- Tier 1: map the web app, write Playwright tests and manual cases ----
@@ -514,6 +522,14 @@ async def _run_audit(audit_job_id: str):
             parts = urlparse(target_url)
             api_result = await run_api_audit(f"{parts.scheme}://{parts.netloc}", discover_subdomains=depth != "quick", scan_js=True)
             tier3_data = api_result.to_dict()
+            # What the crawl itself showed: transport, cookies, forms, and input written back into pages.
+            seen = tier1_data.get("pages") or []
+            extra = web_checks.passive(seen, crawl_report.get("cookies") or [], target_url)
+            try:
+                extra += await web_checks.reflected(seen)
+            except Exception:
+                pass          # one optional check must not lose the rest of the audit
+            tier3_data["findings"] = extra + tier3_data["findings"]
             critical += _count(tier3_data["findings"], "critical")
             high += _count(tier3_data["findings"], "high")
             tier_states.append("completed")
@@ -663,6 +679,8 @@ async def _run_api_spec_audit(audit_job_id: str) -> None:
         job = (await db.execute(select(AuditJob).where(AuditJob.id == audit_job_id))).scalar_one()
         path, target_url = job.source_path, job.target_url
         outputs = set(job.outputs or ALL_OUTPUTS)
+    if await asyncio.to_thread(netguard.private_target, target_url):
+        target_url = None          # the description is still read; the address is not called
 
     await _set_progress(audit_job_id, 5, status=AuditStatus.running, tier1_status="running",
                         tier2_status="skipped", tier2_result={"skipped": "No mobile build provided"})
