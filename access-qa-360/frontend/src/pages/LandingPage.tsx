@@ -7,7 +7,7 @@ import { getPlans } from "../api/billing";
 import { Faq } from "../components/Faq";
 import { faqs } from "../content/site";
 import { BranchCheck, CompareSheets, Plugs } from "../components/Illustrations";
-import { Logo } from "../components/Logo";
+import { PublicFooter, PublicHeader } from "../components/PublicSite";
 import { WiseBot } from "../components/WiseBot";
 
 const targets: [LucideIcon, string, string][] = [
@@ -60,16 +60,7 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-ink">
-      <header className={`${wrap} flex flex-wrap items-center justify-between gap-3 py-5`}>
-        <Link to="/" aria-label="Wiseflow, home"><Logo /></Link>
-        <nav aria-label="Main" className="flex flex-wrap items-center gap-1 sm:gap-2">
-          <a href="#how" className="hidden min-h-[44px] items-center px-3 font-semibold sm:flex">How it works</a>
-          <Link to="/guides" className="hidden min-h-[44px] items-center px-3 font-semibold sm:flex">Guides</Link>
-          <Link to="/pricing" className="flex min-h-[44px] items-center px-3 font-semibold">Pricing</Link>
-          <Link to="/login" className="flex min-h-[44px] items-center px-3 font-semibold">Sign in</Link>
-          <Link to="/register" className="flex h-11 items-center rounded-[10px] bg-ink px-4 font-bold text-white">Start free</Link>
-        </nav>
-      </header>
+      <PublicHeader />
 
       <main>
         <div className="relative overflow-hidden">
@@ -200,16 +191,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className={`${wrap} flex flex-wrap items-center justify-between gap-4 py-8 text-[15px] text-body`}>
-        <span>© {new Date().getFullYear()} Wiseflow</span>
-        <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-          <Link to="/guides" className="font-semibold text-ink">Guides</Link>
-          <Link to="/pricing" className="font-semibold text-ink">Pricing</Link>
-          <Link to="/privacy" className="font-semibold text-ink">Privacy</Link>
-          <Link to="/terms" className="font-semibold text-ink">Terms</Link>
-          <Link to="/login" className="font-semibold text-ink">Sign in</Link>
-        </nav>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

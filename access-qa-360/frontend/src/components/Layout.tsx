@@ -27,6 +27,7 @@ const adminNav: NavItem[] = [
   { to: "/admin/organizations", label: "Organisations", icon: Building2 },
   { to: "/admin/queue", label: "Scan queue", icon: ListChecks },
   { to: "/admin/ai-usage", label: "AI usage", icon: Sparkles },
+  { to: "/admin/contacts", label: "Contact requests", icon: Inbox },
   { to: "/admin/keys", label: "Platform keys", icon: KeyRound },
   { to: "/admin/health", label: "System health", icon: Activity },
   { to: "/admin/audit-log", label: "Audit log", icon: ScrollText },

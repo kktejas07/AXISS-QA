@@ -22,6 +22,8 @@ import { faqs, pricingFaqs, site } from "../src/content/site";
 import { GuidePage, GuidesPage } from "../src/pages/GuidesPage";
 import { LandingPage } from "../src/pages/LandingPage";
 import { PricingPage } from "../src/pages/PricingPage";
+import { ChangelogPage, ContactPage, DocsPage, ProductPage, ProductsPage, WisePage } from "../src/pages/PublicPages";
+import { products } from "../src/content/product";
 
 const out = process.argv[2] || "dist";
 const url = (process.env.SITE_URL || "https://qa.vatax360.com").replace(/\/+$/, "");
@@ -104,9 +106,26 @@ for (const g of guides) {
 write("/pricing", page("/pricing", html("/pricing", <PricingPage />),
   [{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: pricingFaqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }],
   "Pricing: Wiseflow", "Wiseflow plans: a free plan for one person, a Team plan per person per month with no limit on scans, and Enterprise on agreed terms."));
+// The product pages, Wise, docs, the changelog and contact.
+const crumbs = (...trail: [string, string][]) => ({ "@context": "https://schema.org", "@type": "BreadcrumbList",
+  itemListElement: [["Home", "/"], ...trail].map(([name, path], i) => ({ "@type": "ListItem", position: i + 1, name, item: `${url}${path}` })) });
+write("/product", page("/product", html("/product", <ProductsPage />), [crumbs(["Product", "/product"])],
+  "Product: Wiseflow", "What Wiseflow scans: websites, mobile builds, code and repositories, APIs and chatbots, and what each scan checks."));
+for (const p of products) {
+  const path = `/product/${p.slug}`;
+  write(path, page(path, html(path, <ProductPage slug={p.slug} />), [crumbs(["Product", "/product"], [p.name, path])], `${p.name}: Wiseflow`, p.lead));
+}
+write("/wise", page("/wise", html("/wise", <WisePage />), [crumbs(["Wise", "/wise"])], "Wise, the assistant: Wiseflow",
+  "Wise answers questions about your scans in plain words, shows its sources, and can start a scan or a schedule after you confirm."));
+write("/docs", page("/docs", html("/docs", <DocsPage />), [crumbs(["Docs", "/docs"])], "Docs: Wiseflow",
+  "How to run a scan, read the results, scan on a timetable or on every pull request, and start scans from a build pipeline."));
+write("/changelog", page("/changelog", html("/changelog", <ChangelogPage />), [crumbs(["Changelog", "/changelog"])], "Changelog: Wiseflow", "What has changed in Wiseflow, newest first."));
+write("/contact", page("/contact", html("/contact", <ContactPage />), [crumbs(["Contact sales", "/contact"])], "Contact sales: Wiseflow",
+  "Ask Wiseflow for a demo on your own app, a price for your team, or Enterprise terms."));
 writeFileSync(file, page("/", html("/", <LandingPage />), home));
 
 const listed: [string, string, string][] = [["/", "1.0", today], ["/guides", "0.8", today], ...guides.map((g): [string, string, string] => [`/guides/${g.slug}`, "0.7", g.updated]),
+  ["/product", "0.9", today], ...products.map((p): [string, string, string] => [`/product/${p.slug}`, "0.8", today]), ["/wise", "0.8", today], ["/docs", "0.6", today], ["/changelog", "0.5", today], ["/contact", "0.6", today],
   ["/pricing", "0.8", today], ["/register", "0.5", today], ["/login", "0.3", today]];
 writeFileSync(join(out, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -136,6 +155,11 @@ ${site.name} is made by ${site.maker}. It is a web application; there is nothing
 ## Pages
 
 - [Home](${url}/): what ${site.name} does, with screenshots
+${products.map((p) => `- [${p.name}](${url}/product/${p.slug}): ${p.lead}`).join("\n")}
+- [Wise](${url}/wise): the assistant that answers questions about your scans
+- [Docs](${url}/docs): how to use ${site.name}
+- [Changelog](${url}/changelog): what has changed
+- [Contact sales](${url}/contact): ask for a demo or a price
 - [Guides](${url}/guides): practical explanations of testing and security topics
 - [Pricing](${url}/pricing): the free plan and team plans
 - [Sign up](${url}/register): create a free account

@@ -4,7 +4,7 @@ import { card, pageTitle } from "../components/ui";
 
 const origin = typeof window === "undefined" ? "https://your-wiseflow-address" : window.location.origin;
 
-const topics: { id: string; title: string; body: React.ReactNode }[] = [
+export const topics: { id: string; title: string; body: React.ReactNode }[] = [
   {
     id: "first-scan",
     title: "Run your first scan",

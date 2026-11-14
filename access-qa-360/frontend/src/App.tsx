@@ -1,4 +1,6 @@
 import { RouteMeta } from "./components/RouteMeta";
+import { AdminContactsPage } from "./pages/AdminContactsPage";
+import { ChangelogPage, ContactPage, DocsPage, ProductPage, ProductsPage, StatusPage, WisePage } from "./pages/PublicPages";
 import { GuidePage, GuidesPage } from "./pages/GuidesPage";
 import { AdminKeysPage } from "./pages/AdminKeysPage";
 import { HelpPage } from "./pages/HelpPage";
@@ -67,6 +69,13 @@ export default function App() {
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         {/* Signed in: the overview. Signed out: the public page that says what Wiseflow is. */}
         <Route path="/" element={<Home />} />
+        <Route path="/product" element={<ProductsPage />} />
+        <Route path="/product/:slug" element={<ProductPage />} />
+        <Route path="/wise" element={<WisePage />} />
+        <Route path="/docs" element={<DocsPage />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/status" element={<StatusPage />} />
         <Route path="/guides" element={<GuidesPage />} />
         <Route path="/guides/:slug" element={<GuidePage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
@@ -91,6 +100,7 @@ export default function App() {
         <Route path="/admin/ai-usage" element={<RequireAuth><RequireSuperAdmin><AdminAiUsagePage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
         <Route path="/help" element={<RequireAuth><HelpPage /></RequireAuth>} />
+        <Route path="/admin/contacts" element={<RequireAuth><RequireSuperAdmin><AdminContactsPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/keys" element={<RequireAuth><RequireSuperAdmin><AdminKeysPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/health" element={<RequireAuth><RequireSuperAdmin><AdminHealthPage /></RequireSuperAdmin></RequireAuth>} />
         <Route path="/admin/audit-log" element={<RequireAuth><RequireSuperAdmin><AdminAuditPage /></RequireSuperAdmin></RequireAuth>} />

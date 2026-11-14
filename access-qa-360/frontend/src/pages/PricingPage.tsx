@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bot, Braces, Check, Code2, GitBranch, Globe, Smartphone } from "lucide-react";
 import { Faq } from "../components/Faq";
-import { Logo } from "../components/Logo";
+import { PublicFooter, PublicHeader } from "../components/PublicSite";
 import { TechBackdrop } from "../components/TechBackdrop";
 import { fallbackPlans, pricingFaqs } from "../content/site";
 import { getPlans } from "../api/billing";
@@ -16,6 +16,39 @@ function price(plan: Plan, currency: Currency): string {
   if (amount === null) return "Talk to us";
   if (amount === 0) return "Free";
   return currency === "usd" ? `$${amount}` : `₹${amount.toLocaleString("en-IN")}`;
+}
+
+/** What a team of a given size pays. Only shown once the server has said the price. */
+function Calculator({ plans, currency }: { plans: Plan[]; currency: Currency }) {
+  const [people, setPeople] = useState(5);
+  const team = plans.find((p) => p.id === "team");
+  const each = team && (currency === "usd" ? team.price_usd : team.price_inr);
+  if (!each) return null;
+  const show = (n: number) => (currency === "usd" ? `$${n.toLocaleString("en-US")}` : `₹${n.toLocaleString("en-IN")}`);
+  return (
+    <section aria-labelledby="calculator" className="mx-auto mt-14 max-w-6xl px-4 md:px-8">
+      <div className="grid gap-x-10 gap-y-6 rounded-2xl border-2 border-ink bg-white p-7 shadow-hard lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <h2 id="calculator" className="text-2xl font-extrabold tracking-tight">What would your team pay?</h2>
+          <p className="mt-1 text-body">Team is priced per person. Scans are not counted or charged, however many you run.</p>
+          <label htmlFor="people" className="mt-5 block text-sm font-semibold">People on the team: {people}</label>
+          <input id="people" type="range" min={2} max={100} value={people} onChange={(e) => setPeople(Number(e.target.value))} className="mt-2 h-11 w-full accent-brand-600" />
+          <div className="flex justify-between text-[13px] text-body"><span>2</span><span>100</span></div>
+        </div>
+        <dl className="grid grid-cols-2 gap-4 self-center">
+          <div className="rounded-xl bg-soft p-5">
+            <dt className="text-sm font-semibold text-body">Each month</dt>
+            <dd className="text-[34px] font-extrabold leading-tight tracking-tight">{show(each * people)}</dd>
+          </div>
+          <div className="rounded-xl bg-soft p-5">
+            <dt className="text-sm font-semibold text-body">Each year</dt>
+            <dd className="text-[34px] font-extrabold leading-tight tracking-tight">{show(each * people * 12)}</dd>
+          </div>
+          <p className="col-span-2 text-[14px] text-body">{show(each)} per person, per month, billed monthly. Taxes may be added. More than 100 people? <Link to="/contact" className="font-semibold text-brand-600 underline">Talk to us</Link>.</p>
+        </dl>
+      </div>
+    </section>
+  );
 }
 
 /** Public pricing page. Prices come from the server's settings. */
@@ -39,20 +72,7 @@ export function PricingPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-ink">
-      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 md:px-8">
-        <Link to="/" aria-label="Wiseflow, home"><Logo /></Link>
-        <nav aria-label="Account" className="flex flex-wrap items-center gap-2">
-          <Link to="/guides" className="hidden h-11 items-center rounded-[10px] px-4 font-semibold sm:flex">Guides</Link>
-          {signedIn ? (
-            <Link to="/" className="flex h-11 items-center rounded-[10px] bg-ink px-4 font-bold text-white">Open the app</Link>
-          ) : (
-            <>
-              <Link to="/login" className="flex h-11 items-center rounded-[10px] px-4 font-semibold">Sign in</Link>
-              <Link to="/register" className="flex h-11 items-center rounded-[10px] bg-ink px-4 font-bold text-white">Start free</Link>
-            </>
-          )}
-        </nav>
-      </header>
+      <PublicHeader />
 
       <main className="pb-20">
         <div className="relative overflow-hidden">
@@ -96,7 +116,7 @@ export function PricingPage() {
                         Write to <span className="break-all font-semibold">{salesEmail}</span> and we will set it up with you.
                       </p>
                     ) : (
-                      <p className="rounded-[10px] bg-soft px-4 py-3 text-[14.5px] text-body">Contact Wiseflow to set this up.</p>
+                      <Link to="/contact" className="flex h-[52px] items-center justify-center rounded-[10px] border-[1.5px] border-ink bg-white font-bold">Contact sales</Link>
                     )
                   ) : (
                     <Link
@@ -113,6 +133,8 @@ export function PricingPage() {
         <p className="mt-6 max-w-2xl text-[14.5px] text-body">Team is billed monthly by card and can be cancelled at any time; it stays active until the end of the month already paid for. Taxes may be added at checkout.</p>
         </div>
         </div>
+
+        <Calculator plans={plans} currency={currency} />
 
         <section aria-labelledby="included" className="mt-16 border-y border-line bg-soft py-14">
           <div className="mx-auto max-w-6xl px-4 md:px-8">
@@ -140,6 +162,7 @@ export function PricingPage() {
           <Faq items={pricingFaqs} />
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 }
