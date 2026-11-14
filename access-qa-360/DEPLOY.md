@@ -87,6 +87,8 @@ python -m app.seed_accounts --domain yourdomain.com
 
 It makes `admin@` (super admin), `owner@`, `member@` and `viewer@` (one Team organisation, one role each) and `solo@` (free Individual plan) at that domain. Passwords are random and shown once, so copy them. Use a domain you own. Run it again with `--reset` for new passwords.
 
+To give all five the same password while you are trying things out, add `--password "one you choose"` (at least 8 characters). The password is whatever you type; none is built into the code. One of the five is the super admin, so change it before real customers arrive.
+
 ## Search engines and AI assistants
 
 The web app's build writes the landing page's full HTML into `index.html`, with the structured data search engines read, and generates `sitemap.xml`, `robots.txt` and `llms.txt`. All of them carry the site's public address, which comes from the `SITE_URL` build argument of the `web` image (default `https://qa.vatax360.com`). Change it if the domain changes, then rebuild.
