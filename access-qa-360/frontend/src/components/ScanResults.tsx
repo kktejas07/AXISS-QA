@@ -358,7 +358,17 @@ export function QaGapsTab({ job }: { job: AuditJob }) {
 export function AccessibilityTab({ job }: { job: AuditJob }) {
   const a11y = job.tier1_result?.a11y_summary;
   if (!a11y) return <p className={empty}>Accessibility is checked on web apps. This scan did not include a web address.</p>;
-  if (a11y.violations.length === 0) return <p className={empty}>No accessibility problems were found on the pages we checked.</p>;
+  const missed = a11y.pages_not_checked ?? 0;
+  // Saying "no problems" about pages that were never checked would be wrong.
+  if (a11y.violations.length === 0) {
+    return (
+      <p className={empty}>
+        {missed > 0
+          ? `Accessibility could not be checked on ${missed} ${missed === 1 ? "page" : "pages"}, so there is no result for ${missed === 1 ? "it" : "them"}. Run the scan again.`
+          : "No accessibility problems were found on the pages we checked."}
+      </p>
+    );
+  }
   return (
     <section className={card}>
       <div className="relative overflow-x-auto">

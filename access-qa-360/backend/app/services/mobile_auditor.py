@@ -389,7 +389,7 @@ Generate pytest tests covering:
 
 Requirements:
 - Use `AppiumOptions` and `webdriver.Remote`
-- Platform: {'Android' if platform == 'android' else 'iOS'}
+- Platform: {platform_name}
 - Group in class `Test{class_name}App`
 - Use `@pytest.mark.asyncio` and `async def test_*`
 - Include `assert` with meaningful messages
@@ -435,6 +435,7 @@ async def generate_appium_tests(result: MobileAuditResult) -> str:
     class_name = re.sub(r'[^a-zA-Z0-9]', '', result.app_name or "App")
     prompt = APPIUM_PROMPT.format(
         platform=result.platform,
+        platform_name="Android" if result.platform == "android" else "iOS",
         app_name=result.app_name,
         app_id=result.app_id,
         version=result.version,

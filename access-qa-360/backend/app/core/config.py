@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     ANTHROPIC_API_KEY: str
+    # Address of a service that speaks Claude's own API, if the key is not for Anthropic itself
+    # (a reseller or a company gateway). Empty means Anthropic.
+    ANTHROPIC_BASE_URL: str = ""
     # Which AI provider organisations without their own key use. "anthropic" uses ANTHROPIC_API_KEY;
     # any other provider (see app/core/providers.py) uses DEFAULT_AI_KEY. The model is optional.
     DEFAULT_AI_PROVIDER: str = "anthropic"

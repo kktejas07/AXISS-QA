@@ -253,7 +253,10 @@ SECRET_RULES: list[tuple[str, str, re.Pattern, int]] = [
      re.compile(r"\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp)(?:\+\w+)?://(?P<user>[^\s:/\"'@]+):([^\s@\"']{4,})@"), 2),
 ]
 _GENERIC_SECRET = re.compile(
-    r"\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)\b"
+    # The word may sit inside a longer name, as in DB_PASSWORD, AWS_SECRET_ACCESS_KEY or STRIPE_API_KEY.
+    r"(?<![A-Za-z0-9])(?:[A-Za-z0-9]+[_-])*"
+    r"(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)"
+    r"(?:[_-](?:access[_-])?key|[_-]token|[_-]value)?(?![A-Za-z0-9_-])"
     r"[\"']?\s*[:=]\s*[\"']([^\"'\s]{8,})[\"']",
     re.I,
 )
@@ -513,7 +516,8 @@ def find_packages(files: list[SourceFile]) -> list[Package]:
     for f in files:
         base = os.path.basename(f.path).lower()
         try:
-            if re.fullmatch(r"requirements[\w.-]*\.txt", base):
+            in_requirements_folder = base.endswith(".txt") and os.path.basename(os.path.dirname(f.path)).lower() == "requirements"
+            if re.fullmatch(r"requirements[\w.-]*\.txt", base) or in_requirements_folder:
                 for line in f.lines:
                     m = re.match(r"\s*([A-Za-z0-9._-]+)(?:\[[^\]]*\])?\s*==\s*([\w.!+-]+)", line)
                     if m:

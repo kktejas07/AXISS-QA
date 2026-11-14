@@ -33,7 +33,10 @@ ai = ai_client("Web tests")
 # ---------------------------------------------------------------------------
 # axe-core CDN snippet (accessibility engine — injected into every page)
 # ---------------------------------------------------------------------------
-AXE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js"
+# The accessibility engine (axe-core 4.9.1, MPL 2.0) ships with the app. Loading it from a CDN inside the page
+# failed on every site whose Content-Security-Policy forbids outside scripts, and whenever the CDN was unreachable.
+with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), "vendor", "axe.min.js"), encoding="utf-8") as _f:
+    AXE_SOURCE = _f.read()
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -232,6 +235,9 @@ async def crawl_and_audit(
 
             results.append(result)
 
+        if report is not None:
+            # Which protective settings each cookie has. Never the cookie's value.
+            report["cookies"] = [{"name": c.get("name", ""), "httpOnly": c.get("httpOnly"), "secure": c.get("secure"), "sameSite": c.get("sameSite")} for c in await context.cookies()]
         await context.close()
         await browser.close()
 
@@ -406,8 +412,8 @@ async def _run_axe(page: Page) -> list[dict]:
     """Inject axe-core and run accessibility audit. Returns list of violations."""
     violations = []
     try:
-        await page.add_script_tag(url=AXE_CDN)
-        await asyncio.sleep(0.5)
+        # Run through the browser's debugging channel, which a page's Content-Security-Policy does not apply to.
+        await page.evaluate(AXE_SOURCE + "\n;void 0")
         result = await page.evaluate("""async () => {
             const r = await axe.run(document, {
                 runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'best-practice'] },
@@ -505,6 +511,7 @@ async def generate_playwright_tests(pages: list[PageAuditResult], base_url: str)
             forms_json=json.dumps(pg.forms[:3], indent=2),
             api_calls_json=json.dumps(pg.api_calls[:5], indent=2),
             links_sample=json.dumps(pg.links[:5]),
+            PageName=page_name,
         )
         try:
             msg = await ai.messages.create(
@@ -569,8 +576,12 @@ async def generate_manual_test_cases(pages: list[PageAuditResult]) -> list[dict]
 
 def summarise_a11y(pages: list[PageAuditResult]) -> dict:
     all_violations: dict[str, dict] = {}
+    not_checked = 0
     for pg in pages:
         for v in pg.a11y_violations:
+            if "error" in v and "id" not in v:
+                not_checked += 1          # the check itself failed on this page; that is not a problem with the page
+                continue
             vid = v.get("id", "unknown")
             if vid not in all_violations:
                 all_violations[vid] = {
@@ -586,6 +597,7 @@ def summarise_a11y(pages: list[PageAuditResult]) -> dict:
             all_violations[vid]["affected_pages"].append(pg.url)
 
     return {
+        "pages_not_checked": not_checked,
         "total_violations": len(all_violations),
         "critical": sum(1 for v in all_violations.values() if v["impact"] == "critical"),
         "serious": sum(1 for v in all_violations.values() if v["impact"] == "serious"),

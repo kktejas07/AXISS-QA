@@ -237,6 +237,8 @@ async def probe_rate_limiting(base_url: str, auth_path: str, client: httpx.Async
 
     statuses = [r.status_code for r in responses if isinstance(r, httpx.Response)]
     rate_limited = sum(1 for s in statuses if s in (429, 503))
+    # A guessed address that is not there (404, 405, 501) or never answered says nothing about rate limiting.
+    exists = any(s not in (404, 405, 410, 501) for s in statuses)
 
     results.append({
         "endpoint": target,
@@ -244,10 +246,10 @@ async def probe_rate_limiting(base_url: str, auth_path: str, client: httpx.Async
         "elapsed_seconds": round(elapsed, 2),
         "responses": {str(s): statuses.count(s) for s in set(statuses)},
         "rate_limited_count": rate_limited,
-        "verdict": "rate_limited" if rate_limited > 0 else "not_rate_limited",
+        "verdict": "rate_limited" if rate_limited > 0 else ("not_rate_limited" if exists else "no_such_endpoint"),
     })
 
-    if rate_limited == 0:
+    if rate_limited == 0 and exists:
         f = ApiAuditFinding()
         f.check = "rate_limiting"
         f.severity = "high"
