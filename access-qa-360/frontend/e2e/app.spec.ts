@@ -223,6 +223,64 @@ test.describe("questions and pricing", () => {
   });
 });
 
+test.describe("public site", () => {
+  test("a visitor reads about each scan, Wise, the docs and the changelog, checks status, and writes to sales", async ({ page, request }) => {
+    await page.goto("/");
+    await page.getByRole("banner").getByRole("link", { name: "Product" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "One tool, five things to point it at" })).toBeVisible();
+    await page.getByRole("link", { name: /^Websites/ }).first().click();
+    await expect(page.getByRole("heading", { level: 1, name: "Scan a website the way a careful tester would" })).toBeVisible();
+    await expect(page).toHaveTitle("Websites: Wiseflow");
+    for (const heading of ["What it looks for", "What you get back", "What you give it", "Where it stops"]) await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    await page.getByRole("link", { name: "Chatbots", exact: true }).first().click();
+    await expect(page.getByRole("heading", { level: 1, name: "Test the AI you ship" })).toBeVisible();
+
+    // Every public page is one click from the footer.
+    const footer = page.getByRole("contentinfo");
+    for (const [link, heading] of [["Wise, the assistant", "Ask Wise instead of digging"], ["Docs", "Docs"], ["Changelog", "Changelog"], ["Guides", "Guides"]] as const) {
+      await footer.getByRole("link", { name: link, exact: true }).click();
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    }
+    await footer.getByRole("link", { name: "Status" }).click();
+    await expect(page.getByRole("status")).toHaveText("Wiseflow is up.");
+    await expect(page.getByRole("listitem").filter({ hasText: "Database" })).toContainText("Working");
+    // These pages are written out at build time too.
+    for (const [path, text] of [["/product/code/", "Keys, passwords and tokens left in the code"], ["/wise/", "Does things, after you say yes"], ["/docs/", "Starting a scan from your build pipeline"], ["/changelog/", "Chatbot testing and your own AI provider"]]) {
+      expect(await (await page.request.get(path)).text(), path).toContain(text);
+    }
+
+    // The pricing calculator uses the server's price.
+    await page.goto("/pricing");
+    const calc = page.getByRole("region", { name: "What would your team pay?" });
+    await expect(calc).toContainText("$145");                 // 5 people at $29
+    await calc.getByLabel(/People on the team/).fill("10");
+    await expect(calc).toContainText("$290");
+    await expect(calc).toContainText("$3,480");
+    await page.getByRole("region", { name: "Enterprise", exact: true }).getByRole("link", { name: "Contact sales" }).click();
+
+    await expect(page.getByRole("heading", { level: 1, name: "Talk to us" })).toBeVisible();
+    const who = `Priya Nair ${Date.now()}`;
+    await page.getByLabel("Your name").fill(who);
+    await page.getByLabel("Work email").fill("priya@northwind.example");
+    await page.getByLabel("Company (optional)").fill("Northwind");
+    await page.getByLabel("What you are asking for").selectOption({ label: "A price for my team" });
+    await page.getByLabel("Message").fill("We are 14 people. What would a Team plan cost?");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByRole("status")).toContainText("Your message is with us");
+    await expect(page.getByRole("status")).toContainText("priya@northwind.example");
+
+    // The super admin reads it and marks it replied.
+    await signedInAsAdmin(page, request);
+    await page.goto("/admin/contacts");
+    const row = page.getByRole("listitem").filter({ hasText: who });
+    await expect(row).toContainText("A price for my team");
+    await expect(row).toContainText("We are 14 people. What would a Team plan cost?");
+    await expect(row.getByText("Waiting", { exact: true })).toBeVisible();
+    await row.getByRole("button", { name: /Mark as replied/ }).click();
+    await expect(row.getByText("Replied", { exact: true })).toBeVisible();
+  });
+});
+
 test.describe("signed out", () => {
   test("pricing shows the free plan's two scans, and sign-in offers no Microsoft button", async ({ page }) => {
     await page.goto("/pricing");
@@ -530,7 +588,7 @@ test.describe("on a phone", () => {
   }
 
   test("the guides fit the screen without scrolling sideways", async ({ page }) => {
-    for (const path of ["/guides", "/guides/owasp-top-10-in-plain-words"]) {
+    for (const path of ["/guides", "/guides/owasp-top-10-in-plain-words", "/product", "/product/web", "/wise", "/docs", "/changelog", "/contact", "/status", "/pricing"]) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       expect(await scrollsSideways(page), path).toBe(false);

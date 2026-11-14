@@ -1,34 +1,12 @@
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, Clock } from "lucide-react";
-import { Logo } from "../components/Logo";
+import { PublicPage, wrap } from "../components/PublicSite";
 import { guide, guides } from "../content/guides";
 
-const wrap = "mx-auto w-full max-w-6xl px-5 md:px-8";
 const when = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-white font-sans text-ink">
-      <header className={`${wrap} flex flex-wrap items-center justify-between gap-3 py-5`}>
-        <Link to="/" aria-label="Wiseflow, home"><Logo /></Link>
-        <nav aria-label="Main" className="flex flex-wrap items-center gap-x-6 gap-y-2 font-semibold">
-          <Link to="/guides">Guides</Link>
-          <Link to="/pricing">Pricing</Link>
-          <Link to="/login">Sign in</Link>
-          <Link to="/register" className="inline-flex h-11 items-center rounded-[10px] bg-ink px-4 font-bold text-white">Start free</Link>
-        </nav>
-      </header>
-      <main className={`${wrap} pb-20 pt-6`}>{children}</main>
-      <footer className={`${wrap} flex flex-wrap items-center justify-between gap-4 border-t border-line py-8 text-[15px] text-body`}>
-        <span>© {new Date().getFullYear()} Wiseflow</span>
-        <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-          <Link to="/" className="font-semibold text-ink">Home</Link>
-          <Link to="/guides" className="font-semibold text-ink">Guides</Link>
-          <Link to="/pricing" className="font-semibold text-ink">Pricing</Link>
-        </nav>
-      </footer>
-    </div>
-  );
+  return <PublicPage><div className={`${wrap} pb-20 pt-6`}>{children}</div></PublicPage>;
 }
 
 /** The list of public guides. */
